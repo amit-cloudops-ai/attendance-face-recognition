@@ -1,0 +1,14 @@
+# Replace the PART_*_GITHUB_USERNAME placeholders with real GitHub usernames on Day 1.
+*                                                @amit-cloudops-ai
+/docs/                                           @amit-cloudops-ai
+/infra/bootstrap/                                @amit-cloudops-ai
+/infra/foundation/                               @amit-cloudops-ai
+/infra/envs/                                     @amit-cloudops-ai
+/.github/                                        @amit-cloudops-ai
+/shared/python/attendance_common/record_scan.py  @PART_B_GITHUB_USERNAME
+/services/recognition/                           @PART_A_GITHUB_USERNAME
+/infra/modules/recognition/                      @PART_A_GITHUB_USERNAME
+/services/data/                                  @PART_B_GITHUB_USERNAME
+/infra/modules/data/                             @PART_B_GITHUB_USERNAME
+/web/                                            @PART_C_GITHUB_USERNAME
+/infra/modules/access/                           @PART_C_GITHUB_USERNAME
