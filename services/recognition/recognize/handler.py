@@ -1,13 +1,13 @@
-"""S3-triggered face recognition worker with idempotent results and image deletion."""
+"""S3-triggered face recognition worker with retry-safe result handling."""
 import logging
 import os
+from datetime import datetime
 from urllib.parse import unquote_plus
 from uuid import UUID
 
 import boto3
 from attendance_common.config import get_settings
 from attendance_common.record_scan import record_scan
-from attendance_common.tz import now_ist
 from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
@@ -78,6 +78,15 @@ def _message_for_scan(employee_name: str, scan: dict) -> str:
     return f"Already clocked in at {scan['clock_in'][11:16]}."
 
 
+def _finish(s3, bucket: str, key: str, results, request_id: str, code: str,
+            message: str, **fields) -> None:
+    # The terminal result is durable before the biometric image is removed.
+    # If either operation fails, Lambda retries; a terminal retry only repeats
+    # the idempotent DeleteObject operation.
+    _update_result(results, request_id, code, message, **fields)
+    s3.delete_object(Bucket=bucket, Key=key)
+
+
 def _process_record(record: dict) -> None:
     s3_info = record.get("s3") or {}
     bucket = (s3_info.get("bucket") or {}).get("name")
@@ -90,92 +99,100 @@ def _process_record(record: dict) -> None:
         return
 
     s3 = boto3.client("s3", region_name=REGION)
-    results = None
-    try:
-        results = _table("TABLE_SCAN_RESULTS")
-        pending = results.get_item(
-            Key={"request_id": request_id}, ConsistentRead=True
-        ).get("Item")
-        if not pending or pending.get("code") != "pending":
-            return
-        try:
-            s3.head_object(Bucket=bucket, Key=key)
-        except ClientError as exc:
-            if _not_found(exc):
-                return
-            raise
-
-        settings = get_settings()
-        rekognition = boto3.client("rekognition", region_name=REGION)
-        image = {"S3Object": {"Bucket": bucket, "Name": key}}
-        detection = rekognition.detect_faces(Image=image, Attributes=["DEFAULT"])
-        faces = detection.get("FaceDetails", [])
-        if len(faces) == 0:
-            _update_result(results, request_id, "no_face", "No face was detected.")
-            return
-        if len(faces) != 1:
-            _update_result(results, request_id, "multiple_faces", "Only one person should be in the frame.")
-            return
-        quality = faces[0].get("Quality") or {}
-        if (float(quality.get("Brightness", 0)) < float(settings["min_brightness"])
-                or float(quality.get("Sharpness", 0)) < float(settings["min_sharpness"])):
-            _update_result(results, request_id, "low_quality", "Image quality is too low. Please improve lighting and focus.")
-            return
-
-        matches = rekognition.search_faces_by_image(
-            CollectionId=_required_env("COLLECTION_ID"),
-            Image=image,
-            FaceMatchThreshold=float(settings["face_match_threshold"]),
-            MaxFaces=1,
-            QualityFilter="AUTO",
-        ).get("FaceMatches", [])
-        if not matches:
-            _update_result(results, request_id, "no_match", "Face not recognised. Please try again.")
-            return
-        face = (matches[0].get("Face") or {})
-        employee_id = face.get("ExternalImageId")
-        if not employee_id:
-            _update_result(results, request_id, "no_match", "Face not recognised. Please try again.")
-            return
-
-        employees = _table("TABLE_EMPLOYEES")
-        employee = employees.get_item(
-            Key={"employee_id": employee_id}, ConsistentRead=True
-        ).get("Item")
-        if not employee:
-            _update_result(results, request_id, "no_match", "Face not recognised. Please try again.")
-            return
-        if not employee.get("active", False):
-            _update_result(results, request_id, "inactive", "This employee account is inactive.")
-            return
-
-        similarity = float(matches[0].get("Similarity", 0))
-        scan = record_scan(employee_id, now_ist(), similarity)
-        action_time = scan.get("clock_out") if scan["action"] == "clock_out" else scan["clock_in"]
-        _update_result(
-            results, request_id, "matched", _message_for_scan(employee.get("name", "employee"), scan),
-            employee_id=employee_id,
-            name=employee.get("name", ""),
-            time=action_time,
-            status=scan["status"],
-            action=scan["action"],
-        )
-    except Exception as exc:
-        if results is not None:
-            try:
-                _update_result(results, request_id, "error", "Recognition failed. Please try again.")
-            except Exception:
-                LOGGER.exception("Unable to mark scan result as failed")
-        LOGGER.error("Recognition processing failed (%s)", type(exc).__name__)
-        raise
-    finally:
-        # DeleteObject is idempotent; a retry after an earlier deletion is harmless.
+    results = _table("TABLE_SCAN_RESULTS")
+    pending = results.get_item(
+        Key={"request_id": request_id}, ConsistentRead=True
+    ).get("Item")
+    if not pending or pending.get("code") != "pending":
+        # A duplicate S3 notification after a terminal result is cleanup-only.
         s3.delete_object(Bucket=bucket, Key=key)
+        return
+
+    try:
+        s3.head_object(Bucket=bucket, Key=key)
+    except ClientError as exc:
+        if _not_found(exc):
+            _finish(s3, bucket, key, results, request_id, "error",
+                    "The uploaded image is no longer available.")
+            return
+        raise
+
+    settings = get_settings()
+    rekognition = boto3.client("rekognition", region_name=REGION)
+    image = {"S3Object": {"Bucket": bucket, "Name": key}}
+    detection = rekognition.detect_faces(Image=image, Attributes=["DEFAULT"])
+    faces = detection.get("FaceDetails", [])
+    if len(faces) == 0:
+        _finish(s3, bucket, key, results, request_id, "no_face", "No face was detected.")
+        return
+    if len(faces) != 1:
+        _finish(s3, bucket, key, results, request_id, "multiple_faces",
+                "Only one person should be in the frame.")
+        return
+    quality = faces[0].get("Quality") or {}
+    if (float(quality.get("Brightness", 0)) < float(settings["min_brightness"])
+            or float(quality.get("Sharpness", 0)) < float(settings["min_sharpness"])):
+        _finish(s3, bucket, key, results, request_id, "low_quality",
+                "Image quality is too low. Please improve lighting and focus.")
+        return
+
+    matches = rekognition.search_faces_by_image(
+        CollectionId=_required_env("COLLECTION_ID"),
+        Image=image,
+        FaceMatchThreshold=float(settings["face_match_threshold"]),
+        MaxFaces=1,
+        QualityFilter="AUTO",
+    ).get("FaceMatches", [])
+    if not matches:
+        _finish(s3, bucket, key, results, request_id, "no_match",
+                "Face not recognised. Please try again.")
+        return
+    face = matches[0].get("Face") or {}
+    employee_id = face.get("ExternalImageId")
+    if not employee_id:
+        _finish(s3, bucket, key, results, request_id, "no_match",
+                "Face not recognised. Please try again.")
+        return
+
+    employees = _table("TABLE_EMPLOYEES")
+    employee = employees.get_item(
+        Key={"employee_id": employee_id}, ConsistentRead=True
+    ).get("Item")
+    if not employee:
+        _finish(s3, bucket, key, results, request_id, "no_match",
+                "Face not recognised. Please try again.")
+        return
+    if not employee.get("active", False):
+        _finish(s3, bucket, key, results, request_id, "inactive",
+                "This employee account is inactive.")
+        return
+
+    # created_at is written before the presigned URL is returned. Using it
+    # makes delayed S3 notifications and retries retain the original scan time.
+    captured_at = datetime.fromisoformat(pending["created_at"])
+    scan = record_scan(employee_id, captured_at, float(matches[0].get("Similarity", 0)),
+                       request_id=request_id)
+    action_time = scan.get("clock_out") if scan["action"] == "clock_out" else scan["clock_in"]
+    _finish(
+        s3, bucket, key, results, request_id, "matched",
+        _message_for_scan(employee.get("name", "employee"), scan),
+        employee_id=employee_id,
+        name=employee.get("name", ""),
+        time=action_time,
+        status=scan["status"],
+        action=scan["action"],
+    )
 
 
 def lambda_handler(event, context):
     if event == {"warmup": True}:
         return {"statusCode": 200, "body": "warm"}
     for record in (event or {}).get("Records", []):
-        _process_record(record)
+        try:
+            _process_record(record)
+        except Exception as exc:
+            # Do not write a terminal error or delete the source image here.
+            # Lambda's async retry policy must be allowed to retry this event.
+            LOGGER.error("Recognition processing failed (%s)", type(exc).__name__)
+            raise
     return {"statusCode": 200, "body": "processed"}
