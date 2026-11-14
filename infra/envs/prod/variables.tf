@@ -53,3 +53,13 @@ variable "allowed_origins" {
     error_message = "At least one browser origin is required."
   }
 }
+
+variable "execution_role_boundary_arn" {
+  description = "Pre-created us-east-1 customer-managed IAM permissions boundary ARN for prod execution roles."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:iam::\\d{12}:policy/attendance-prod-execution-boundary$", var.execution_role_boundary_arn))
+    error_message = "execution_role_boundary_arn must be the pre-created attendance-prod-execution-boundary policy in this AWS account."
+  }
+}
