@@ -279,3 +279,33 @@ def test_employee_lease_blocks_concurrent_duplicate_invocation(aws_env):
     with pytest.raises(RuntimeError, match="another enrollment"):
         enroll._acquire_employee_lock(employees, "EMP001", request_id)
     enroll._release_employee_lock(employees, "EMP001", request_id)
+
+
+
+def test_enrollment_retry_recovers_face_indexed_for_same_request(aws_env, monkeypatch):
+    scans, employees, _ = aws_env
+    request_id = str(uuid.uuid4())
+    seed_pending(scans, request_id)
+    employees.put_item(Item={"employee_id": "EMP001", "name": "Priya", "active": True,
+        "photo_count": 0, "face_ids": []})
+    recovered_id = "face-recovered"
+    fake_rekognition = FakeRekognition(matches=[{
+        "Similarity": 99,
+        "Face": {
+            "ExternalImageId": "EMP001#" + request_id,
+            "FaceId": recovered_id,
+        },
+    }])
+    fake_s3 = FakeS3()
+    setup_worker(monkeypatch, scans, employees, fake_rekognition, fake_s3)
+
+    enroll.lambda_handler(s3_event("EMP001", request_id), None)
+
+    employee = employees.get_item(Key={"employee_id": "EMP001"})["Item"]
+    result = scans.get_item(Key={"request_id": request_id})["Item"]
+    assert employee["photo_count"] == 1
+    assert employee["face_ids"] == [recovered_id]
+    assert employee["enrollment_" + request_id] == recovered_id
+    assert result["code"] == "enrolled"
+    assert fake_rekognition.index_calls == 0
+    assert fake_s3.deleted == [f"enroll/EMP001/{request_id}.jpg"]
