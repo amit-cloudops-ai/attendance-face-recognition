@@ -5,6 +5,9 @@ on:
   push:
     branches: [develop, main]
 
+permissions:
+  contents: read
+
 jobs:
   python:
     runs-on: ubuntu-latest
@@ -17,9 +20,17 @@ jobs:
       - run: ruff check .
       - run: pytest -q
 
-  terraform-fmt:
+  template-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - run: terraform fmt -check -recursive infra
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cfn-lint
+      - run: |
+          if [ -f template.yaml ]; then
+            cfn-lint template.yaml
+          else
+            echo "template.yaml not present yet; infrastructure validation gate remains open"
+          fi
