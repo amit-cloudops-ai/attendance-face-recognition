@@ -133,9 +133,9 @@ report "Project Lambda log groups" aws logs describe-log-groups --log-group-name
 report "Project CloudWatch alarms" aws cloudwatch describe-alarms --region "$REGION" \
   --query "MetricAlarms[?starts_with(AlarmName, 'attendance-')]" --output json
 report "Project IAM runtime roles" aws iam list-roles \
-  --query "Roles[?starts_with(RoleName, 'attendance-dev-') || starts_with(RoleName, 'attendance-prod-')]" --output json
+  --query "Roles[?starts_with(RoleName, 'attendance-')]" --output json
 report "Project IAM managed policies" aws iam list-policies --scope Local \
-  --query "Policies[?starts_with(PolicyName, 'attendance-dev-') || starts_with(PolicyName, 'attendance-prod-')]" --output json
+  --query "Policies[?contains(PolicyName, 'attendance')]" --output json
 report "Project AWS Budgets" aws budgets describe-budgets --account-id "$ACCOUNT_ID" \
   --query "Budgets[?starts_with(BudgetName, 'attendance-')]" --output json
 report "Project CloudFront distributions" aws cloudfront list-distributions \
