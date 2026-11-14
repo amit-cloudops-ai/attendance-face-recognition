@@ -57,7 +57,7 @@ The previous recommendation to bypass OIDC and apply locally as the broad `Amit-
 13. **Raw-image deletion has a fallback gap.** Normal workers and the failure processor attempt deletion, while S3 lifecycle expiry is one day. If the failure processor itself dead-letters, the 10-minute raw-image deletion objective is not guaranteed. Define an orphan-cleanup/recovery policy and test the failure path.
 14. **Supply-chain controls are incomplete.** CI installs unpinned Python test dependencies; Terraform CI uses the setup action's default version while deployment pins Terraform 1.10.5; GitHub Actions are tag-pinned rather than SHA-pinned. T28 remains open.
 
-16. **JWT revocation is delayed.** Cognito access tokens are valid for 60 minutes and API Gateway validates them statelessly. Disabling a kiosk/admin user prevents future authentication/refresh but an already-issued JWT can remain usable until expiry. Document the incident response and decide whether shorter access-token validity or a server-side revocation mechanism is required before production.
+15. **JWT revocation is delayed.** Cognito access tokens are valid for 60 minutes and API Gateway validates them statelessly. Disabling a kiosk/admin user prevents future authentication/refresh but an already-issued JWT can remain usable until expiry. Document the incident response and decide whether shorter access-token validity or a server-side revocation mechanism is required before production.
 
 ### P3 — product/operational decisions
 
