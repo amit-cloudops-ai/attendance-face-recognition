@@ -571,7 +571,7 @@ data "aws_iam_policy_document" "attendance_kms_key" {
       identifiers = ["cloudwatch.amazonaws.com"]
     }
 
-    actions   = ["kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"]
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
     resources = ["*"]
 
     condition {
