@@ -1,4 +1,27 @@
-# E2E smoke test
+# Project operations scripts
+
+## Canonical region and safe Terraform wrapper
+
+`config/deployment.json` is the single region source. Run local Terraform commands through `bash scripts/terraform.sh`; the wrapper loads the canonical region, rejects conflicting `AWS_REGION`/`AWS_DEFAULT_REGION` values and exports the same value to Terraform's S3 backend. CI validates the region manifest and all regional ARN/endpoint references with `scripts/check_region_consistency.py`.
+
+Example (only after the owner approves remote backend initialization):
+
+```bash
+bash scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-config=backend.hcl
+```
+
+## Read-only AWS bootstrap inventory
+
+`scripts/aws_preflight_readonly.sh` verifies the authenticated STS identity and inspects the GitHub OIDC provider, runtime boundaries, six deployment roles and (when `TF_STATE_BUCKET` is supplied) state-bucket controls. It contains no create/update/delete/attach operations. Access-denied results are reported as unknown, not as proof that a resource is absent. The script has not been run against the owner's AWS account in this session.
+
+Run it only with an intentionally selected AWS profile and read-only permissions:
+
+```bash
+AWS_PROFILE=<approved-profile> bash scripts/aws_preflight_readonly.sh
+TF_STATE_BUCKET=<candidate-bucket> AWS_PROFILE=<approved-profile> bash scripts/aws_preflight_readonly.sh
+```
+
+## E2E smoke test
 
 `e2e_smoke.sh` exercises a deployed dev stack without creating infrastructure. It creates one test employee, enrolls three JPEG photos, performs at least 20 kiosk upload/recognition cycles, verifies duplicate-scan debounce and queries the resulting attendance record. Its cleanup trap deactivates the test employee and deletes indexed face templates; the attendance/audit history remains.
 
