@@ -295,6 +295,31 @@ jobs:
                       raise SystemExit(f"{module} Lambda logging configuration missing: {item}")
           PY
 
+      - name: Validate local Terraform account and frontend config guards
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          wrapper = Path("scripts/terraform.sh").read_text(encoding="utf-8")
+          for path in ("infra/envs/dev/versions.tf", "infra/envs/prod/versions.tf"):
+              source = Path(path).read_text(encoding="utf-8")
+              if "allowed_account_ids = [var.account_id]" not in source:
+                  raise SystemExit(f"{path} does not restrict provider account identity")
+          if 'path != "config.json"' not in access:
+              raise SystemExit("Generated web/config.json is not excluded from the generic frontend fileset")
+          if "aws sts get-caller-identity" not in wrapper or "EXPECTED_AWS_ACCOUNT_ID" not in wrapper:
+              raise SystemExit("Local Terraform wrapper is missing its STS account guard")
+          dev_vars = Path("infra/envs/dev/terraform.tfvars.example").read_text(encoding="utf-8")
+          prod_vars = Path("infra/envs/prod/terraform.tfvars.example").read_text(encoding="utf-8")
+          if "http://localhost:8000/callback.html" not in dev_vars:
+              raise SystemExit("Dev callback example does not match web/callback.html")
+          if "attendance-dev-execution-boundary" not in dev_vars:
+              raise SystemExit("Dev tfvars example is missing the required execution boundary ARN")
+          if "attendance-prod-execution-boundary" not in prod_vars:
+              raise SystemExit("Prod tfvars example is missing the required execution boundary ARN")
+          PY
+
       - name: Validate encrypted SNS notification KMS permissions
         run: |
           python - <<'PY'
@@ -856,6 +881,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
       - uses: actions/checkout@v4
       - run: terraform fmt -check -diff -recursive infra
       - name: Verify committed environment and billing provider lockfiles
