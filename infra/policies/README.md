@@ -45,7 +45,7 @@ The current repository does not create or attach these managed policies. Bootstr
 ## Evidence and limitations
 
 - Runtime action/resource union is based on the data and recognition handler audits in `docs/IAM-LEAST-PRIVILEGE-INVENTORY.md`.
-- AWS KMS conditions `kms:ResourceAliases` and `kms:ViaService` are documented for IAM policies; S3 and SQS are supported `kms:ViaService` integrations.
+- AWS KMS conditions `kms:ResourceAliases` and `kms:ViaService` are documented for IAM policies; S3, SQS and SNS are included as the runtime forward-access integrations used by this project.
 - Static JSON/template validation does not prove live AWS authorization. Validate the rendered policy with IAM Access Analyzer and an approved non-production deployment before relying on it.
 
 
