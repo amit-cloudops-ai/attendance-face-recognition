@@ -1,0 +1,44 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BillingStateBucketLocation",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:GetBucketVersioning"
+      ],
+      "Resource": "arn:aws:s3:::${state_bucket}"
+    },
+    {
+      "Sid": "BillingStateBucketList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::${state_bucket}",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "attendance/billing/terraform.tfstate",
+            "attendance/billing/terraform.tfstate.tflock"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "BillingStateObjectRead",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::${state_bucket}/attendance/billing/terraform.tfstate"
+    },
+    {
+      "Sid": "BillingLockfileLifecycle",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::${state_bucket}/attendance/billing/terraform.tfstate.tflock"
+    }
+  ]
+}
