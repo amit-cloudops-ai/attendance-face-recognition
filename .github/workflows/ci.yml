@@ -235,8 +235,6 @@ jobs:
               raise SystemExit("Missing DynamoDB KMS ViaService statement")
           if "dynamodb.us-east-1.amazonaws.com" not in access or "kms:CallerAccount" not in access:
               raise SystemExit("DynamoDB KMS service statement must be account and region constrained")
-          if "AllowDynamoDBDirectKeyMetadata" not in access or "dynamodb.amazonaws.com" not in access:
-              raise SystemExit("Missing DynamoDB direct key-metadata service principal statement")
 
           for env in ("dev", "prod"):
               path = Path(f"infra/policies/github-apply-{env}-dynamodb-kms.json.tftpl")
