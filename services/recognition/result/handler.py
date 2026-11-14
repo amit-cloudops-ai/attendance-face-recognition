@@ -4,7 +4,6 @@ import os
 import re
 
 import boto3
-
 from attendance_common.auth import require_group
 from attendance_common.responses import error, ok
 
