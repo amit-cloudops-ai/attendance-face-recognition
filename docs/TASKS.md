@@ -73,6 +73,6 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T16 GitHub environment setup: PR #24; documentation is ready, but actual GitHub environment settings cannot be inspected or configured by the current connector. Repository-admin action is required.
 - T17 template linting: PR #25; CI run 43619026006 passed. No CloudFormation/SAM templates exist; Terraform and JSON policy templates are validated in CI.
 - T18 manual bootstrap plan: PR #26; plan is documented and CI run 43619095037 passed. Exact account ID, globally unique bucket suffix and owner approval remain required.
-- T37 is active: separate billing plan/apply policy and OIDC trust templates are drafted; workflow and CI integration are being validated.
+- T37 is active: billing plan/apply policies and OIDC trust templates are drafted; deploy workflow supports infra/billing on main with operation-specific GitHub environments; CI validation is pending.
 - All task PRs remain unmerged pending owner review. Do not merge teammate PRs or promote to main/develop without explicit direction.
 - No AWS resources, OIDC provider, IAM roles, boundaries, state bucket or KMS keys have been created. No remote backend init, Terraform plan or apply has been run.
