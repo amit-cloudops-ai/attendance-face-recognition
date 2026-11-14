@@ -67,7 +67,8 @@
 
 ### T06 — foundation Terraform provider IAM mapping
 
-- **Status:** static mapping drafted; CI validation pending.
+- **Status:** complete on `ai/T06-foundation-provider-iam`.
+- CI run [43613487881](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43613487881), commit `2a05c4d8248f7164d21f0aa6e1c851dad3b8e94d`: Python and Terraform jobs passed, including the policy-template validator, formatting, all module validations and both environment-root validations.
 - CI resolved AWS provider v6.73.0 and archive provider v2.8.1 in run [43613054015](https://github.com/amit-cloudops-ai/attendance-face-recognition). The root constraint still allows AWS provider >=5,<7 and no lockfile is committed; T33 tracks pinning and reproducibility.
 - Mapped KMS key/alias, all S3 bucket and split configuration resources, SNS topic/subscription, Lambda layer and AWS Budget API operations against provider v6.73.0 source and AWS Service Authorization References. Full matrix: `docs/security/FOUNDATION-PROVIDER-IAM.md`.
 - S3 provider v6.73.0 `aws_s3_bucket` read path requires more bucket-level read actions than the explicitly configured split resources alone suggest; HeadBucket maps to `s3:ListBucket`. S3 Control tagging operations are used for tagged buckets.
