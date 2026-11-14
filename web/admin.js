@@ -6,6 +6,7 @@ const employeesBody = document.querySelector("#employees-body");
 const attendanceBody = document.querySelector("#attendance-body");
 const reportOutput = document.querySelector("#report-output");
 const csvDownload = document.querySelector("#csv-download");
+const overrideDialog = document.querySelector("#override-dialog");
 let nextCursor = null;
 
 function status(text, isError = false) {
@@ -29,8 +30,11 @@ async function loadEmployees() {
     cell(row, employee.name);
     cell(row, employee.department);
     cell(row, `${employee.shift_start}–${employee.shift_end}`);
-    const active = cell(row, employee.active ? "Active" : "Inactive");
-    active.firstChild?.classList?.add("pill");
+    const active = cell(row, "");
+    const activePill = document.createElement("span");
+    activePill.className = "pill";
+    activePill.textContent = employee.active ? "Active" : "Inactive";
+    active.append(activePill);
     cell(row, `${employee.photo_count || 0}/5`);
     const actions = document.createElement("td");
     const group = document.createElement("div");
@@ -160,12 +164,19 @@ async function loadAttendance(cursor = null) {
     cell(row, item.clock_out ? new Date(item.clock_out).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "—");
     cell(row, item.status);
     cell(row, (item.flags || []).join(", "));
+    const actions = document.createElement("td");
+    const override = document.createElement("button");
+    override.className = "secondary";
+    override.textContent = "Override";
+    override.addEventListener("click", () => openOverride(item));
+    actions.append(override);
+    row.append(actions);
     attendanceBody.append(row);
   }
   if (!attendanceBody.children.length) {
     const row = document.createElement("tr");
     const td = cell(row, "No matching attendance records.");
-    td.colSpan = 7;
+    td.colSpan = 8;
     attendanceBody.append(row);
   }
   nextCursor = data.next_cursor;
@@ -213,12 +224,95 @@ document.querySelector("#report-form").addEventListener("submit", async event =>
     csvDownload.classList.add("hidden");
   }
 });
+async function loadSettings() {
+  const data = await api("/admin/settings");
+  document.querySelector("#setting-threshold").value = data.face_match_threshold;
+  document.querySelector("#setting-brightness").value = data.min_brightness;
+  document.querySelector("#setting-sharpness").value = data.min_sharpness;
+  document.querySelector("#setting-grace").value = data.grace_minutes;
+  document.querySelector("#setting-debounce").value = data.debounce_minutes;
+  document.querySelector("#setting-max-photos").value = data.max_photos_per_employee;
+  document.querySelector("#setting-weekends").value = (data.weekend_days || []).join(",");
+}
+
+function openOverride(item) {
+  document.querySelector("#override-employee").value = item.employee_id;
+  document.querySelector("#override-date").value = item.date;
+  document.querySelector("#override-status").value = item.status;
+  document.querySelector("#override-clock-in").value = item.clock_in ? item.clock_in.slice(11, 16) : "";
+  document.querySelector("#override-clock-out").value = item.clock_out ? item.clock_out.slice(11, 16) : "";
+  document.querySelector("#override-reason").value = "";
+  updateOverrideTimeFields();
+  overrideDialog.showModal();
+}
+
+function updateOverrideTimeFields() {
+  const absent = document.querySelector("#override-status").value === "absent";
+  document.querySelector("#override-clock-in").disabled = absent;
+  document.querySelector("#override-clock-out").disabled = absent;
+}
+
+document.querySelector("#override-status").addEventListener("change", updateOverrideTimeFields);
+document.querySelector("#cancel-override").addEventListener("click", () => overrideDialog.close());
+document.querySelector("#override-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const employeeId = document.querySelector("#override-employee").value;
+  const day = document.querySelector("#override-date").value;
+  const statusValue = document.querySelector("#override-status").value;
+  const body = {
+    employee_id: employeeId,
+    date: day,
+    status: statusValue,
+    reason: document.querySelector("#override-reason").value.trim()
+  };
+  if (statusValue !== "absent") {
+    const clockIn = document.querySelector("#override-clock-in").value;
+    const clockOut = document.querySelector("#override-clock-out").value;
+    if (!clockIn) {
+      status("A present or late override requires a clock-in time.", true);
+      return;
+    }
+    body.clock_in = `${day}T${clockIn}:00+05:30`;
+    if (clockOut) body.clock_out = `${day}T${clockOut}:00+05:30`;
+  }
+  try {
+    await api("/admin/attendance/override", { method: "POST", body: JSON.stringify(body) });
+    overrideDialog.close();
+    status(`Attendance override saved for ${employeeId} on ${day}.`);
+    await loadAttendance();
+  } catch (error) {
+    status(error.message || "Attendance override failed.", true);
+  }
+});
+
+document.querySelector("#settings-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const numbers = [
+    ["face_match_threshold", "#setting-threshold"],
+    ["min_brightness", "#setting-brightness"],
+    ["min_sharpness", "#setting-sharpness"],
+    ["grace_minutes", "#setting-grace"],
+    ["debounce_minutes", "#setting-debounce"],
+    ["max_photos_per_employee", "#setting-max-photos"]
+  ];
+  const body = Object.fromEntries(numbers.map(([key, selector]) => [key, Number(document.querySelector(selector).value)]));
+  body.weekend_days = document.querySelector("#setting-weekends").value.split(",").map(value => value.trim()).filter(Boolean).map(Number);
+  try {
+    await api("/admin/settings", { method: "PUT", body: JSON.stringify(body) });
+    await loadSettings();
+    status("Attendance settings saved and audit-logged.");
+  } catch (error) {
+    status(error.message || "Settings could not be saved.", true);
+  }
+});
+
+document.querySelector("#reload-settings").addEventListener("click", () => loadSettings().catch(error => status(error.message, true)));
 document.querySelector("#sign-out").addEventListener("click", logout);
 
 try {
   if (accessToken()) {
     if (!hasGroup("admin")) throw new Error("An administrator account is required.");
-    await loadEmployees();
+    await Promise.all([loadEmployees(), loadSettings()]);
     status("Administration ready.");
   } else {
     status("Sign in with your administrator account to continue.");
