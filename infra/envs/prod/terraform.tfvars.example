@@ -1,5 +1,6 @@
 env         = "prod"
 account_id  = "123456789012"
+execution_role_boundary_arn = "arn:aws:iam::123456789012:policy/attendance-prod-execution-boundary"
 alert_email = "replace-with-your-alert-email@example.com"
 
 # Initial values for the first deployment only. After CloudFront exists,
