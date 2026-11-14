@@ -170,8 +170,25 @@ employee_body="$(jq -n \
   --arg start "$SHIFT_START" \
   --arg end "$SHIFT_END" \
   '{employee_id:$id,name:$name,email:$email,department:$department,shift_start:$start,shift_end:$end,consent:true}')"
-api_post "$ADMIN_TOKEN" "/admin/employees" "$employee_body" > "$TMP_DIR/employee.json"
+existing_status="$(curl -sS -o "$TMP_DIR/existing-employee.json" -w '%{http_code}' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" "$API_BASE/admin/employees/$EMPLOYEE_ID")"
+case "$existing_status" in
+  404) ;;
+  200)
+    echo "Refusing to reuse existing employee ID $EMPLOYEE_ID; choose a unique test ID." >&2
+    exit 2
+    ;;
+  *)
+    echo "Could not safely verify that employee ID $EMPLOYEE_ID is unused (HTTP $existing_status)." >&2
+    cat "$TMP_DIR/existing-employee.json" >&2
+    exit 2
+    ;;
+esac
+
+# Set cleanup before the create request so a lost HTTP response cannot leave
+# a successfully-created test employee behind.
 CREATED=1
+api_post "$ADMIN_TOKEN" "/admin/employees" "$employee_body" > "$TMP_DIR/employee.json"
 
 for photo in "$ENROLL_PHOTO_1" "$ENROLL_PHOTO_2" "$ENROLL_PHOTO_3"; do
   request_id="$(upload_presigned "$ADMIN_TOKEN" "/admin/employees/$EMPLOYEE_ID/enroll-url" "$photo")"
