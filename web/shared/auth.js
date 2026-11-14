@@ -5,6 +5,7 @@ const ID = "attendance.idToken";
 const REFRESH = "attendance.refreshToken";
 const STATE = "attendance.oauthState";
 const VERIFIER = "attendance.pkceVerifier";
+const NONCE = "attendance.oauthNonce";
 
 function randomString(bytes = 32) {
   const data = crypto.getRandomValues(new Uint8Array(bytes));
@@ -20,7 +21,9 @@ async function challenge(verifier) {
 function decodeJwt(token) {
   try {
     const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(decodeURIComponent(escape(atob(part))));
+    const padded = part + "=".repeat((4 - part.length % 4) % 4);
+    const bytes = Uint8Array.from(atob(padded), character => character.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     return {};
   }
@@ -52,8 +55,10 @@ export function clearSession() {
 export async function login() {
   const config = await getConfig();
   const state = randomString();
+  const nonce = randomString();
   const verifier = randomString(48);
   sessionStorage.setItem(STATE, state);
+  sessionStorage.setItem(NONCE, nonce);
   sessionStorage.setItem(VERIFIER, verifier);
   const url = new URL("/oauth2/authorize", config.cognitoDomain);
   url.search = new URLSearchParams({
@@ -62,6 +67,7 @@ export async function login() {
     scope: "openid email profile",
     redirect_uri: `${location.origin}/callback.html`,
     state,
+    nonce,
     code_challenge: await challenge(verifier),
     code_challenge_method: "S256"
   });
@@ -75,6 +81,7 @@ export async function completeLogin() {
   const returnedState = params.get("state");
   const expectedState = sessionStorage.getItem(STATE);
   const verifier = sessionStorage.getItem(VERIFIER);
+  const expectedNonce = sessionStorage.getItem(NONCE);
   if (params.has("error")) throw new Error(params.get("error_description") || "Sign-in was not completed.");
   if (!code || !returnedState || returnedState !== expectedState || !verifier) {
     throw new Error("The sign-in response could not be verified. Please sign in again.");
@@ -94,11 +101,15 @@ export async function completeLogin() {
   if (!response.ok || !payload.access_token || !payload.id_token) {
     throw new Error("Sign-in failed. Please try again.");
   }
+  if (decodeJwt(payload.id_token).nonce !== expectedNonce) {
+    throw new Error("The sign-in response could not be verified. Please sign in again.");
+  }
   sessionStorage.setItem(ACCESS, payload.access_token);
   sessionStorage.setItem(ID, payload.id_token);
   if (payload.refresh_token) sessionStorage.setItem(REFRESH, payload.refresh_token);
   sessionStorage.removeItem(STATE);
   sessionStorage.removeItem(VERIFIER);
+  sessionStorage.removeItem(NONCE);
   return userClaims();
 }
 
