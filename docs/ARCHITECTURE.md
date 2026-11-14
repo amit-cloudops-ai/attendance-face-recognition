@@ -135,7 +135,7 @@ See [COST.md](COST.md). About 10 to 14 USD per month at 100 employees x 2 scans/
 | Tune accuracy | Admin app Settings (or config table item `SETTINGS`): `face_match_threshold` |
 | Re-run daily/weekly job | Console, Lambda, Test with `{"date": "YYYY-MM-DD"}` / `{"week": "YYYY-Www"}` |
 | Revoke a kiosk | Cognito, disable user `kiosk-01` |
-| Roll back | Revert commit on `main`; pipeline redeploys |
+| Roll back | Revert commit on `main`, run a new manual plan, review it, then apply through the protected `prod` environment |
 | Restore data | DynamoDB point-in-time restore to a new table, then swap |
 
 ## 13. Limitations and future work
