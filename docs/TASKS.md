@@ -38,6 +38,10 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T23 | Prepare production release review | TODO | Dev acceptance complete, security/cost evidence, rollback plan and separate production approval |
 | T24 | Deploy production after explicit approval | TODO | Exact production plan reviewed and approved; production apply and post-deploy checks evidenced |
 
+## Phase B cross-cutting blocker
+
+| ID | Task | Status | Acceptance criteria |
+|---|---|---|---|
 | T31 | Align all Lambda runtime AWS SDK clients with the us-east-1 deployment region | TODO | Every explicit region override/default is aligned to the deployed region; no runtime client targets ap-south-1; CI and unit tests pass |
 
 ## Phase C — release and operations
