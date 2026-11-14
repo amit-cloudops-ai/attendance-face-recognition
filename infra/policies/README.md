@@ -47,3 +47,24 @@ The current repository does not create or attach these managed policies. Bootstr
 - Runtime action/resource union is based on the data and recognition handler audits in `docs/IAM-LEAST-PRIVILEGE-INVENTORY.md`.
 - AWS KMS conditions `kms:ResourceAliases` and `kms:ViaService` are documented for IAM policies; S3 and SQS are supported `kms:ViaService` integrations.
 - Static JSON/template validation does not prove live AWS authorization. Validate the rendered policy with IAM Access Analyzer and an approved non-production deployment before relying on it.
+
+
+## Dev Terraform plan-role policies
+
+The dev plan role uses three separate customer-managed policy templates so each remains below the IAM managed-policy size limit:
+
+- `github-plan-dev-core.json.tftpl` — read-only DynamoDB, IAM role/inline-policy, Lambda, Scheduler, SQS, Rekognition, CloudWatch, SNS and Budget reads.
+- `github-plan-dev-edge.json.tftpl` — read-only KMS, S3 bucket/object metadata, Cognito, API Gateway v2 and CloudFront reads.
+- `github-plan-dev-state.json.tftpl` — dev state object read and S3 native lockfile lifecycle.
+
+Render with:
+- `account_id`: verified 12-digit AWS account ID.
+- `state_bucket`: exact bootstrap-created S3 state bucket name.
+
+The plan role receives no infrastructure create/update/delete permissions. The only write/delete actions are `s3:PutObject` and `s3:DeleteObject` on `attendance/dev/terraform.tfstate.tflock`, because the S3 backend must acquire and release its state lock. The state object itself is read-only. The state bucket list operation is restricted to the dev state and lock prefixes. No prod state key or prod resource ARN is present.
+
+The plan policies intentionally include `s3:ListBucket` on the three dev application buckets because the reviewed AWS provider v6.73.0 `aws_s3_bucket` refresh path performs HeadBucket, which is authorized by `s3:ListBucket`. This reveals object-key metadata, not object contents; no raw-bucket object read permission is granted to the plan role.
+
+Cognito pool IDs and CloudFront distribution IDs are service-generated. The templates use service-supported resource ARN patterns and tag conditions where available. Some CloudFront policy families do not support resource tags; their read actions are restricted to the corresponding CloudFront resource family and remain read-only.
+
+The templates are policy source, not an AWS deployment. CI renders them with a dummy account/bucket, validates JSON, checks the 6,144-character managed-policy limit, rejects infrastructure mutation actions from core/edge policies, and ensures dev state permissions cannot reach prod keys. The exact account and state bucket values must be reviewed before bootstrap.
