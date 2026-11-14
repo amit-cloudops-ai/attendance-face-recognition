@@ -304,7 +304,8 @@ resource "aws_iam_role" "lambda" {
   for_each = local.function_specs
 
   name               = "attendance-${var.env}-${replace(each.key, "_", "-")}"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+  assume_role_policy  = data.aws_iam_policy_document.lambda_assume_role.json
+  permissions_boundary = var.execution_role_boundary_arn
 
   tags = {
     Project     = "attendance"
