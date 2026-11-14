@@ -535,15 +535,19 @@ jobs:
                       raise SystemExit(f"Wrong or broad OIDC subject: {path}")
 
           workflow = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          environment_expr = "$" + "{{ inputs.environment }}"
+          operation_expr = "$" + "{{ inputs.operation }}"
+          role_var_expr = "$" + "{{ vars.AWS_ROLE_ARN }}"
+          role_env_expr = "$" + "{{ env.AWS_ROLE_ARN }}"
           for required in (
-              "name: ${{ inputs.environment }}-${{ inputs.operation }}",
-              "AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}",
+              "name: " + environment_expr + "-" + operation_expr,
+              "AWS_ROLE_ARN: " + role_var_expr,
               "github.ref == 'refs/heads/develop'",
               "github.ref == 'refs/heads/main'",
               "actions: read",
               "contents: read",
               "id-token: write",
-              "role-to-assume: ${{ env.AWS_ROLE_ARN }}",
+              "role-to-assume: " + role_env_expr,
           ):
               if required not in workflow:
                   raise SystemExit(f"Deployment workflow missing required OIDC boundary: {required}")
