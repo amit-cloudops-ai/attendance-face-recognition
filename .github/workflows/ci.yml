@@ -627,8 +627,8 @@ jobs:
               "EXECUTION_ROLE_BOUNDARY_ARN", "TF_STATE_BUCKET",
               "COGNITO_CALLBACK_URLS", "COGNITO_LOGOUT_URLS", "ALLOWED_ORIGINS",
               "TF_PLAN_AGE_RECIPIENT", "TF_PLAN_AGE_IDENTITY",
-              "prevent self-review", "Require pull requests", "Python",
-              "terraform-fmt", "cannot be verified from this session",
+              "solo-owner", "self-review allowed", "Require pull requests", "Python",
+              "terraform-fmt", "remain unverified",
           ):
               if required not in docs:
                   raise SystemExit(f"GitHub environment setup guide missing: {required}")
