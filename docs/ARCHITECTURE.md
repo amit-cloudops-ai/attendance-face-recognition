@@ -41,7 +41,7 @@ Latency budget (target p95 under 3 s): client resize + upload about 0.5 s, S3 ev
 | Kiosk and admin web apps | static HTML/JS on S3 behind CloudFront (OAC) | C |
 | Auth | Cognito user pool, Hosted UI + PKCE, groups `admin`, `kiosk` | C |
 | API | API Gateway HTTP API, JWT authorizer, routes built from module outputs | C |
-| Recognition | presign, result, recognize, enroll, enroll-url, faces-delete Lambdas; Rekognition collection | A |
+| Recognition | presign, result, recognize, enroll, enroll-url, faces-delete and internal failure-recovery Lambdas; Rekognition collection; encrypted SQS recovery queues | A |
 | Data and automation | 5 DynamoDB tables, employees/attendance-query/reports/override/settings Lambdas, daily-job, weekly-job, EventBridge Scheduler | B |
 | Platform | KMS, buckets, layer, SNS, alarms, budgets, CI/CD, bootstrap | Lead |
 
@@ -57,7 +57,7 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 | recognize | `rekognition:DetectFaces`; `rekognition:SearchFacesByImage` on the collection; `s3:GetObject`, `s3:DeleteObject` on raw `captures/*`; `dynamodb:GetItem` employees + config; `GetItem`/`PutItem`/`UpdateItem` attendance; `GetItem`/`UpdateItem` scan-results; `sqs:SendMessage` on its DLQ |
 | enroll | `rekognition:DetectFaces`; `IndexFaces`, `SearchFacesByImage`, `DeleteFaces` on the collection; `s3:GetObject`, `s3:DeleteObject` on raw `enroll/*`; `dynamodb:GetItem`/`UpdateItem` employees; `GetItem` config; `GetItem`/`UpdateItem` scan-results; DLQ send |
 | enroll-url | `s3:PutObject` on raw `enroll/*`; `dynamodb:GetItem` employees; `PutItem` scan-results |
-| faces-delete | `rekognition:DeleteFaces` on the collection; `dynamodb:GetItem`/`UpdateItem` employees; `PutItem` audit |
+| faces-delete | `rekognition:DeleteFaces` on the collection; `dynamodb:GetItem`/`UpdateItem` employees; `PutItem` audit; only for inactive employees |
 | failure | `sqs:ReceiveMessage`/`DeleteMessage`/`GetQueueAttributes`/`ChangeMessageVisibility` on recognition/enrollment DLQs; `dynamodb:GetItem`/`UpdateItem` scan-results + employees; `dynamodb:Query` attendance + date-index; `rekognition:SearchFacesByImage`/`DeleteFaces` on collection; `s3:GetObject`/`DeleteObject` raw captures/enroll prefixes |
 | employees | `dynamodb:GetItem`/`PutItem`/`UpdateItem`/`Scan` employees; `PutItem` audit |
 | attendance-query | `dynamodb:Query` attendance and `attendance/index/date-index`; `Scan` employees |
@@ -86,7 +86,7 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 | Admin misuse | Cognito admin group, override requires reason and is audited | Low |
 | Cost attack | Throttling, reserved concurrency, AWS Budget alarm | Low |
 ### 6.4 Privacy and compliance
-Biometric data is personal data (India DPDP Act 2023 applies). Controls: explicit consent captured at enrollment (`consent_at`), purpose limitation (attendance only), no retention of raw images, deletion of faces on offboarding, access limited to admins. Have HR/mentor confirm the consent text. This is engineering guidance, not legal advice.
+Biometric data is personal data (India DPDP Act 2023 applies). Controls: explicit consent captured at enrollment (`consent_at`), purpose limitation (attendance only), no retention of raw images, deletion of faces on offboarding (the API refuses to delete while the employee is active), access limited to admins. Have HR/mentor confirm the consent text. This is engineering guidance, not legal advice.
 
 ## 7. Reliability and failure modes
 | Failure | Behaviour |
