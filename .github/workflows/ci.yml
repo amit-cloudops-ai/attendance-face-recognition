@@ -73,6 +73,61 @@ jobs:
                   raise SystemExit(f"IAM managed policy size exceeds 6144 characters: {path}")
           PY
 
+      - name: Validate environment deployment IAM policy templates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("infra/policies")
+          names = (
+              "github-plan-dev-core.json.tftpl",
+              "github-plan-dev-edge.json.tftpl",
+              "github-plan-dev-state.json.tftpl",
+          )
+          policies = {}
+          for name in names:
+              path = root / name
+              rendered = path.read_text(encoding="utf-8")
+              rendered = rendered.replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              if "${account_id}" in rendered or "${state_bucket}" in rendered:
+                  raise SystemExit(f"Unresolved template variable in {path}")
+              policy = json.loads(rendered)
+              if policy.get("Version") != "2012-10-17" or not policy.get("Statement"):
+                  raise SystemExit(f"Invalid policy envelope: {path}")
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy size exceeded: {path}")
+              policies[name] = policy
+
+          core_edge = policies[names[0]]["Statement"] + policies[names[1]]["Statement"]
+          forbidden_prefixes = ("iam:", "sts:", "lambda:Create", "lambda:Update", "lambda:Delete",
+                                "s3:Put", "s3:Delete", "kms:Create", "kms:Put", "kms:Schedule",
+                                "cloudfront:Create", "cloudfront:Update", "cloudfront:Delete",
+                                "cognito-idp:Create", "cognito-idp:Update", "cognito-idp:Delete")
+          for statement in core_edge:
+              actions = statement.get("Action", [])
+              actions = [actions] if isinstance(actions, str) else actions
+              if any(action.startswith(forbidden_prefixes) for action in actions):
+                  raise SystemExit(f"Mutation action in read-only plan policy: {statement['Sid']}")
+              resources = statement.get("Resource", [])
+              resources = [resources] if isinstance(resources, str) else resources
+              if any("attendance/prod/" in resource or "attendance-prod-" in resource for resource in resources):
+                  raise SystemExit(f"Production resource in dev plan policy: {statement['Sid']}")
+
+          state_statements = policies[names[2]]["Statement"]
+          for statement in state_statements:
+              actions = statement.get("Action", [])
+              actions = [actions] if isinstance(actions, str) else actions
+              resources = statement.get("Resource", [])
+              resources = [resources] if isinstance(resources, str) else resources
+              if any(action in ("s3:PutObject", "s3:DeleteObject") for action in actions):
+                  if not all(resource.endswith(".tflock") for resource in resources):
+                      raise SystemExit("Dev plan may mutate only its Terraform lockfile")
+              if any("attendance/prod/" in resource for resource in resources):
+                  raise SystemExit("Dev state policy references production state")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
