@@ -34,6 +34,7 @@ jobs:
           bash -n scripts/terraform.sh
           bash -n scripts/aws_preflight_readonly.sh
           bash -n scripts/configure_github_environments.sh
+          bash -n scripts/configure_branch_protection.sh
       - name: Validate GitHub Actions workflow YAML
         run: |
           python - <<'PY'
