@@ -191,20 +191,10 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - uses: actions/checkout@v4
       - run: terraform fmt -check -diff -recursive infra
-      - name: Generate reproducible environment provider lockfiles
+      - name: Verify committed dev and prod provider lockfiles
         run: |
-          terraform -chdir=infra/envs/dev init -backend=false -input=false
-          terraform -chdir=infra/envs/dev providers lock -platform=linux_amd64 -platform=windows_amd64
-          echo "LOCKFILE_DEV_BASE64_BEGIN"
-          base64 -w0 infra/envs/dev/.terraform.lock.hcl
-          echo
-          echo "LOCKFILE_DEV_BASE64_END"
-          terraform -chdir=infra/envs/prod init -backend=false -input=false
-          terraform -chdir=infra/envs/prod providers lock -platform=linux_amd64 -platform=windows_amd64
-          echo "LOCKFILE_PROD_BASE64_BEGIN"
-          base64 -w0 infra/envs/prod/.terraform.lock.hcl
-          echo
-          echo "LOCKFILE_PROD_BASE64_END"
+          terraform -chdir=infra/envs/dev init -backend=false -input=false -lockfile=readonly -lockfile=readonly
+          terraform -chdir=infra/envs/prod init -backend=false -input=false -lockfile=readonly -lockfile=readonly
       - run: terraform -chdir=infra/modules/recognition init -backend=false -input=false
       - run: terraform -chdir=infra/modules/recognition validate
       - run: terraform -chdir=infra/modules/data init -backend=false -input=false
