@@ -58,3 +58,8 @@ variable "common_env" {
     error_message = "common_env must include TZ_NAME, LOG_LEVEL and BUCKET_REPORTS."
   }
 }
+
+variable "execution_role_boundary_arn" {
+  description = "Mandatory customer-managed permissions boundary attached to all application roles."
+  type        = string
+}
