@@ -1,6 +1,6 @@
 # Data and automation Terraform module
 
-Creates the five contract tables (employees, attendance with `date-index`, scan-results with TTL, config, audit), Part B Lambda functions, Asia/Kolkata daily/weekly EventBridge Scheduler schedules, least-privilege IAM, 30-day log groups and CloudWatch error/throttle alarms.
+Creates the five contract tables (employees, attendance with `date-index`, scan-results with TTL, config, audit), Part B Lambda functions (employee CRUD, attendance query, reports, override and settings), Asia/Kolkata daily/weekly EventBridge Scheduler schedules, least-privilege IAM, 30-day log groups and CloudWatch error/throttle alarms.
 
 ## Inputs
 
