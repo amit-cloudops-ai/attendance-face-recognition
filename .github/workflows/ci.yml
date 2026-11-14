@@ -95,7 +95,7 @@ jobs:
               path = root / name
               rendered = path.read_text(encoding="utf-8")
               rendered = rendered.replace("${account_id}", "123456789012")
-              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
               if "${account_id}" in rendered or "${state_bucket}" in rendered:
                   raise SystemExit(f"Unresolved template variable in {path}")
               policy = json.loads(rendered)
@@ -172,7 +172,7 @@ jobs:
           for name in prod_names:
               path = root / name
               rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
-              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
               if "${account_id}" in rendered or "${state_bucket}" in rendered:
                   raise SystemExit(f"Unresolved template variable in {path}")
               policy = json.loads(rendered)
@@ -329,7 +329,7 @@ jobs:
           for name in names:
               path = root / name
               rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
-              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
               if "${account_id}" in rendered or "${state_bucket}" in rendered:
                   raise SystemExit(f"Unresolved template variable: {path}")
               policy = json.loads(rendered)
@@ -367,7 +367,7 @@ jobs:
           state_object = next(s for s in state if s["Sid"] == "DevStateObject")
           if set(state_object["Action"]) != {"s3:GetObject", "s3:PutObject"}:
               raise SystemExit("Dev apply state object permissions must be read/write only")
-          if state_object["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012/attendance/dev/terraform.tfstate":
+          if state_object["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012-ci-test/attendance/dev/terraform.tfstate":
               raise SystemExit("Dev apply state object must be exact")
           lock = next(s for s in state if s["Sid"] == "DevLockfileLifecycle")
           lock_resources = lock["Resource"]
@@ -414,7 +414,7 @@ jobs:
           for name in names:
               path = root / name
               rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
-              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
               if "${account_id}" in rendered or "${state_bucket}" in rendered:
                   raise SystemExit(f"Unresolved template variable: {path}")
               policy = json.loads(rendered)
@@ -450,7 +450,7 @@ jobs:
           state_object = next(s for s in state if s["Sid"] == "ProdStateObject")
           if set(state_object["Action"]) != {"s3:GetObject", "s3:PutObject"}:
               raise SystemExit("Prod apply state object permissions must be read/write only")
-          if state_object["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012/attendance/prod/terraform.tfstate":
+          if state_object["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012-ci-test/attendance/prod/terraform.tfstate":
               raise SystemExit("Prod apply state object must be exact")
           lock = next(s for s in state if s["Sid"] == "ProdLockfileLifecycle")
           lock_resources = lock["Resource"]
@@ -666,7 +666,7 @@ jobs:
           for path in policies:
               rendered = path.read_text(encoding="utf-8")
               rendered = rendered.replace("${account_id}", "123456789012")
-              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
               if "${" in rendered:
                   raise SystemExit(f"Unresolved template variable in {path}")
               policy = json.loads(rendered)
@@ -724,7 +724,7 @@ jobs:
           for name in expected:
               path = root / name
               rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
-              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
               policy = json.loads(rendered)
               if len(json.dumps(policy, separators=(",", ":"))) > 6144:
                   raise SystemExit(f"Billing managed policy too large: {path}")
@@ -744,13 +744,13 @@ jobs:
           if set(apply_actions) != {"budgets:ModifyBudget", "budgets:ViewBudget", "aws-portal:ModifyBilling", "aws-portal:ViewBilling"}:
               raise SystemExit("Billing apply policy must contain only the documented budget/account billing actions")
 
-          state = json.loads((root / "github-apply-billing-state.json.tftpl").read_text().replace("${state_bucket}", "attendance-tf-state-123456789012"))
+          state = json.loads((root / "github-apply-billing-state.json.tftpl").read_text().replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test"))
           state_statements = state["Statement"]
           billing_state = next(s for s in state_statements if s["Sid"] == "BillingStateObjectReadWrite")
-          if billing_state["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012/attendance/billing/terraform.tfstate":
+          if billing_state["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012-ci-test/attendance/billing/terraform.tfstate":
               raise SystemExit("Billing apply state path must be exact")
           lock = next(s for s in state_statements if s["Sid"] == "BillingLockfileLifecycle")
-          if lock["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012/attendance/billing/terraform.tfstate.tflock":
+          if lock["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012-ci-test/attendance/billing/terraform.tfstate.tflock":
               raise SystemExit("Billing lock lifecycle must be exact")
 
           for operation in ("plan", "apply"):
