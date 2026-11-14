@@ -1,6 +1,6 @@
 # Serverless Face-Recognition Attendance System
 
-Contactless, real-time employee clock-in / clock-out using face recognition on AWS. A kiosk browser captures a still image, uploads it straight to S3, and a Lambda matches the face against an Amazon Rekognition collection, writes a timestamped attendance record to DynamoDB, and shows the result in under 3 seconds. Scheduled jobs mark absences and publish daily and weekly summaries. An admin web app lets HR filter and export attendance.
+Contactless, real-time employee clock-in / clock-out using face recognition on AWS. A kiosk browser captures a still image, uploads it straight to S3, and a Lambda matches the face against an Amazon Rekognition collection, writes a timestamped attendance record to DynamoDB, and is designed to meet a sub-3-second result target (not yet verified end-to-end). Scheduled jobs mark absences and publish daily and weekly summaries. An admin web app lets HR filter and export attendance.
 
 **Status:** [docs/STATUS.md](docs/STATUS.md) | **Finish line:** [docs/SPEC.md](docs/SPEC.md) | **New to the team?** Start with [docs/TEAM_BRIEF.md](docs/TEAM_BRIEF.md)
 
@@ -48,7 +48,7 @@ scripts/     region guard, Terraform wrapper, read-only AWS preflight, e2e smoke
 ```
 
 ## Environments and branches
-`develop` is the **dev** deployment branch; `main` is the **prod** deployment branch. Deployments are manual via `.github/workflows/deploy.yml`: run `plan`, review it, then explicitly select `apply`. Production apply requires the `prod-apply` GitHub environment's independent reviewer. Feature branches: `a/<topic>`, `b/<topic>`, `c/<topic>`, `lead/<topic>`; open PRs into `develop`.
+`develop` is the **dev** deployment branch; `main` is the **prod** deployment branch. Deployments are manual via `.github/workflows/deploy.yml`: run `plan`, review it, then explicitly select `apply`. Apply environments use a manual owner approval checkpoint with self-review allowed; this is not independent separation of duties. Work stays isolated on the solo release branch until it is promoted by an owner-reviewed PR to `develop` (dev) or `main` (prod).
 
 ## Frontend and local verification
 The kiosk is served at `/`, the admin app at `/admin/`, and Cognito returns to `/callback.html`. See [docs/FRONTEND.md](docs/FRONTEND.md) for local run instructions, runtime configuration and the browser verification matrix. The generated `web/config.json` is ignored by Git and uploaded by the access Terraform module.
