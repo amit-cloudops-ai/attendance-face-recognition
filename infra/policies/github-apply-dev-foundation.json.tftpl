@@ -96,7 +96,6 @@
       "Sid": "SnsSubscriptionLifecycle",
       "Effect": "Allow",
       "Action": [
-        "sns:Subscribe",
         "sns:GetSubscriptionAttributes",
         "sns:SetSubscriptionAttributes",
         "sns:Unsubscribe"
@@ -200,6 +199,12 @@
           "aws:RequestTag/Environment": "dev"
         }
       }
+    },
+    {
+      "Sid": "SnsTopicSubscribe",
+      "Effect": "Allow",
+      "Action": "sns:Subscribe",
+      "Resource": "arn:aws:sns:us-east-1:${account_id}:attendance-dev-alerts"
     }
   ]
 }
