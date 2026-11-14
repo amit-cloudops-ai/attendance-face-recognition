@@ -365,6 +365,9 @@ jobs:
               via = set(kms["Condition"]["StringEquals"]["kms:ViaService"])
               if "sns.us-east-1.amazonaws.com" not in via:
                   raise SystemExit(f"{env} runtime boundary blocks KMS use through SNS")
+              publish = next(s for s in policy["Statement"] if s["Sid"] == "AlertsTopicPublish")
+              if "sns:Publish" not in publish["Action"] or f"attendance-{env}-alerts" not in publish["Resource"]:
+                  raise SystemExit(f"{env} runtime boundary does not scope SNS publish to its alerts topic")
           PY
 
       - name: Validate DynamoDB customer-managed KMS policies
