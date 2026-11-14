@@ -32,6 +32,7 @@ jobs:
         run: |
           bash -n scripts/e2e_smoke.sh
           bash -n scripts/terraform.sh
+          bash -n scripts/aws_preflight_readonly.sh
       - name: Validate GitHub Actions workflow YAML
         run: |
           python - <<'PY'
