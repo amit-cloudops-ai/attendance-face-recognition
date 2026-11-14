@@ -56,6 +56,9 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T41 | Make local Terraform deployment inputs and packaging safe | IN_PROGRESS | Callback/boundary examples, account-bound ARN validation, provider allowed-account restrictions, STS wrapper guard and config.json exclusion are in PR #29; local WSL verification remains |
 | T42 | Complete runtime failure monitoring and raw-image retention guarantee | TODO | Add Scheduler target-error monitoring, durable scheduled-job failure handling, and test/implement cleanup for raw objects after failure-processor exhaustion |
 | T43 | Complete browser and deployed integration acceptance | TODO | Cognito/PKCE, camera, CORS, enrollment/offboarding, reports, schedule jobs, real capture-to-screen p95, and browser/device matrix verified in dev |
+| T44 | Make business updates and audit events atomic | TODO | Employee create/deactivate, settings updates and attendance overrides must commit with their audit event atomically or use a durable outbox; add failure-injection tests |
+| T45 | Complete biometric consent, privacy and token-revocation controls | BLOCKED | Owner/privacy approval for notice version, purpose, retention, deletion/withdrawal and us-east-1 processing; decide response to 60-minute JWT revocation delay |
+| T46 | Define attendance report data retention | TODO | Set reports bucket lifecycle and noncurrent-version expiry consistent with the approved retention schedule |
 
 ## Phase C — release and operations
 
@@ -88,3 +91,5 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T39 pre-deployment audit is in progress on PR #29. It corrects the DynamoDB KMS key-policy attachment, Python 3 command usage, deploy-time STS account assertion, Lambda JSON logging, solo-owner governance, route-contract coverage and dev raw-image cleanup verification. The expanded read-only AWS inventory has not yet been run. Do not treat T39 as DONE until CI passes and the owner has completed the required local checks.
 
 - T40–T43 are newly identified by the full pre-deployment audit. Do not mark them complete based on static Terraform validation alone; T40 requires a live dev notification test, and T43 requires a deployed dev environment.
+
+- T44–T46 were added by the full pre-deployment audit. T45 requires a product/privacy decision; do not treat a boolean consent flag as a complete governance process.
