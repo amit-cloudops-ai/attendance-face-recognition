@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "kms_key" {
     condition {
       test     = "ArnLike"
       variable = "aws:SourceArn"
-      values   = ["arn:aws:sns:ap-south-1:${var.account_id}:attendance-${var.env}-alerts"]
+      values   = ["arn:aws:sns:us-east-1:${var.account_id}:attendance-${var.env}-alerts"]
     }
   }
 
