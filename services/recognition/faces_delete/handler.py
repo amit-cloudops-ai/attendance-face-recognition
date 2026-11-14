@@ -116,10 +116,10 @@ def lambda_handler(event, context):
                     "SET face_ids=:empty, photo_count=:zero, updated_at=:now, "
                     "last_faces_delete_audit_id=:audit_id"
                 ),
-                ConditionExpression="active=:inactive AND face_ids=:expected",
+                ConditionExpression="active=:inactive",
                 ExpressionAttributeValues={
                     ":empty": [], ":zero": 0, ":now": now, ":audit_id": audit_id,
-                    ":inactive": False, ":expected": face_ids,
+                    ":inactive": False,
                 },
             )
         except ClientError as exc:
