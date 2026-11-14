@@ -120,6 +120,39 @@ def _release_employee_lock(employees, employee_id: str, request_id: str) -> None
             raise
 
 
+
+
+
+def _delete_request_faces(rekognition, image: dict, external_id: str) -> None:
+    matches = rekognition.search_faces_by_image(
+        CollectionId=_required_env("COLLECTION_ID"),
+        Image=image,
+        FaceMatchThreshold=0.0,
+        MaxFaces=10,
+        QualityFilter="NONE",
+    ).get("FaceMatches", [])
+    face_ids = [
+        (match.get("Face") or {}).get("FaceId")
+        for match in matches
+        if (match.get("Face") or {}).get("ExternalImageId") == external_id
+        and (match.get("Face") or {}).get("FaceId")
+    ]
+    if not face_ids:
+        return
+    response = rekognition.delete_faces(
+        CollectionId=_required_env("COLLECTION_ID"),
+        FaceIds=face_ids,
+    )
+    confirmed = set(response.get("DeletedFaces", []))
+    for failure in response.get("UnsuccessfulFaceDeletions", []):
+        if failure.get("Reason") in {"FACE_NOT_FOUND", "RESOURCE_NOT_FOUND"}:
+            confirmed.add(failure.get("FaceId"))
+        else:
+            raise RuntimeError("Rekognition could not remove an uncommitted enrollment face")
+    if confirmed != set(face_ids):
+        raise RuntimeError("Rekognition did not confirm cleanup of every uncommitted face")
+
+
 def _process_record(record: dict) -> None:
     info = record.get("s3") or {}
     bucket = (info.get("bucket") or {}).get("name")
@@ -150,26 +183,33 @@ def _process_record(record: dict) -> None:
         raise
 
     employees = _table("TABLE_EMPLOYEES")
+    rekognition = boto3.client("rekognition", region_name=REGION)
+    image = {"S3Object": {"Bucket": bucket, "Name": key}}
+    request_external_id = f"{employee_id}#{request_id}"
+    marker = _request_marker(request_id)
     employee = employees.get_item(
         Key={"employee_id": employee_id}, ConsistentRead=True
     ).get("Item")
-    if not employee or not employee.get("active", False):
-        _finish(s3, bucket, key, results, request_id, "unknown_employee",
-                "The employee does not exist or is inactive.")
-        return
 
-    # If the employee update succeeded but result finalization failed, this
-    # request marker lets a retry finish without adding the face twice.
-    marker = _request_marker(request_id)
-    committed_face_id = employee.get(marker)
-    if committed_face_id:
+    if employee and employee.get(marker):
         _finish(s3, bucket, key, results, request_id, "enrolled",
                 "Employee photo enrolled successfully.",
                 employee_id=employee_id, name=employee.get("name", ""))
         return
+    if not employee:
+        _delete_request_faces(rekognition, image, request_external_id)
+        _finish(s3, bucket, key, results, request_id, "unknown_employee",
+                "The employee does not exist or is inactive.")
+        return
+    if not employee.get("active", False):
+        _delete_request_faces(rekognition, image, request_external_id)
+        _finish(s3, bucket, key, results, request_id, "unknown_employee",
+                "The employee does not exist or is inactive.")
+        return
 
     settings = get_settings()
     if int(employee.get("photo_count", 0)) >= int(settings["max_photos_per_employee"]):
+        _delete_request_faces(rekognition, image, request_external_id)
         _finish(s3, bucket, key, results, request_id, "limit_reached",
                 "The maximum number of enrollment photos has been reached.")
         return
@@ -177,8 +217,8 @@ def _process_record(record: dict) -> None:
     _acquire_employee_lock(employees, employee_id, request_id)
     indexed_face_ids = []
     try:
-        # Refresh after acquiring the lock; another invocation may have
-        # completed this same request just before the lock was obtained.
+        # Refresh after acquiring the lease; another request may have changed
+        # employee state while this request was waiting.
         employee = employees.get_item(
             Key={"employee_id": employee_id}, ConsistentRead=True
         ).get("Item")
@@ -189,9 +229,18 @@ def _process_record(record: dict) -> None:
                     "Employee photo enrolled successfully.",
                     employee_id=employee_id, name=employee.get("name", ""))
             return
-
-        rekognition = boto3.client("rekognition", region_name=REGION)
-        image = {"S3Object": {"Bucket": bucket, "Name": key}}
+        if not employee or not employee.get("active", False):
+            _delete_request_faces(rekognition, image, request_external_id)
+            _release_employee_lock(employees, employee_id, request_id)
+            _finish(s3, bucket, key, results, request_id, "unknown_employee",
+                    "The employee does not exist or is inactive.")
+            return
+        if int(employee.get("photo_count", 0)) >= int(settings["max_photos_per_employee"]):
+            _delete_request_faces(rekognition, image, request_external_id)
+            _release_employee_lock(employees, employee_id, request_id)
+            _finish(s3, bucket, key, results, request_id, "limit_reached",
+                    "The maximum number of enrollment photos has been reached.")
+            return
         faces = rekognition.detect_faces(Image=image, Attributes=["DEFAULT"]).get("FaceDetails", [])
         if not faces:
             _release_employee_lock(employees, employee_id, request_id)
@@ -230,7 +279,6 @@ def _process_record(record: dict) -> None:
         known_face_ids = set(employee.get("face_ids") or [])
         # A request-specific ExternalImageId makes an IndexFaces operation
         # recoverable even if the invocation stops before employee persistence.
-        request_external_id = f"{employee_id}#{request_id}"
         recovered = [
             (match.get("Face") or {}).get("FaceId")
             for match in matches
@@ -293,9 +341,7 @@ def _process_record(record: dict) -> None:
                 indexed_face_ids = []
             else:
                 if face_id not in set((latest or {}).get("face_ids") or []):
-                    rekognition.delete_faces(
-                        CollectionId=_required_env("COLLECTION_ID"), FaceIds=[face_id]
-                    )
+                    _delete_request_faces(rekognition, image, request_external_id)
                     indexed_face_ids = []
                 _release_employee_lock(employees, employee_id, request_id)
                 code = "limit_reached" if latest and latest.get("active", False) else "unknown_employee"
@@ -310,7 +356,7 @@ def _process_record(record: dict) -> None:
                 employee_id=employee_id, name=employee.get("name", ""))
     except Exception:
         # Do not mark a retryable failure terminal and do not delete the image.
-        # Keep the short lease; a retry of this request can reclaim it.
+        # Keep the short lease; a later retry can reclaim it after expiry.
         LOGGER.exception("Enrollment processing failed; preserving image for retry")
         raise
 
