@@ -1,39 +1,63 @@
 # Serverless Face-Recognition Attendance System
 
-Contactless employee clock-in/clock-out prototype using browser camera capture, Amazon Rekognition, AWS Lambda and DynamoDB.
+Contactless, real-time employee clock-in / clock-out using face recognition on AWS. A kiosk browser captures a still image, uploads it straight to S3, and a Lambda matches the face against an Amazon Rekognition collection, writes a timestamped attendance record to DynamoDB, and shows the result in under 3 seconds. Scheduled jobs mark absences and publish daily and weekly summaries. An admin web app lets HR filter and export attendance.
 
-**Monday delivery target:** 16 November 2026. Read [finish line](docs/FINISH_LINE.md), [work allocation](docs/TASKS.md), [status](docs/STATUS.md) and [frozen contracts](docs/contracts.md).
+**Status:** [docs/STATUS.md](docs/STATUS.md) | **Finish line:** [docs/SPEC.md](docs/SPEC.md) | **New to the team?** Start with [docs/TEAM_BRIEF.md](docs/TEAM_BRIEF.md)
 
-## Branch ownership
-- `solo/amit-monday`: Amit's independent end-to-end implementation and guaranteed demo track.
-- `develop`: team integration branch.
-- Sushmita: Part B (data and attendance logic), via PR to develop.
-- Gopi: Part C (access and frontend), via PR to develop.
-Team contributions are not automatically included in the solo branch. Amit reviews and chooses whether to integrate them.
+## Architecture
 
-## Monday sprint architecture
-The sprint uses one SAM/CloudFormation template (`template.yaml`) as the infrastructure source of truth. Terraform is deferred for this sprint. See docs/FINISH_LINE.md for scope and limitations. The API/data interfaces remain governed by docs/contracts.md.
+```mermaid
+flowchart LR
+  K[Kiosk browser] -->|HTTPS| CF[CloudFront]
+  AD[Admin browser] -->|HTTPS| CF
+  CF -->|"/ and /admin"| WEB[(S3 web bucket)]
+  CF -->|"/api/*"| API["API Gateway HTTP API + Cognito JWT"]
+  API --> PRE[presign Lambda]
+  API --> RESL[result Lambda]
+  API --> ADM["admin Lambdas: employees, attendance, reports, override, settings"]
+  K -.->|pre-signed POST| RAW[("S3 raw bucket: captures/ enroll/")]
+  RAW -->|"ObjectCreated captures/"| REC[recognize Lambda]
+  RAW -->|"ObjectCreated enroll/"| ENR[enroll Lambda]
+  REC --> RK[Rekognition collection]
+  ENR --> RK
+  REC --> DDB[("DynamoDB: employees, attendance, scan-results, config, audit")]
+  ENR --> DDB
+  RESL --> DDB
+  ADM --> DDB
+  SCH["EventBridge Scheduler: 23:59 IST daily, Mon 00:30 IST weekly"] --> JOBS[daily + weekly job Lambdas]
+  JOBS --> DDB
+  JOBS --> REP[("S3 reports bucket, versioned")]
+  ADM --> REP
+```
+
+## Tech stack
+AWS (ap-south-1): S3, CloudFront, API Gateway (HTTP API), Cognito, Lambda (Python 3.12), Rekognition, DynamoDB, EventBridge Scheduler, KMS, SNS, CloudWatch. Infrastructure as code: Terraform. CI/CD: GitHub Actions (OIDC to AWS, no stored keys). Frontend: static HTML + vanilla JS (no build step).
 
 ## Repository layout
 ```
-docs/       finish line, frozen contracts, work briefs, architecture and status
-shared/     shared Python attendance library
-services/   recognition and data Lambda handlers
-web/        kiosk and admin applications
-template.yaml   SAM/CloudFormation infrastructure target
-tests/      unit, contract and integration tests
-scripts/    local checks, smoke tests and deployment helpers
+docs/        SPEC (finish line), contracts, architecture, team brief, per-part guides, status
+infra/       bootstrap (state + OIDC), foundation, modules/{data,recognition,access}, envs/{dev,prod}
+shared/      attendance_common Python layer (config, time, auth, responses, record_scan)
+services/    Lambda source: recognition/ (Part A), data/ (Part B)
+web/         kiosk/, admin/, shared/ (Part C)
+tests/       unit/, contract/, integration/
+scripts/     seed data, e2e smoke test
 ```
 
-## Development checks
-```bash
-python -m pip install -r requirements-dev.txt
-ruff check .
-pytest -q
-# Once template.yaml exists:
-cfn-lint template.yaml
-sam validate --lint
-sam build
-```
+## Environments and branches
+`develop` auto-deploys to **dev**; `main` deploys to **prod** after manual approval. Feature branches: `a/<topic>`, `b/<topic>`, `c/<topic>`, `lead/<topic>`; open PRs into `develop`.
 
-Do not provision or modify AWS resources without Amit's explicit approval. Never commit secrets, credentials, AWS account IDs or biometric images.
+## Deploy
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 11 (bootstrap once, then CI deploys).
+
+## Documents
+| Doc | Purpose |
+|---|---|
+| [SPEC](docs/SPEC.md) | What "done" means. Frozen. |
+| [contracts](docs/contracts.md) | Every name, schema, endpoint, code. Frozen. |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | Technical design document |
+| [TEAM_BRIEF](docs/TEAM_BRIEF.md) | Read this first if you are on the team |
+| [parts/](docs/parts) | Build guides for Part A, B, C |
+| [COST](docs/COST.md) | Cost sheet (100 employees, 2 scans/day) |
+| [DEMO_SCRIPT](docs/DEMO_SCRIPT.md) | Video storyboard |
+| [AI_CONTEXT](docs/AI_CONTEXT.md) | Paste into any AI assistant at the start of a session |

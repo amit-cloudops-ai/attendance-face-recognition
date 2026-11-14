@@ -1,22 +1,16 @@
-## Task / owner
-<!-- Task ID and whether this is team Part B, team Part C, or Amit solo -->
+## What & why
+<!-- One or two sentences. Which Part (A/B/C/Lead)? -->
 
-## Summary
--
+## Contract check
+- [ ] I did NOT change docs/contracts.md (if I did: lead approved + docs updated in this PR)
+- [ ] Names, table attributes, S3 keys, result codes, endpoints match docs/contracts.md exactly
 
-## Files changed
-- One line per file, with reason.
+## Tests
+- [ ] Unit tests added/updated and passing locally (`pytest`)
+- [ ] Contract tests passing
+- [ ] Tested on dev (paste evidence: screenshot / response / log line)
 
-## Acceptance evidence
-- [ ] `pytest -q`
-- [ ] `ruff check .`
-- [ ] `cfn-lint template.yaml` / `sam validate --lint` when applicable
-- [ ] Contracts and contract tests unchanged
-- [ ] No secrets, account IDs, tokens or biometric images
-- [ ] docs/STATUS.md updated only for verified work
-
-## Manual proof
--
-
-## Known gaps / limitations
--
+## Hygiene
+- [ ] docs/STATUS.md updated (my module's row + anything I learned)
+- [ ] No secrets, no real face images, no tokens in code or logs
+- [ ] IAM: only the permissions listed for my Part in docs/ARCHITECTURE.md (or explained why more)

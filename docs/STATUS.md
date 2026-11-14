@@ -1,36 +1,39 @@
-# Project Status
+# Project Status (source of truth for "what is built")
 
-Updated: Saturday 14 November 2026. This file records verified work only.
+**Update this file at the end of every work session (human or AI).** Newest entries at the top of the log.
 
-## Audit baseline
-- Public repository; default branch main.
-- Existing branches at initial audit: main and develop.
-- Scaffold and documentation exist; application implementation and AWS deployment are not yet evidenced.
-- Amit's independent branch `solo/amit-monday` has been created from develop.
-- Team contributions are assigned to develop through independent PRs.
-
-## Assignments
-| Owner | Scope | Target | State |
+## Milestones
+| Day | Date | Goal | Done? |
 |---|---|---|---|
-| Amit | Independent end-to-end build, platform, integration, release | solo/amit-monday | In progress |
-| Sushmita | Part B: data and attendance | team branch → develop | Assigned; delivery not yet verified |
-| Gopi | Part C: frontend | team branch → develop | Assigned; delivery not yet verified |
+| 1 | Wed 11 Nov | Docs frozen, repo + branch rules, bootstrap + foundation on dev, team onboarded, stubs of all Lambdas deployed | [ ] |
+| 2 | Thu 12 Nov | Walking skeleton end-to-end on dev (kiosk to stubbed recognize to table to admin list) | [ ] |
+| 3 | Fri 13 Nov | Real implementations merged to `develop`; contract tests green; 6 pm integration checkpoint | [ ] |
+| 4 | Sat 14 Nov | Hardening, prod deploy, pilot starts, docs complete | [ ] |
+| 5 | Sun 15 Nov | **Code freeze 12:00**, final tests, video, PDF, submission pack ready | [ ] |
+| - | Mon 16 Nov | Submission buffer | [ ] |
 
-## Verified items
-| Item | State | Evidence |
-|---|---|---|
-| Repository audit | Complete | Branches and repository tree inspected |
-| ZIP control pack | Inspected | attendance-update-1.zip |
-| Solo branch | Created | solo/amit-monday |
-| Delivery briefs | Documented | docs/TASKS.md |
-| Application code | Not verified | No implementation claimed |
-| AWS deployment | Not performed/verified | No resources provisioned |
+## Module status
+| Module | Owner | Status (not started / in progress / on dev / on prod) | Tests | Notes |
+|---|---|---|---|---|
+| bootstrap + foundation | Lead | not started | - | |
+| shared layer (tz, config, responses) | Lead | not started | - | |
+| Part A: recognition | | not started | - | |
+| Part B: data + automation | | not started | - | |
+| shared record_scan | Part B | not started | - | |
+| Part C: access + web | | not started | - | |
+| CI/CD | Lead | CI file in repo; deploy workflow pending | - | |
 
-## Timeline
-- Sat 14 Nov: branch/control setup and AWS/tool readiness.
-- Sun 15 Nov: implementation, integration, tests; deployment only after explicit approval.
-- Sun 15 Nov 21:00 IST: code freeze.
-- Mon 16 Nov: final rehearsal and mentor demo.
+## Acceptance evidence
+Paste links/screenshots per SPEC ID (F01-F13, N01-N11) as they pass.
+
+## Confirmed decisions
+- UI direction: A (clean light enterprise admin + high-contrast kiosk), confirmed 11 Nov.
+
+## Known issues
+(none yet)
+
+## Decisions made after freeze
+(none; contracts are frozen. List approved changes here with date and reason.)
 
 ## Session log
-- 14 Nov: inspected repo and ZIP; created solo/amit-monday from develop; prepared explicit Part B and Part C work contracts and separated solo/team delivery paths.
+- 11 Nov: repo scaffold, SPEC, contracts, architecture, part guides created.
