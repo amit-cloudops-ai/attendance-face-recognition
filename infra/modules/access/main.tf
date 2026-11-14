@@ -1,8 +1,8 @@
 locals {
-  region             = "ap-south-1"
-  cognito_prefix     = "attendance-${var.account_id}-${var.env}"
-  cognito_base_url   = "${aws_cognito_user_pool_domain.hosted.domain}.auth.ap-south-1.amazoncognito.com"
-  api_origin_domain  = replace(aws_apigatewayv2_api.http.api_endpoint, "https://", "")
+  region            = "ap-south-1"
+  cognito_prefix    = "attendance-${var.account_id}-${var.env}"
+  cognito_base_url  = "${aws_cognito_user_pool_domain.hosted.domain}.auth.ap-south-1.amazoncognito.com"
+  api_origin_domain = replace(aws_apigatewayv2_api.http.api_endpoint, "https://", "")
   api_log_format     = jsonencode({
     requestId      = "$context.requestId"
     routeKey       = "$context.routeKey"
@@ -124,8 +124,8 @@ resource "aws_apigatewayv2_api" "http" {
 
   cors_configuration {
     allow_origins = var.allowed_origins
-    allow_methods  = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-    allow_headers  = ["Authorization", "Content-Type", "Accept"]
+    allow_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    allow_headers = ["Authorization", "Content-Type", "Accept"]
     max_age       = 300
   }
 
