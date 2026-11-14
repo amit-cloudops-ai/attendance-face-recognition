@@ -1,7 +1,8 @@
-"""Index one consented employee photo and always remove its raw S3 object."""
+"""Retry-safe S3 enrollment worker with idempotent employee updates."""
 import logging
 import os
 import re
+import time
 from urllib.parse import unquote_plus
 from uuid import UUID
 
@@ -14,6 +15,7 @@ LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
 REGION = "ap-south-1"
+_LOCK_SECONDS = 90
 
 
 def _required_env(name: str) -> str:
@@ -71,6 +73,54 @@ def _update_result(table, request_id: str, code: str, message: str, **fields) ->
         raise
 
 
+def _finish(s3, bucket: str, key: str, results, request_id: str, code: str,
+            message: str, **fields) -> None:
+    _update_result(results, request_id, code, message, **fields)
+    # Delete only after a durable terminal result. Repeated deletion is safe.
+    s3.delete_object(Bucket=bucket, Key=key)
+
+
+def _request_marker(request_id: str) -> str:
+    return f"enrollment_{request_id}"
+
+
+def _acquire_employee_lock(employees, employee_id: str, request_id: str) -> None:
+    now = int(time.time())
+    try:
+        employees.update_item(
+            Key={"employee_id": employee_id},
+            UpdateExpression="SET enrollment_lock_request=:request, enrollment_lock_until=:until",
+            ConditionExpression=(
+                "active=:active AND "
+                "(attribute_not_exists(enrollment_lock_until) OR "
+                "enrollment_lock_until < :now OR enrollment_lock_request=:request)"
+            ),
+            ExpressionAttributeValues={
+                ":active": True,
+                ":request": request_id,
+                ":until": now + _LOCK_SECONDS,
+                ":now": now,
+            },
+        )
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            raise RuntimeError("another enrollment is currently processing for this employee") from exc
+        raise
+
+
+def _release_employee_lock(employees, employee_id: str, request_id: str) -> None:
+    try:
+        employees.update_item(
+            Key={"employee_id": employee_id},
+            UpdateExpression="REMOVE enrollment_lock_request, enrollment_lock_until",
+            ConditionExpression="enrollment_lock_request=:request",
+            ExpressionAttributeValues={":request": request_id},
+        )
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+            raise
+
+
 def _process_record(record: dict) -> None:
     info = record.get("s3") or {}
     bucket = (info.get("bucket") or {}).get("name")
@@ -83,83 +133,127 @@ def _process_record(record: dict) -> None:
         return
     employee_id, request_id = parsed
     s3 = boto3.client("s3", region_name=REGION)
-    results = None
-    rekognition = None
+    results = _table("TABLE_SCAN_RESULTS")
+    pending = results.get_item(
+        Key={"request_id": request_id}, ConsistentRead=True
+    ).get("Item")
+    if not pending or pending.get("code") != "pending":
+        s3.delete_object(Bucket=bucket, Key=key)
+        return
+
+    try:
+        s3.head_object(Bucket=bucket, Key=key)
+    except ClientError as exc:
+        if _not_found(exc):
+            _finish(s3, bucket, key, results, request_id, "error",
+                    "The uploaded enrollment image is no longer available.")
+            return
+        raise
+
+    employees = _table("TABLE_EMPLOYEES")
+    employee = employees.get_item(
+        Key={"employee_id": employee_id}, ConsistentRead=True
+    ).get("Item")
+    if not employee or not employee.get("active", False):
+        _finish(s3, bucket, key, results, request_id, "unknown_employee",
+                "The employee does not exist or is inactive.")
+        return
+
+    # If the employee update succeeded but result finalization failed, this
+    # request marker lets a retry finish without adding the face twice.
+    marker = _request_marker(request_id)
+    committed_face_id = employee.get(marker)
+    if committed_face_id:
+        _finish(s3, bucket, key, results, request_id, "enrolled",
+                "Employee photo enrolled successfully.",
+                employee_id=employee_id, name=employee.get("name", ""))
+        return
+
+    settings = get_settings()
+    if int(employee.get("photo_count", 0)) >= int(settings["max_photos_per_employee"]):
+        _finish(s3, bucket, key, results, request_id, "limit_reached",
+                "The maximum number of enrollment photos has been reached.")
+        return
+
+    _acquire_employee_lock(employees, employee_id, request_id)
     indexed_face_ids = []
     try:
-        results = _table("TABLE_SCAN_RESULTS")
-        pending = results.get_item(
-            Key={"request_id": request_id}, ConsistentRead=True
-        ).get("Item")
-        if not pending or pending.get("code") != "pending":
-            return
-        try:
-            s3.head_object(Bucket=bucket, Key=key)
-        except ClientError as exc:
-            if _not_found(exc):
-                return
-            raise
-
-        employees = _table("TABLE_EMPLOYEES")
+        # Refresh after acquiring the lock; another invocation may have
+        # completed this same request just before the lock was obtained.
         employee = employees.get_item(
             Key={"employee_id": employee_id}, ConsistentRead=True
         ).get("Item")
-        if not employee or not employee.get("active", False):
-            _update_result(results, request_id, "unknown_employee",
-                           "The employee does not exist or is inactive.")
-            return
-
-        settings = get_settings()
-        if int(employee.get("photo_count", 0)) >= int(settings["max_photos_per_employee"]):
-            _update_result(results, request_id, "limit_reached",
-                           "The maximum number of enrollment photos has been reached.")
+        committed_face_id = employee.get(marker) if employee else None
+        if committed_face_id:
+            _release_employee_lock(employees, employee_id, request_id)
+            _finish(s3, bucket, key, results, request_id, "enrolled",
+                    "Employee photo enrolled successfully.",
+                    employee_id=employee_id, name=employee.get("name", ""))
             return
 
         rekognition = boto3.client("rekognition", region_name=REGION)
         image = {"S3Object": {"Bucket": bucket, "Name": key}}
         faces = rekognition.detect_faces(Image=image, Attributes=["DEFAULT"]).get("FaceDetails", [])
         if not faces:
-            _update_result(results, request_id, "no_face", "No face was detected.")
+            _release_employee_lock(employees, employee_id, request_id)
+            _finish(s3, bucket, key, results, request_id, "no_face", "No face was detected.")
             return
         if len(faces) != 1:
-            _update_result(results, request_id, "multiple_faces",
-                           "Only one person should be in the frame.")
+            _release_employee_lock(employees, employee_id, request_id)
+            _finish(s3, bucket, key, results, request_id, "multiple_faces",
+                    "Only one person should be in the frame.")
             return
         quality = faces[0].get("Quality") or {}
         if (float(quality.get("Brightness", 0)) < float(settings["min_brightness"])
                 or float(quality.get("Sharpness", 0)) < float(settings["min_sharpness"])):
-            _update_result(results, request_id, "low_quality",
-                           "Image quality is too low. Please improve lighting and focus.")
+            _release_employee_lock(employees, employee_id, request_id)
+            _finish(s3, bucket, key, results, request_id, "low_quality",
+                    "Image quality is too low. Please improve lighting and focus.")
             return
 
         matches = rekognition.search_faces_by_image(
             CollectionId=_required_env("COLLECTION_ID"),
             Image=image,
             FaceMatchThreshold=float(settings["face_match_threshold"]),
-            MaxFaces=1,
+            MaxFaces=5,
             QualityFilter="AUTO",
         ).get("FaceMatches", [])
         if any((match.get("Face") or {}).get("ExternalImageId") not in (None, employee_id)
                for match in matches):
-            _update_result(results, request_id, "duplicate_face",
-                           "This face is already enrolled to another employee.")
+            _release_employee_lock(employees, employee_id, request_id)
+            _finish(s3, bucket, key, results, request_id, "duplicate_face",
+                    "This face is already enrolled to another employee.")
             return
 
-        indexed = rekognition.index_faces(
-            CollectionId=_required_env("COLLECTION_ID"),
-            Image=image,
-            ExternalImageId=employee_id,
-            MaxFaces=1,
-            QualityFilter="AUTO",
-        )
-        indexed_face_ids = [
-            item["Face"]["FaceId"] for item in indexed.get("FaceRecords", [])
-            if item.get("Face", {}).get("FaceId")
+        known_face_ids = set(employee.get("face_ids") or [])
+        # If IndexFaces succeeded on an earlier invocation but the employee
+        # write did not, the untracked matching FaceId is recovered here.
+        recovered = [
+            (match.get("Face") or {}).get("FaceId")
+            for match in matches
+            if (match.get("Face") or {}).get("ExternalImageId") == employee_id
+            and (match.get("Face") or {}).get("FaceId") not in known_face_ids
         ]
-        if not indexed_face_ids:
-            _update_result(results, request_id, "no_face",
-                           "The face could not be indexed. Please try another photo.")
-            return
+        if recovered:
+            face_id = recovered[0]
+        else:
+            indexed = rekognition.index_faces(
+                CollectionId=_required_env("COLLECTION_ID"),
+                Image=image,
+                ExternalImageId=employee_id,
+                MaxFaces=1,
+                QualityFilter="AUTO",
+            )
+            indexed_face_ids = [
+                item["Face"]["FaceId"] for item in indexed.get("FaceRecords", [])
+                if item.get("Face", {}).get("FaceId")
+            ]
+            if not indexed_face_ids:
+                _release_employee_lock(employees, employee_id, request_id)
+                _finish(s3, bucket, key, results, request_id, "no_face",
+                        "The face could not be indexed. Please try another photo.")
+                return
+            face_id = indexed_face_ids[0]
 
         now = now_ist().isoformat(timespec="seconds")
         try:
@@ -168,59 +262,60 @@ def _process_record(record: dict) -> None:
                 UpdateExpression=(
                     "SET photo_count=if_not_exists(photo_count,:zero)+:one, "
                     "face_ids=list_append(if_not_exists(face_ids,:empty),:new_faces), "
-                    "updated_at=:now"
+                    "#marker=:face_id, updated_at=:now "
+                    "REMOVE enrollment_lock_request, enrollment_lock_until"
                 ),
                 ConditionExpression=(
-                    "active=:active AND (attribute_not_exists(photo_count) OR photo_count < :max)"
+                    "active=:active AND attribute_not_exists(#marker) AND "
+                    "(attribute_not_exists(photo_count) OR photo_count < :max) AND "
+                    "enrollment_lock_request=:request"
                 ),
+                ExpressionAttributeNames={"#marker": marker},
                 ExpressionAttributeValues={
-                    ":zero": 0, ":one": 1, ":empty": [], ":new_faces": indexed_face_ids,
-                    ":now": now, ":active": True,
+                    ":zero": 0, ":one": 1, ":empty": [], ":new_faces": [face_id],
+                    ":face_id": face_id, ":now": now, ":active": True,
                     ":max": int(settings["max_photos_per_employee"]),
+                    ":request": request_id,
                 },
             )
             indexed_face_ids = []
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
                 raise
-            rekognition.delete_faces(
-                CollectionId=_required_env("COLLECTION_ID"), FaceIds=indexed_face_ids
-            )
-            indexed_face_ids = []
             latest = employees.get_item(
                 Key={"employee_id": employee_id}, ConsistentRead=True
             ).get("Item")
-            code = "limit_reached" if latest and latest.get("active", False) else "unknown_employee"
-            message = ("The maximum number of enrollment photos has been reached."
-                       if code == "limit_reached" else
-                       "The employee does not exist or is inactive.")
-            _update_result(results, request_id, code, message)
-            return
+            if latest and latest.get(marker):
+                indexed_face_ids = []
+            else:
+                if face_id not in set((latest or {}).get("face_ids") or []):
+                    rekognition.delete_faces(
+                        CollectionId=_required_env("COLLECTION_ID"), FaceIds=[face_id]
+                    )
+                    indexed_face_ids = []
+                _release_employee_lock(employees, employee_id, request_id)
+                code = "limit_reached" if latest and latest.get("active", False) else "unknown_employee"
+                message = ("The maximum number of enrollment photos has been reached."
+                           if code == "limit_reached" else
+                           "The employee does not exist or is inactive.")
+                _finish(s3, bucket, key, results, request_id, code, message)
+                return
 
-        _update_result(
-            results, request_id, "enrolled", "Employee photo enrolled successfully.",
-            employee_id=employee_id, name=employee.get("name", ""),
-        )
-    except Exception as exc:
-        if indexed_face_ids and rekognition is not None:
-            try:
-                rekognition.delete_faces(
-                    CollectionId=_required_env("COLLECTION_ID"), FaceIds=indexed_face_ids
-                )
-            except Exception:
-                LOGGER.exception("Unable to roll back partially indexed enrollment faces")
-        if results is not None:
-            try:
-                _update_result(results, request_id, "error", "Enrollment failed. Please try again.")
-            except Exception:
-                LOGGER.exception("Unable to mark enrollment result as failed")
-        LOGGER.error("Enrollment processing failed (%s)", type(exc).__name__)
+        _finish(s3, bucket, key, results, request_id, "enrolled",
+                "Employee photo enrolled successfully.",
+                employee_id=employee_id, name=employee.get("name", ""))
+    except Exception:
+        # Do not mark a retryable failure terminal and do not delete the image.
+        # Keep the short lease; a retry of this request can reclaim it.
+        LOGGER.exception("Enrollment processing failed; preserving image for retry")
         raise
-    finally:
-        s3.delete_object(Bucket=bucket, Key=key)
 
 
 def lambda_handler(event, context):
     for record in (event or {}).get("Records", []):
-        _process_record(record)
+        try:
+            _process_record(record)
+        except Exception as exc:
+            LOGGER.error("Enrollment processing failed (%s)", type(exc).__name__)
+            raise
     return {"statusCode": 200, "body": "processed"}
