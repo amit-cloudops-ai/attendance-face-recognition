@@ -323,6 +323,12 @@ resource "aws_cloudfront_function" "directory_index" {
   publish = true
   comment = "Rewrite static directory routes to their index.html object."
 
+  tags = {
+    Project     = "attendance"
+    Environment = var.env
+    Component   = "access"
+  }
+
   code = <<-JAVASCRIPT
     function handler(event) {
       var request = event.request;
