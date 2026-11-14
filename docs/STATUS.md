@@ -105,6 +105,14 @@
 - API Gateway v2 uses `apigateway:GET/POST/PATCH/PUT/DELETE`; CloudFront is global and uses resource-specific action names; Cognito IAM granularity is user-pool level. Exact provider source/API matrix: `docs/security/ACCESS-PROVIDER-IAM.md`.
 - CI run [43615508377](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43615508377), commit `59ad7e0c1ccd`: Python and Terraform jobs passed, including access module and dev/prod root validation.
 
+### T09 — dev plan-role policy
+
+- **Status:** policy templates drafted; CI validation pending.
+- Added three read-only policy templates: `github-plan-dev-core.json.tftpl` (DynamoDB/IAM/Lambda/Scheduler/SQS/Rekognition/CloudWatch/SNS/Budgets reads), `github-plan-dev-edge.json.tftpl` (KMS/S3/Cognito/API Gateway v2/CloudFront reads), and `github-plan-dev-state.json.tftpl` (dev state read plus dev lockfile lifecycle only).
+- The three rendered managed policies are each below 6,144 characters with dummy values. The state object is read-only; PutObject/DeleteObject are restricted to the dev `.tflock` object. No production state path is included.
+- The plan role has no infrastructure create/update/delete actions. `s3:ListBucket` on the three app buckets is retained because the reviewed AWS provider v6.73.0 bucket refresh path calls HeadBucket, which requires ListBucket; no raw-object read permission is granted.
+- CI now validates rendered JSON, template substitution, policy size, absence of infrastructure mutation actions, and dev-only state paths.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
