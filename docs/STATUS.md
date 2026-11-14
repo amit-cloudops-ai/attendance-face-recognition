@@ -36,7 +36,11 @@
 
 ### T31 — Lambda runtime region alignment
 
-- **Status:** implementation complete; CI validation pending.
+- **Status:** complete on `ai/T31-runtime-region`.
+- Attempt 1 CI run [43612501767](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43612501767) failed 29 tests because the region was captured at module import, before Moto fixtures set `AWS_REGION`.
+- Root cause: module-level region constants evaluated before test fixture environment overrides. Tests were not changed.
+- Attempt 2 changed all handler region resolution to call-time `_region()` lookups and kept shared helpers on call-time environment reads. This preserves isolated Moto test regions while deployed Lambdas use their actual `AWS_REGION`.
+- CI run [43612668343](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43612668343), commit `604a3ef6f69c05af50c8cd3319e1d44166c93545`: Python and Terraform jobs passed, including pytest, Ruff, formatting, all module validations and both environment-root validations.
 - Root cause: all seven data handlers and all seven recognition handlers contained an explicit `ap-south-1` region constant; shared DynamoDB helpers and the result handler also fell back to `ap-south-1`. Terraform provider and backend roots target `us-east-1`, so these SDK clients could address the wrong regional resources.
 - Fix: all 14 Lambda handlers now derive their region from Lambda's reserved `AWS_REGION` environment variable with `us-east-1` as the local/test fallback. Shared `get_settings` and `record_scan` helpers use the same environment variable and fallback.
 - No AWS resources or live AWS calls were used. Python and Terraform CI are the validation gates.
