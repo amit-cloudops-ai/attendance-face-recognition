@@ -1,3 +1,5 @@
+data "aws_region" "current" {}
+
 data "archive_file" "common_layer" {
   type        = "zip"
   source_dir  = "${path.module}/../../../shared"
@@ -196,6 +198,62 @@ resource "aws_sns_topic_subscription" "email" {
   topic_arn = aws_sns_topic.alerts.arn
   protocol  = "email"
   endpoint  = var.alert_email
+}
+
+data "aws_iam_policy_document" "alerts_topic" {
+  statement {
+    sid    = "AllowAccountOwnerManageAlertsTopic"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${var.account_id}:root"]
+    }
+
+    actions = [
+      "sns:AddPermission",
+      "sns:DeleteTopic",
+      "sns:GetTopicAttributes",
+      "sns:ListSubscriptionsByTopic",
+      "sns:Publish",
+      "sns:RemovePermission",
+      "sns:SetTopicAttributes",
+      "sns:Subscribe",
+      "sns:Unsubscribe"
+    ]
+
+    resources = [aws_sns_topic.alerts.arn]
+  }
+
+  statement {
+    sid    = "AllowCloudWatchAlarmPublish"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.alerts.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:cloudwatch:${data.aws_region.current.name}:${var.account_id}:alarm:attendance-${var.env}-*"]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "alerts" {
+  arn    = aws_sns_topic.alerts.arn
+  policy = data.aws_iam_policy_document.alerts_topic.json
 }
 
 resource "aws_lambda_layer_version" "common" {
