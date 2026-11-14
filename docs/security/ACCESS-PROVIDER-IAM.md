@@ -86,3 +86,8 @@ CloudFront policy creation/update/delete and distribution/function creation APIs
 - [Cognito user-pool management API authorization model](https://docs.aws.amazon.com/cognito/latest/developerguide/authentication-flows-public-server-side.html)
 - [API Gateway ARN reference](https://docs.aws.amazon.com/apigateway/latest/developerguide/arn-format-reference.html)
 - [S3 Service Authorization Reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_s3.html)
+
+
+### KMS key policy dependency
+
+The access module owns the final `aws_kms_key_policy.attendance` resource because only this module has the created CloudFront distribution ARN. The policy grants `kms:Decrypt` to `cloudfront.amazonaws.com` only when `aws:SourceAccount` matches the account and `aws:SourceArn` equals `aws_cloudfront_distribution.site.arn`. The key itself is created in the foundation module with the default account-root policy, then the access module installs the complete service policy. This avoids a Terraform dependency cycle and removes the previous distribution wildcard. Deployment IAM must scope `kms:PutKeyPolicy` and `kms:GetKeyPolicy` to the exact environment KMS key ARN.
