@@ -468,3 +468,51 @@ resource "aws_s3_bucket_policy" "web" {
   bucket = var.web_bucket_name
   policy = data.aws_iam_policy_document.web_bucket.json
 }
+
+
+locals {
+  frontend_root = "${path.module}/../../../web"
+  frontend_mime_types = {
+    ".html"  = "text/html; charset=utf-8"
+    ".js"    = "text/javascript; charset=utf-8"
+    ".css"   = "text/css; charset=utf-8"
+    ".json"  = "application/json"
+    ".svg"   = "image/svg+xml"
+    ".png"   = "image/png"
+    ".jpg"   = "image/jpeg"
+    ".webp"  = "image/webp"
+    ".ico"   = "image/x-icon"
+    ".woff2" = "font/woff2"
+  }
+  frontend_files = {
+    for path in fileset(local.frontend_root, "**") : path => path
+    if !endswith(path, ".gitkeep")
+  }
+}
+
+resource "aws_s3_object" "frontend" {
+  for_each = local.frontend_files
+
+  bucket       = var.web_bucket_name
+  key          = each.value
+  source       = "${local.frontend_root}/${each.value}"
+  etag         = filemd5("${local.frontend_root}/${each.value}")
+  content_type = lookup(local.frontend_mime_types, regex("\\.[^.]+$", each.value), "application/octet-stream")
+  cache_control = "no-cache, no-store, must-revalidate"
+}
+
+resource "aws_s3_object" "frontend_config" {
+  bucket  = var.web_bucket_name
+  key     = "config.json"
+  content = jsonencode({
+    region       = local.region
+    userPoolId   = aws_cognito_user_pool.main.id
+    clientId     = aws_cognito_user_pool_client.web.id
+    cognitoDomain = "https://${local.cognito_base_url}"
+    apiBase      = "/api"
+    rawBucketUrl = "https://${var.raw_bucket_name}.s3.${local.region}.amazonaws.com"
+  })
+
+  content_type  = "application/json"
+  cache_control = "no-cache, no-store, must-revalidate"
+}
