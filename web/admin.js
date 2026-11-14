@@ -8,6 +8,7 @@ const reportOutput = document.querySelector("#report-output");
 const csvDownload = document.querySelector("#csv-download");
 const overrideDialog = document.querySelector("#override-dialog");
 let nextCursor = null;
+let maxPhotosPerEmployee = 5;
 
 function status(text, isError = false) {
   message.textContent = text;
@@ -35,7 +36,7 @@ async function loadEmployees() {
     activePill.className = "pill";
     activePill.textContent = employee.active ? "Active" : "Inactive";
     active.append(activePill);
-    cell(row, `${employee.photo_count || 0}/5`);
+    cell(row, `${employee.photo_count || 0}/${maxPhotosPerEmployee}`);
     const actions = document.createElement("td");
     const group = document.createElement("div");
     group.className = "actions";
@@ -43,7 +44,7 @@ async function loadEmployees() {
     enroll.className = "secondary";
     enroll.textContent = "Enroll photos";
     enroll.disabled = !employee.active;
-    enroll.addEventListener("click", () => enrollPhotos(employee.employee_id));
+    enroll.addEventListener("click", () => enrollPhotos(employee));
     group.append(enroll);
     if (employee.active) {
       const deactivate = document.createElement("button");
@@ -51,6 +52,12 @@ async function loadEmployees() {
       deactivate.textContent = "Deactivate";
       deactivate.addEventListener("click", () => deactivateEmployee(employee.employee_id));
       group.append(deactivate);
+    } else if (Number(employee.photo_count || 0) > 0) {
+      const retryDelete = document.createElement("button");
+      retryDelete.className = "danger";
+      retryDelete.textContent = "Retry face deletion";
+      retryDelete.addEventListener("click", () => retryFaceDeletion(employee.employee_id));
+      group.append(retryDelete);
     }
     actions.append(group);
     row.append(actions);
@@ -64,15 +71,27 @@ async function loadEmployees() {
   }
 }
 
-async function enrollPhotos(employeeId) {
+async function enrollPhotos(employee) {
+  const employeeId = employee.employee_id;
+  const remaining = Math.max(0, maxPhotosPerEmployee - Number(employee.photo_count || 0));
+  if (remaining === 0) {
+    status(employeeId + " already has the maximum " + maxPhotosPerEmployee + " enrollment photos.");
+    return;
+  }
+  const minimum = Number(employee.photo_count || 0) === 0 ? Math.min(3, remaining) : 1;
   const picker = document.createElement("input");
   picker.type = "file";
   picker.accept = "image/jpeg,image/png,image/webp";
   picker.multiple = true;
   picker.addEventListener("change", async () => {
     const files = Array.from(picker.files || []);
-    if (files.length < 3 || files.length > 5) {
-      status("Select 3 to 5 varied employee photos for enrollment.", true);
+    if (files.length < minimum || files.length > remaining) {
+      status(
+        Number(employee.photo_count || 0) === 0
+          ? "Select " + minimum + " to " + remaining + " varied photos for initial enrollment."
+          : "Select 1 to " + remaining + " additional photo(s); " + maxPhotosPerEmployee + " is the configured maximum.",
+        true
+      );
       return;
     }
     try {
@@ -88,6 +107,7 @@ async function enrollPhotos(employeeId) {
       await loadEmployees();
     } catch (error) {
       status(error.message || "Enrollment failed.", true);
+      await loadEmployees().catch(() => {});
     }
   });
   picker.click();
@@ -109,7 +129,7 @@ async function normalizePhoto(file) {
 }
 
 async function pollEnrollment(requestId) {
-  const deadline = Date.now() + 12000;
+  const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
     const data = await api(`/kiosk/result/${encodeURIComponent(requestId)}`);
     if (data.code !== "pending") return data;
@@ -127,7 +147,21 @@ async function deactivateEmployee(employeeId) {
     status(`${employeeId} deactivated. Face templates deleted; attendance history retained.`);
     await loadEmployees();
   } catch (error) {
-    status(error.message || "Offboarding did not complete. Review the employee and face-template state.", true);
+    status(error.message || "Offboarding did not complete. Retry face deletion from the inactive employee row if needed.", true);
+    await loadEmployees().catch(() => {});
+  }
+}
+
+async function retryFaceDeletion(employeeId) {
+  if (!confirm("Retry deletion of remaining biometric face templates for " + employeeId + "?")) return;
+  try {
+    status("Retrying face-template deletion for " + employeeId + "…");
+    await api("/admin/employees/" + encodeURIComponent(employeeId) + "/faces", { method: "DELETE" });
+    status("Remaining face templates removed for " + employeeId + ".");
+    await loadEmployees();
+  } catch (error) {
+    status(error.message || "Face-template deletion is still incomplete. You can retry again.", true);
+    await loadEmployees().catch(() => {});
   }
 }
 
@@ -191,7 +225,7 @@ document.querySelector("#employee-form").addEventListener("submit", async event 
   try {
     await api("/admin/employees", { method: "POST", body: JSON.stringify(body) });
     event.currentTarget.reset();
-    status(`Employee ${body.employee_id} created. Enroll 3–5 photos next.`);
+    status("Employee " + body.employee_id + " created. Enroll at least 3 photos, up to the configured maximum of " + maxPhotosPerEmployee + ".");
     await loadEmployees();
   } catch (error) {
     status(error.message || "Employee could not be created.", true);
@@ -231,7 +265,8 @@ async function loadSettings() {
   document.querySelector("#setting-sharpness").value = data.min_sharpness;
   document.querySelector("#setting-grace").value = data.grace_minutes;
   document.querySelector("#setting-debounce").value = data.debounce_minutes;
-  document.querySelector("#setting-max-photos").value = data.max_photos_per_employee;
+  maxPhotosPerEmployee = Number(data.max_photos_per_employee) || 5;
+  document.querySelector("#setting-max-photos").value = maxPhotosPerEmployee;
   document.querySelector("#setting-weekends").value = (data.weekend_days || []).join(",");
 }
 
@@ -300,19 +335,28 @@ document.querySelector("#settings-form").addEventListener("submit", async event 
   try {
     await api("/admin/settings", { method: "PUT", body: JSON.stringify(body) });
     await loadSettings();
+    await loadEmployees();
     status("Attendance settings saved and audit-logged.");
   } catch (error) {
     status(error.message || "Settings could not be saved.", true);
   }
 });
 
-document.querySelector("#reload-settings").addEventListener("click", () => loadSettings().catch(error => status(error.message, true)));
+document.querySelector("#reload-settings").addEventListener("click", async () => {
+  try {
+    await loadSettings();
+    await loadEmployees();
+  } catch (error) {
+    status(error.message, true);
+  }
+});
 document.querySelector("#sign-out").addEventListener("click", logout);
 
 try {
   if (accessToken()) {
     if (!hasGroup("admin")) throw new Error("An administrator account is required.");
-    await Promise.all([loadEmployees(), loadSettings()]);
+    await loadSettings();
+    await loadEmployees();
     status("Administration ready.");
   } else {
     status("Sign in with your administrator account to continue.");
