@@ -49,7 +49,7 @@ Provider v6.23+ uses S3 Control `TagResource`, `UntagResource`, and `ListTagsFor
 - `kms:CreateKey` has no resource type and must use `Resource: "*"`; constrain it with request-tag conditions for Project=attendance and Environment=dev or prod.
 - Key read/write actions are scoped to the one environment key ARN. KMS tag operations are scoped to that key ARN and environment tags.
 - `kms:CreateAlias` and `kms:UpdateAlias` require the alias and key resources; `kms:DeleteAlias` is scoped to the exact alias ARN. `kms:ListAliases` has no resource-level scope.
-- Do not grant `kms:CreateGrant`, `kms:Decrypt`, or `kms:GenerateDataKey` to the deployment role merely because the key is being created. Those cryptographic operations belong to runtime/service principals and are covered by their own policies.
+- KMS key creation itself does not require runtime cryptographic permissions. However, T07 found that the data module creates DynamoDB tables encrypted with this customer-managed key; AWS requires the principal selecting that key for a table to have `kms:Encrypt`, `kms:Decrypt`, `kms:ReEncryptFrom`, `kms:ReEncryptTo`, `kms:GenerateDataKey`, `kms:GenerateDataKeyWithoutPlaintext`, `kms:DescribeKey`, and `kms:CreateGrant`, constrained to DynamoDB via `kms:ViaService`. These are deployment-role permissions, not Lambda runtime permissions. See `docs/security/DATA-RECOGNITION-PROVIDER-IAM.md` and task T36 for the missing DynamoDB service-principal key-policy statement.
 
 ### SNS email subscription
 

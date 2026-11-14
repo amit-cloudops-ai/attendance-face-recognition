@@ -75,6 +75,22 @@
 - AWS Budget operations require `budgets:ModifyBudget`/`ViewBudget` plus account-wide `aws-portal:ModifyBilling`/`ViewBilling`. T34 tracks isolating budgets so ordinary deployment roles do not receive account-wide billing modification.
 - Foundation KMS key policy still allows CloudFront service access from any distribution in the account; T35 tracks exact distribution scoping.
 
+### T07 — data and recognition Terraform provider IAM mapping
+
+- **Status:** static mapping drafted; CI validation pending.
+- Mapped DynamoDB table TTL/PITR/tag APIs; CloudWatch Logs and metric alarms; IAM roles/inline policies; Lambda functions, permissions, event source mappings and async invoke config; Scheduler schedules; SQS queues/redrive allow policies; Rekognition collections; and S3 bucket notifications. Full matrix: `docs/security/DATA-RECOGNITION-PROVIDER-IAM.md`.
+- Exact `iam:PassRole` scopes are required for Lambda execution roles and Scheduler target roles, with `iam:PassedToService` conditions.
+- Critical KMS dependency: all five DynamoDB tables use the customer-managed KMS key. AWS requires the principal selecting the CMK to have Encrypt, Decrypt, ReEncrypt, GenerateDataKey, DescribeKey and CreateGrant permissions via DynamoDB. These belong in deployment-role policies, not Lambda runtime boundaries.
+- The foundation key policy currently has no DynamoDB service-principal statement for direct key metadata access. Added T36 to fix the key policy and deployment KMS policy before bootstrap.
+
+### T07 — data and recognition Terraform provider IAM mapping
+
+- **Status:** complete on `ai/T07-data-recognition-provider-iam`.
+- Provider v6.73.0 source/API mapping covers DynamoDB table TTL/PITR/tags, CloudWatch Logs and alarms, IAM roles and inline policies, Lambda functions/permissions/event-source mappings/async invoke config, Scheduler schedules, SQS queues/redrive allow policies, Rekognition collections and S3 bucket notifications.
+- Full matrix and exact resource-scope requirements: `docs/security/DATA-RECOGNITION-PROVIDER-IAM.md`.
+- Identified the DynamoDB customer-managed-key deployment dependency. T36 tracks the corresponding key-policy and apply-role permission work.
+- CI run [43614059591](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43614059591), commit `6421a667c10c`: Python and Terraform jobs passed.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
