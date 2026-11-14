@@ -51,7 +51,11 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T37 | Build dedicated billing plan/apply policies and OIDC roles | DONE | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
 
 | T38 | Establish canonical AWS region manifest and CI drift prevention | DONE | Terraform providers, backend initialization, Lambda SDKs, contracts, frontend config, IAM regional ARNs and documentation resolve to config/deployment.json; CI fails on any conflicting region or legacy region reference |
-| T39 | Complete full solo pre-deployment audit and close static blockers | IN_PROGRESS | KMS policy placement, region source, Python 3 tooling, STS account guard, JSON logging, route-contract checks, raw-image cleanup verification, deployment docs and expanded read-only resource inventory reviewed; CI green |
+| T39 | Complete full solo pre-deployment audit and close static blockers | IN_PROGRESS | Phased findings in docs/PREDEPLOYMENT-AUDIT.md; Part 1 application corrections committed on PR #29 and CI passed on code commit; SNS/KMS, local Terraform safety, config object collision and AWS inventory remain open |
+| T40 | Correct encrypted SNS/KMS permissions and verify alert delivery | BLOCKED | Lambda publisher roles, runtime boundary and CloudWatch service principal must be authorized for the encrypted alerts topic; add CI policy checks and verify delivery in dev |
+| T41 | Make local Terraform deployment inputs and packaging safe | TODO | Correct callback/boundary tfvars examples, STS account guard, account-bound boundary ARN validation, exclude generated config.json from generic upload, and align local instructions |
+| T42 | Complete runtime failure monitoring and raw-image retention guarantee | TODO | Add Scheduler target-error monitoring, durable scheduled-job failure handling, and test/implement cleanup for raw objects after failure-processor exhaustion |
+| T43 | Complete browser and deployed integration acceptance | TODO | Cognito/PKCE, camera, CORS, enrollment/offboarding, reports, schedule jobs, real capture-to-screen p95, and browser/device matrix verified in dev |
 
 ## Phase C — release and operations
 
@@ -82,3 +86,5 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - No AWS resources, OIDC provider, IAM roles, boundaries, state bucket or KMS keys have been created. No remote backend init, Terraform plan or apply has been run. PR #28 merge did not provision AWS resources.
 
 - T39 pre-deployment audit is in progress on PR #29. It corrects the DynamoDB KMS key-policy attachment, Python 3 command usage, deploy-time STS account assertion, Lambda JSON logging, solo-owner governance, route-contract coverage and dev raw-image cleanup verification. The expanded read-only AWS inventory has not yet been run. Do not treat T39 as DONE until CI passes and the owner has completed the required local checks.
+
+- T40–T43 are newly identified by the full pre-deployment audit. Do not mark them complete based on static Terraform validation alone; T40 requires a live dev notification test, and T43 requires a deployed dev environment.
