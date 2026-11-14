@@ -8,7 +8,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 
 | ID | Task | Status | Acceptance criteria |
 |---|---|---|---|
-| T01 | Restore repository working rules, task board, and ChatGPT project instructions | IN_PROGRESS | Governance files exist, agree with owner-approved workflow, status is accurate, CI passes |
+| T01 | Restore repository working rules, task board, and ChatGPT project instructions | DONE | Governance files exist, agree with owner-approved workflow, status is accurate, CI passes |
 
 ## Phase B — deployment security and readiness
 
@@ -51,7 +51,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 
 ## Task execution notes
 
-- T01 is the active governance restoration task.
-- T02 is the next task after T01 is closed.
+- T01 is complete: governance files restored and branch CI passed on commits `be5b4e94c41f760d6bd750bf283f76dec222b2ef` and `aa293276cc8d35961ac75b6cd70ccd681105ae0f`.
+- T02 is the next active task: validate the KMS key policy for Lambda asynchronous failure destinations.
 - Do not reorder or mark tasks complete without evidence.
 - The task board is a plan, not proof that implementation or AWS validation has occurred.
