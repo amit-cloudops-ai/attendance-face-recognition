@@ -626,6 +626,46 @@ jobs:
               raise SystemExit("Deployment workflow must bind OIDC subject to operation-specific environment")
           PY
 
+      - name: Lint current infrastructure template formats
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          ignored = {".git", ".terraform", "node_modules", ".venv"}
+          candidates = []
+          for path in Path(".").rglob("*"):
+              if not path.is_file() or any(part in ignored for part in path.parts):
+                  continue
+              name = path.name.lower()
+              path_text = str(path).lower()
+              if name in ("template.yaml", "template.yml", "template.json", "samconfig.toml"):
+                  candidates.append(path)
+              elif "cloudformation" in path_text or "serverless.yml" in name:
+                  candidates.append(path)
+          if candidates:
+              paths = ", ".join(str(path) for path in candidates)
+              raise SystemExit(
+                  "CloudFormation/SAM template introduced without cfn-lint or sam validate --lint: " + paths
+              )
+
+          policies = list(Path("infra/policies").glob("*.json.tftpl"))
+          if not policies:
+              raise SystemExit("Expected IAM policy JSON templates under infra/policies")
+          for path in policies:
+              rendered = path.read_text(encoding="utf-8")
+              rendered = rendered.replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              if "${" in rendered:
+                  raise SystemExit(f"Unresolved template variable in {path}")
+              policy = json.loads(rendered)
+              if policy.get("Version") != "2012-10-17" or not policy.get("Statement"):
+                  raise SystemExit(f"Invalid IAM policy structure: {path}")
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy exceeds 6,144 characters: {path}")
+          print(f"Validated {len(policies)} IAM policy JSON templates; no CloudFormation/SAM templates are present.")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:

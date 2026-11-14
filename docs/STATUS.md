@@ -260,3 +260,12 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - CI run [43618843607](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43618843607), commit `3a1af215f5`: Python policy/workflow/documentation validation passed; Terraform job is pending.
 - The GitHub connector cannot inspect or configure repository Actions environments. Branch protection API reads returned 403 Resource not accessible by integration. Therefore actual environment existence, variable values, secret presence, reviewer assignments and branch restrictions cannot be verified or changed in this session.
 - **Owner action required:** configure the four environments and protection settings from the setup guide, then provide confirmation or an authorized read-only verification path. No secrets or GitHub settings were changed.
+
+
+### T17 — infrastructure template linting
+
+- **Status:** linting guard drafted; CI validation pending.
+- Recursive Git tree audit of the Phase B branch found 220 paths and no CloudFormation/SAM templates (`template.yaml`, `template.yml`, `template.json`, `samconfig.toml`, CloudFormation or Serverless template directories). The project uses Terraform and 28 JSON IAM policy templates.
+- Added `docs/INFRASTRUCTURE-TEMPLATE-LINTING.md` documenting the current source inventory and existing Terraform/YAML/JSON CI coverage.
+- CI now renders and parses every `infra/policies/*.json.tftpl`, checks IAM policy structure and 6,144-character size, and fails if a CloudFormation/SAM template is added without a matching cfn-lint/SAM validation step.
+- No unnecessary cfn-lint or SAM CLI dependency added because no such source exists.
