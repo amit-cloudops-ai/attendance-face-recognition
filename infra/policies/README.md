@@ -75,7 +75,7 @@ The templates are policy source, not an AWS deployment. CI renders them with a d
 The data module creates all five tables with the foundation customer-managed key. The final key policy therefore includes the AWS-documented DynamoDB model:
 
 - Account principals can use the key for DynamoDB only when `kms:CallerAccount` matches the account and `kms:ViaService` is `dynamodb.us-east-1.amazonaws.com`. The statement grants `kms:Encrypt`, `kms:Decrypt`, `kms:ReEncrypt*`, `kms:GenerateDataKey*`, `kms:CreateGrant` and `kms:DescribeKey`.
-- The direct `dynamodb.amazonaws.com` service principal receives only `kms:Describe*`, `kms:Get*` and `kms:List*` metadata access.
+- The direct `dynamodb.amazonaws.com` metadata statement is intentionally omitted because AWS documents it in the AWS-managed-key example, not the customer-managed-key policy example.
 - Deployment identities still need matching IAM permissions. `infra/policies/github-apply-dev-dynamodb-kms.json.tftpl` and the prod equivalent scope cryptographic actions to the environment alias and DynamoDB ViaService. `kms:CreateGrant` is separate and requires `kms:GrantIsForAWSResource=true`.
 
 AWS source: [DynamoDB encryption at rest usage notes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/encryption.usagenotes.html). These are policy templates only; they have not been attached to any AWS identity.
