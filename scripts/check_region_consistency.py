@@ -54,7 +54,7 @@ def validate() -> None:
     }
     for relative, manifest_path in terraform_roots.items():
         content = (ROOT / relative).read_text(encoding="utf-8")
-        if manifest_path not in content or not re.search(r"^\\s*region\\s*=\\s*local\\.deployment_region\\s*$", content, re.MULTILINE):
+        if manifest_path not in content or not re.search(r"^\s*region\s*=\s*local\.deployment_region\s*$", content, re.MULTILINE):
             errors.append(f"{relative} must load its provider region from {manifest_path}")
         backend = content.split('backend "s3" {', 1)[1].split("}", 1)[0]
         if re.search(r"^\s*region\s*=", backend, re.MULTILINE):
