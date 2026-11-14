@@ -118,6 +118,23 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      - name: Verify saved plan belongs to this exact release revision
+        if: ${{ inputs.operation == 'apply' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          plan_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PLAN_RUN_ID")"
+          plan_sha="$(jq -r '.head_sha' <<<"$plan_run")"
+          plan_branch="$(jq -r '.head_branch' <<<"$plan_run")"
+          plan_result="$(jq -r '.conclusion' <<<"$plan_run")"
+          plan_event="$(jq -r '.event' <<<"$plan_run")"
+          expected_branch="${{ inputs.environment == 'prod' && 'main' || 'develop' }}"
+          if [[ "$plan_sha" != "$GITHUB_SHA" || "$plan_branch" != "$expected_branch" || "$plan_result" != "success" || "$plan_event" != "workflow_dispatch" ]]; then
+            echo "Plan must be a successful manual run for this exact commit and environment branch."
+            exit 1
+          fi
+
       - name: Download the previously reviewed plan
         if: ${{ inputs.operation == 'apply' }}
         uses: actions/download-artifact@v4
