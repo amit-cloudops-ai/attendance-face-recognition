@@ -1,6 +1,6 @@
 """DynamoDB-backed settings with documented defaults and a 60-second cache."""
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from threading import Lock
 from typing import Any
 
@@ -30,7 +30,7 @@ def _load() -> dict[str, Any]:
 
 def get_settings() -> dict[str, Any]:
     global _cache, _cached_at
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with _lock:
         if _cache is not None and _cached_at is not None and now - _cached_at < timedelta(seconds=_CACHE_SECONDS):
             return _cache.copy()
