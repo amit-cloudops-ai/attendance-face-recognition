@@ -127,7 +127,7 @@ upload_presigned() {
   # The file part is intentionally last, as required by S3 presigned POST.
   form_args+=(--form "file=@$photo;type=image/jpeg")
   curl -fsS --max-time 30 -o /dev/null -X POST "$upload_url" "${form_args[@]}"
-  printf '%s\\t%s\\n' "$request_id" "$raw_key"
+  printf '%s\t%s\n' "$request_id" "$raw_key"
 }
 
 verify_raw_deleted() {
