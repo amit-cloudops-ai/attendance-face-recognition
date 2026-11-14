@@ -380,6 +380,13 @@ resource "aws_lambda_function" "lambda" {
     variables = local.lambda_environment
   }
 
+  logging_config {
+    log_format            = "JSON"
+    application_log_level = "INFO"
+    system_log_level      = "WARN"
+    log_group             = aws_cloudwatch_log_group.lambda[each.key].name
+  }
+
   depends_on = [aws_iam_role_policy.lambda]
 
   tags = {
