@@ -30,10 +30,14 @@ Reuse the provider if it already exists in the account.
 
 Create two roles only after the deployment workflow and its exact permissions policy have been reviewed:
 
-- `attendance-github-deploy-dev`: trust only `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev`
-- `attendance-github-deploy-prod`: trust only `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`
+Create separate plan and apply roles for each environment:
 
-Both trust policies must require audience `sts.amazonaws.com`. Do not use wildcard repository, branch or environment subjects. Do not attach `AdministratorAccess`; the deploy policy must be scoped to the resources and actions required by the reviewed Terraform plan.
+- `attendance-github-plan-dev`: read-only infrastructure access plus dev state/lock access.
+- `attendance-github-apply-dev`: dev resource mutation access plus dev state/lock access.
+- `attendance-github-plan-prod`: read-only infrastructure access plus prod state/lock access.
+- `attendance-github-apply-prod`: prod resource mutation access plus prod state/lock access.
+
+Each role's trust policy must require audience `sts.amazonaws.com` and the exact matching environment subject: `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev` or `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`. Do not use wildcard repository, branch or environment subjects. The plan role must not have resource mutation permissions. The apply role must not receive broad account administration; scope it to the reviewed Terraform resources, and restrict `iam:PassRole` to the exact environment application execution roles and required service principals.
 
 ## 4. GitHub environments and variables
 
@@ -44,7 +48,7 @@ Create GitHub Environments:
 
 Configure these repository/environment variables:
 
-- `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`
+- `AWS_ROLE_ARN_DEV_PLAN`, `AWS_ROLE_ARN_DEV_APPLY`, `AWS_ROLE_ARN_PROD_PLAN`, `AWS_ROLE_ARN_PROD_APPLY`
 - `TF_PLAN_AGE_RECIPIENT` (environment variable; age public recipient for the matching environment)
 - `TF_STATE_BUCKET`, `AWS_ACCOUNT_ID`, `ALERT_EMAIL`
 - `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS`, `ALLOWED_ORIGINS` (each a non-empty JSON array of strings)
