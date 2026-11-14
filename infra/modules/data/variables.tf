@@ -8,6 +8,16 @@ variable "env" {
   }
 }
 
+variable "account_id" {
+  description = "12-digit AWS account ID used to constrain the Scheduler service trust policy."
+  type        = string
+
+  validation {
+    condition     = can(regex("^\\d{12}$", var.account_id))
+    error_message = "account_id must contain exactly 12 digits."
+  }
+}
+
 variable "kms_key_arn" {
   description = "KMS key ARN for DynamoDB and report objects."
   type        = string

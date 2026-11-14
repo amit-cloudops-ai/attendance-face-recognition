@@ -48,7 +48,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 
 | ID | Task | Status | Acceptance criteria |
 |---|---|---|---|
-| T32 | Constrain EventBridge Scheduler execution-role trust policy to source account and schedule ARN | TODO | Trust policy is scoped to the owning account and exact schedule ARN; no wildcard service trust beyond required schedule group |
+| T32 | Constrain EventBridge Scheduler execution-role trust policy to source account and environment schedule-group ARN | DONE | Dev/prod use separate named schedule groups; trust requires the exact environment schedule-group ARN and owning account. AWS requires a schedule-group ARN, not an individual schedule ARN.
 | T33 | Pin Terraform AWS provider and commit environment lockfiles | TODO | Exact provider version tested in CI is pinned; dev/prod lockfiles committed with runner platform checks |
 | T34 | Isolate AWS Budgets from normal deployment roles | TODO | Budget resources move to a separate root and dedicated role; normal apply roles do not need aws-portal:ModifyBilling |
 | T35 | Scope CloudFront KMS key policy to the exact distribution | TODO | KMS key policy authorizes only the project CloudFront distribution ARN; no distribution wildcard remains |
@@ -69,6 +69,6 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 
 - T01 is complete: governance files restored and branch CI passed on commits `be5b4e94c41f760d6bd750bf283f76dec222b2ef` and `aa293276cc8d35961ac75b6cd70ccd681105ae0f`.
 - T07 is complete: provider v6.73.0 operations for DynamoDB, CloudWatch, IAM, Lambda, Scheduler, SQS, Rekognition and S3 notifications are mapped in `docs/security/DATA-RECOGNITION-PROVIDER-IAM.md`. CI run [43614059591](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43614059591) passed Python and Terraform jobs.
-- T08 is next: map access module provider IAM actions. Do not reorder or mark tasks complete without evidence.
+- T08 is complete (PR #11); T09 is complete (PR #12); T32 is complete (PR #13). T33 is next: pin the provider and commit environment lockfiles before finalizing deployment policies.
 - Do not reorder or mark tasks complete without evidence.
 - The task board is a plan, not proof that implementation or AWS validation has occurred.
