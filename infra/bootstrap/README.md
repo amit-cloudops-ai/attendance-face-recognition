@@ -9,9 +9,9 @@ The only canonical deployment-region setting is `config/deployment.json` (`aws_r
 Use the wrapper for every local Terraform command. It rejects conflicting `AWS_REGION` or `AWS_DEFAULT_REGION` values:
 
 ```bash
-scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-config=backend.hcl
-scripts/terraform.sh -chdir=infra/envs/dev validate
-scripts/terraform.sh -chdir=infra/envs/dev plan -input=false
+bash scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-config=backend.hcl
+bash scripts/terraform.sh -chdir=infra/envs/dev validate
+bash scripts/terraform.sh -chdir=infra/envs/dev plan -input=false
 ```
 
 The backend examples intentionally omit `region`; the wrapper exports it from the canonical manifest. Never run `terraform init` against the remote backend until the owner has separately approved it.
