@@ -3,7 +3,6 @@ import hashlib
 import logging
 import os
 import re
-import uuid
 
 import boto3
 from attendance_common.auth import get_username, require_group
@@ -133,6 +132,6 @@ def lambda_handler(event, context):
                 raise RuntimeError("Employee face list changed during offboarding") from exc
 
         return ok({"deleted": deleted})
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - API boundary returns a sanitized response
         LOGGER.error("Face-template deletion failed (%s)", type(exc).__name__)
         return error(500, "internal_error", "Unable to delete all employee face templates.")
