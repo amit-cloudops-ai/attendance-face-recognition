@@ -334,7 +334,7 @@ jobs:
               for module in ("data", "recognition"):
                   start = root.index(f'module "{module}"')
                   end = root.find("\n}", start)
-                  if not re.search(r"depends_on\\s*=\\s*\\[module\\.foundation\\]", root[start:end]):
+                  if not re.search(r"depends_on\s*=\s*\[module\.foundation\]", root[start:end]):
                       raise SystemExit(f"{env} {module} module must wait for foundation resources and SNS topic policy")
           PY
 
