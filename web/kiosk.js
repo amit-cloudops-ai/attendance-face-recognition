@@ -91,11 +91,16 @@ async function capture() {
 signIn.addEventListener("click", () => accessToken() ? logout() : login());
 button.addEventListener("click", async () => {
   if (!accessToken()) return login();
-  if (!cameraReady) {
-    try { await startCamera(); } catch (error) { status(error.message || "Camera unavailable.", "error"); }
-    return;
+  try {
+    if (!requireGroup("kiosk")) return;
+    if (!cameraReady) {
+      await startCamera();
+      return;
+    }
+    await capture();
+  } catch (error) {
+    status(error.message || "Camera unavailable.", "error");
   }
-  await capture();
 });
 
 try {
