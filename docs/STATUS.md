@@ -18,8 +18,8 @@
 | bootstrap + foundation | Lead | not started | - | |
 | shared layer (tz, config, responses) | Lead | not started | - | |
 | Part A: recognition | | not started | - | |
-| Part B: data + automation | | not started | - | |
-| shared record_scan | Part B | not started | - | |
+| Part B: data + automation | Sushmitha | in progress | Ruff + 20 pytest tests + Terraform fmt + Part B module validate green | PR #2 ready for review; AWS deployment and end-to-end integration still pending |
+| shared record_scan | Part B | in progress | unit tests green in CI | Conditional IST clock-in/clock-out logic implemented on `b/data-automation` |
 | Part C: access + web | | not started | - | |
 | CI/CD | Lead | CI file in repo; deploy workflow pending | - | |
 
@@ -36,4 +36,5 @@ Paste links/screenshots per SPEC ID (F01-F13, N01-N11) as they pass.
 (none; contracts are frozen. List approved changes here with date and reason.)
 
 ## Session log
+- 14 Nov: Part B implementation added shared attendance scan logic, employee/attendance/report/settings/override handlers, daily/weekly jobs, seed script, DynamoDB module and unit tests. PR #2 CI passed (Ruff, 20 pytest tests, Terraform fmt, and Part B module init/validate); AWS deployment and end-to-end integration remain pending.
 - 11 Nov: repo scaffold, SPEC, contracts, architecture, part guides created.
