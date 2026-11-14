@@ -69,5 +69,6 @@ Contactless attendance for ~100 employees: face capture in browser, recognition 
 
 ## 8. Known limitations (declared up front)
 - **Still-photo spoofing:** v1 uses still images; a printed or on-screen photo of an enrolled employee could match. Mitigations in v1: strict threshold (default 95, tunable), kiosk supervised by reception, audit trail. Planned fix (LATER): Rekognition Face Liveness.
+- **JWT revocation delay:** API Gateway validates JWTs statelessly. Disabling a Cognito kiosk/admin user prevents future authentication/refresh but does not immediately invalidate an already-issued access token; it can remain usable until its 60-minute expiry. A server-side denylist or shorter-token/refresh design is deferred.
 - Lighting and camera quality affect accuracy; enrollment with 3-5 varied photos is mandatory.
 - Single region (us-east-1), no multi-region failover. The canonical region is `config/deployment.json`.
