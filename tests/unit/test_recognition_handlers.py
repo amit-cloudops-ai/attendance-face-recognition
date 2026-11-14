@@ -4,13 +4,13 @@ import uuid
 
 import boto3
 import pytest
-from moto import mock_aws
 
 from attendance_common import config
 from attendance_common.auth import get_username, require_group
+from moto import mock_aws
 from services.recognition.presign import handler as presign
-from services.recognition.result import handler as result
 from services.recognition.recognize import handler as recognize
+from services.recognition.result import handler as result
 
 
 def api_event(group="kiosk", request_id=None):
