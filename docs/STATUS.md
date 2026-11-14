@@ -224,7 +224,11 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T13 — Terraform state bucket bootstrap specification
 
-- **Status:** specification drafted; CI validation pending.
+- **Status:** complete on `ai/T13-state-bucket-bootstrap`.
+- Added `docs/STATE-BUCKET-BOOTSTRAP.md`: globally unique account-specific bucket name, us-east-1, versioning, SSE-S3, all four Block Public Access settings, BucketOwnerEnforced ownership, TLS-only deny, no Object Lock, no automatic state expiration, recovery and approval sequence.
+- Documented dev/prod/billing state and `.tflock` keys and the environment-isolated plan/apply access model. Billing state remains separate.
+- CI run [43618372200](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43618372200), commit `3a563213ab`: Python and Terraform jobs passed. CI checks the three backend keys, region, encryption, native lockfiles, and required bootstrap security controls.
+- No bucket created; remote backend init, plan and apply remain approval-gated.
 - Added `docs/STATE-BUCKET-BOOTSTRAP.md` with a globally unique account-specific bucket naming convention, us-east-1 region, SSE-S3 default encryption, versioning, all four Block Public Access settings, BucketOwnerEnforced ownership, TLS-only deny policy, no Object Lock, no automatic state expiration, rollback and manual verification sequence.
 - Documented state and lockfile keys for dev, prod and the isolated billing root. Plan/apply state permissions are environment-specific; billing state remains separate and is not included in normal environment roles.
 - CI checks all three Terraform S3 backend blocks for exact state keys, region, encryption and native lockfiles, and checks required bucket security controls in the bootstrap spec.
