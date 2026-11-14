@@ -23,3 +23,21 @@ variable "alert_email" {
   description = "Email address for SNS and budget notifications."
   type        = string
 }
+
+variable "callback_urls" {
+  description = "Exact Cognito Hosted UI callback URLs. Add the CloudFront site URL after the first apply."
+  type        = list(string)
+  default     = ["http://localhost:8000/auth/callback/"]
+}
+
+variable "logout_urls" {
+  description = "Exact Cognito Hosted UI logout URLs."
+  type        = list(string)
+  default     = ["http://localhost:8000/"]
+}
+
+variable "allowed_origins" {
+  description = "Additional browser origins for local API development. CloudFront web/API requests are same-origin."
+  type        = list(string)
+  default     = ["http://localhost:8000"]
+}

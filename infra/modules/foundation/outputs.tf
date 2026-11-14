@@ -33,6 +33,11 @@ output "web_bucket_arn" {
   value       = aws_s3_bucket.web.arn
 }
 
+output "web_bucket_regional_domain_name" {
+  description = "Regional S3 REST endpoint used by CloudFront OAC."
+  value       = aws_s3_bucket.web.bucket_regional_domain_name
+}
+
 output "layer_arn" {
   description = "Published attendance_common Lambda layer ARN."
   value       = aws_lambda_layer_version.common.arn

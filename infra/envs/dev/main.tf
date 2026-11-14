@@ -33,3 +33,17 @@ module "recognition" {
   alerts_topic_arn = module.foundation.alerts_topic_arn
   common_env       = module.foundation.common_env
 }
+
+module "access" {
+  source = "../../modules/access"
+
+  env                             = var.env
+  account_id                      = var.account_id
+  web_bucket_name                 = module.foundation.web_bucket_name
+  web_bucket_arn                  = module.foundation.web_bucket_arn
+  web_bucket_regional_domain_name = module.foundation.web_bucket_regional_domain_name
+  api_routes                      = merge(module.recognition.api_routes, module.data.api_routes)
+  callback_urls                   = var.callback_urls
+  logout_urls                     = var.logout_urls
+  allowed_origins                 = var.allowed_origins
+}

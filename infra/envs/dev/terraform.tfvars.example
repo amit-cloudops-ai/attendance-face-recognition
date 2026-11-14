@@ -1,3 +1,6 @@
-env        = "dev"
-account_id = "123456789012"
-alert_email = "replace-with-your-alert-email@example.com"
+env          = "dev"
+account_id   = "123456789012"
+alert_email  = "replace-with-your-alert-email@example.com"
+callback_urls = ["http://localhost:8000/auth/callback/"]
+logout_urls   = ["http://localhost:8000/"]
+allowed_origins = ["http://localhost:8000"]
