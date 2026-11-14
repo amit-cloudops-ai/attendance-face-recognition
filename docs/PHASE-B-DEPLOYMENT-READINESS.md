@@ -149,4 +149,4 @@ The exact deployment policy is intentionally not guessed in this phase. It must 
 
 ## Safety boundary
 
-No AWS resources have been created, no OIDC roles have been created, no Terraform backend has been initialized against an AWS account, and no plan or apply has been run as part of this phase. The encrypted plan workflow change is committed to the solo branch but must pass CI and receive the later deployment-readiness review before use.
+No AWS resources have been created, no OIDC roles have been created, no Terraform backend has been initialized against an AWS account, and no plan or apply has been run as part of this phase. The encrypted-plan workflow and plan/apply role selection passed CI at commit `df98ed0`; the latest documentation-only changes are awaiting CI. The workflow still requires environment secrets/variables and reviewed AWS roles before use.
