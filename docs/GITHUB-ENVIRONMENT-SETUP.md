@@ -2,7 +2,7 @@
 
 **Status:** configuration checklist. The repository connector can update code and workflows but cannot read or configure GitHub Actions environment protection rules or branch protection settings. These settings have not been verified or changed.
 
-## Create four environments
+## Create six environments
 
 Create these exact repository environments:
 
@@ -70,4 +70,4 @@ Require reviews for changes to .github/workflows/**, infra/**, infra/policies/**
 
 ## Verification limitation
 
-GitHub branch protection API reads returned 403 Resource not accessible by integration, and the repository connector does not expose GitHub Actions environment settings. Therefore the environment list, variable values, secret presence, reviewer configuration and branch restrictions cannot be verified from this session. This task remains blocked until a repository administrator configures the four environments and provides confirmation or an authorized read-only verification path.
+GitHub branch protection API reads returned 403 Resource not accessible by integration, and the repository connector does not expose GitHub Actions environment settings. Therefore the environment list, variable values, secret presence, reviewer configuration and branch restrictions cannot be verified from this session. This task remains blocked until a repository administrator configures the six environments and provides confirmation or an authorized read-only verification path.
