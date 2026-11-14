@@ -139,7 +139,7 @@ report "Project IAM managed policies" aws iam list-policies --scope Local \
 report "Project AWS Budgets" aws budgets describe-budgets --account-id "$ACCOUNT_ID" \
   --query "Budgets[?starts_with(BudgetName, 'attendance-')]" --output json
 report "Project CloudFront distributions" aws cloudfront list-distributions \
-  --query "DistributionList.Items[?starts_with(Comment, 'attendance-')].{Id:Id,Comment:Comment,DomainName:DomainName,Enabled:Enabled}" --output json
+  --query "DistributionList.Items[?Comment != null && starts_with(Comment, 'attendance-')].{Id:Id,Comment:Comment,DomainName:DomainName,Enabled:Enabled}" --output json
 
 echo
 echo "=== Check globally unique application bucket names (read-only) ==="
