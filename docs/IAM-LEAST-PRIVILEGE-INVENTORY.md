@@ -80,6 +80,26 @@ Important corrections to the initial inventory:
 - The raw S3 bucket and recognition SQS queues use the shared customer-managed KMS key. Recognition roles that upload/read raw objects and send/consume encrypted SQS messages may require scoped GenerateDataKey/Decrypt permissions. Split the requirement by handler and exact bucket/queue resources; do not copy the current broad KMS statement to every role.
 - The foundation KMS key policy grants SNS service access to the encrypted alerts topic and CloudFront access to read encrypted objects. Verify the CloudFront statement is scoped to the actual distribution ARN rather than a distribution wildcard before bootstrap.
 
+The runtime policy code has now been changed to remove the blanket KMS grant from every Lambda role and instead add per-handler KMS statements:
+
+| Module | Function | KMS actions | Reason |
+|---|---|---|---|
+| Data | daily_job | GenerateDataKey | Writes SSE-KMS report objects |
+| Data | weekly_job | GenerateDataKey | Writes SSE-KMS report objects |
+| Data | reports | Decrypt | Reads SSE-KMS report objects |
+| Recognition | presign | GenerateDataKey | Presigned upload to raw SSE-KMS bucket |
+| Recognition | enroll_url | GenerateDataKey | Presigned upload to raw SSE-KMS bucket |
+| Recognition | recognize | Decrypt, GenerateDataKey | Reads raw objects and sends to encrypted SQS DLQ |
+| Recognition | enroll | Decrypt, GenerateDataKey | Reads raw objects and sends to encrypted SQS DLQ |
+| Recognition | failure | Decrypt | Reads raw objects and consumes encrypted SQS DLQs |
+| Other handlers | result, faces_delete, employees, attendance_query, override, settings | None | No direct S3/SQS KMS data operation identified |
+
+The foundation KMS key policy also now includes a service-principal statement for Lambda failure destinations to use the encrypted SQS DLQs, conditioned by source account and the environment queue ARN pattern. This is necessary because Lambda's asynchronous failure destination is sent by the Lambda service, not by the function execution role.
+
+AWS authorization references reviewed:
+- S3 SSE-KMS requires `kms:GenerateDataKey` for PutObject and `kms:Decrypt` for GetObject: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html
+- SQS SSE-KMS producers require `kms:GenerateDataKey` and `kms:Decrypt`; consumers require `kms:Decrypt`: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-key-management.html
+
 This is a code-call-site review, not a complete AWS authorization verification. Exact KMS condition keys, S3 encryption context, SQS permissions, Rekognition resource-level support and provider API actions remain open gates.
 
 ## 4. Deployment policy construction
