@@ -535,15 +535,19 @@ jobs:
                       raise SystemExit(f"Wrong or broad OIDC subject: {path}")
 
           workflow = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          environment_expr = "$" + "{{ inputs.environment }}"
+          operation_expr = "$" + "{{ inputs.operation }}"
+          role_var_expr = "$" + "{{ vars.AWS_ROLE_ARN }}"
+          role_env_expr = "$" + "{{ env.AWS_ROLE_ARN }}"
           for required in (
-              "name: ${{ inputs.environment }}-${{ inputs.operation }}",
-              "AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}",
+              "name: " + environment_expr + "-" + operation_expr,
+              "AWS_ROLE_ARN: " + role_var_expr,
               "github.ref == 'refs/heads/develop'",
               "github.ref == 'refs/heads/main'",
               "actions: read",
               "contents: read",
               "id-token: write",
-              "role-to-assume: ${{ env.AWS_ROLE_ARN }}",
+              "role-to-assume: " + role_env_expr,
           ):
               if required not in workflow:
                   raise SystemExit(f"Deployment workflow missing required OIDC boundary: {required}")
@@ -574,7 +578,7 @@ jobs:
               ".github/workflows/deploy.yml",
               "plan_attempt",
               "steps.plan-provenance.outputs.run_attempt",
-              "run-id: ${{ inputs.plan_run_id }}",
+              "run-id: " + "$" + "{{ inputs.plan_run_id }}",
               "TF_PLAN_AGE_IDENTITY",
               "umask 077",
               "trap 'rm -f \"$identity_file\"' EXIT",
@@ -584,11 +588,11 @@ jobs:
           for item in required:
               if item not in workflow:
                   raise SystemExit(f"Encrypted plan lifecycle missing: {item}")
-          if "path: infra/envs/${{ inputs.environment }}/tfplan.age" not in workflow:
+          if "path: infra/envs/" + "$" + "{{ inputs.environment }}/tfplan.age" not in workflow:
               raise SystemExit("Only the encrypted plan may be uploaded")
           if "tfplan" in workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]:
               upload = workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]
-              if "path: infra/envs/${{ inputs.environment }}/tfplan.age" not in upload:
+              if ("path: infra/envs/" + "$" + "{{ inputs.environment }}/tfplan.age") not in upload:
                   raise SystemExit("Plan upload path must be encrypted age artifact")
           if "AWS_ACCESS_KEY_ID" in workflow or "AWS_SECRET_ACCESS_KEY" in workflow:
               raise SystemExit("Static AWS credentials are prohibited")
