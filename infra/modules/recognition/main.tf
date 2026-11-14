@@ -369,7 +369,7 @@ resource "aws_lambda_function_event_invoke_config" "dlq" {
   for_each = toset(["recognize", "enroll"])
 
   function_name                = aws_lambda_function.lambda[each.key].function_name
-  maximum_event_age_in_seconds = 3600
+  maximum_event_age_in_seconds = 600
   maximum_retry_attempts       = 2
 
   destination_config {
