@@ -31,6 +31,21 @@ output "api_routes" {
       invoke_arn    = aws_lambda_function.lambda["reports"].invoke_arn
       group         = "admin"
     }
+    "POST /api/admin/attendance/override" = {
+      function_name = aws_lambda_function.lambda["override"].function_name
+      invoke_arn    = aws_lambda_function.lambda["override"].invoke_arn
+      group         = "admin"
+    }
+    "GET /api/admin/settings" = {
+      function_name = aws_lambda_function.lambda["settings"].function_name
+      invoke_arn    = aws_lambda_function.lambda["settings"].invoke_arn
+      group         = "admin"
+    }
+    "PUT /api/admin/settings" = {
+      function_name = aws_lambda_function.lambda["settings"].function_name
+      invoke_arn    = aws_lambda_function.lambda["settings"].invoke_arn
+      group         = "admin"
+    }
   }
 }
 
