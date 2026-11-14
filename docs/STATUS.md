@@ -10,7 +10,7 @@
 ## Phase A reliability hardening (implementation committed; CI validation pending)
 - Recognition now leaves retryable failures pending and retains raw images. Terminal results are persisted before image deletion. The original presign `created_at` is used as the scan timestamp.
 - Shared `record_scan` accepts a UUID request ID and stores the exact outcome in the attendance row's `scan_events` map alongside the conditional attendance transition. Replays return the original outcome rather than creating a second clock action.
-- Enrollment now uses a 90-second per-employee lease, a request-specific employee marker, and recovery of an untracked same-employee Rekognition FaceId. A retry after employee persistence can finish result persistence without incrementing photo_count or appending the FaceId again.
+- Enrollment now uses a 45-second per-employee lease, a request-specific employee marker, and recovery of an untracked same-employee Rekognition FaceId. A retry after employee persistence can finish result persistence without incrementing photo_count or appending the FaceId again.
 - Added an internal `failure` Lambda to consume async failure destination messages, mark exhausted pending requests as `error`, and delete retained raw images. A processor DLQ receives poison recovery messages after five receives and has its own alarm. Terraform and unit tests have been updated.
 - These changes are committed to `solo/amit-monday`; **they are not yet validated by a completed CI run**. Do not treat Phase A as complete until Python tests, Ruff, Terraform fmt and Terraform validate are green, and failure-path test cases are inspected.
 
