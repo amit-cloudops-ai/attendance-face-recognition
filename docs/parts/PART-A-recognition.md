@@ -4,7 +4,7 @@
 **Read first:** SPEC (F01 F03 F05 F06 F12, N01 N02 N10), contracts sections 1, 3, 4, 6, 7, 9, 10.
 
 ## Mission
-Turn "an image landed in S3" into "a correct, safe, fast recognition result", and never keep the image. You provide six Lambdas: `presign`, `result`, `recognize`, `enroll`, `enroll-url`, `faces-delete`, plus the Rekognition collection, S3 triggers, DLQ and IAM for them.
+Turn "an image landed in S3" into "a correct, safe, fast recognition result", and never keep the image. You provide seven Lambdas: `presign`, `result`, `recognize`, `enroll`, `enroll-url`, `faces-delete`, and the internal `failure` recovery worker, plus the Rekognition collection, S3 triggers, failure queues and IAM for them.
 
 ## You depend on / provide
 - From Lead: layer `attendance_common` (`tz`, `config.get_settings`, `responses`), KMS key, buckets, SNS topic, common env vars.
@@ -39,13 +39,15 @@ Turn "an image landed in S3" into "a correct, safe, fast recognition result", an
 
 **8. Keep-warm (SHOULD).** Scheduler schedule `attendance-{env}-recognize-warm`, every 5 min, 08:00-20:00 IST, payload `{"warmup": true}`.
 
-**9. Terraform module `infra/modules/recognition`.** Inputs: `env`, `account_id`, `kms_key_arn`, `raw_bucket_name`, `raw_bucket_arn`, `tables` (names + arns), `layer_arn`, `alerts_topic_arn`, `common_env`. Outputs: `api_routes` (4 routes), `collection_id`, `recognize_function_name`. One role per Lambda following the IAM matrix in ARCHITECTURE 6.1 exactly. S3 notification for **both** prefixes defined here, with `aws_lambda_permission` for S3. DLQ (SQS, KMS-encrypted) for `recognize` and `enroll`, CloudWatch log groups with 30-day retention, alarms on Errors and DLQ depth.
+**9. Terraform module `infra/modules/recognition`.** It also creates the internal failure worker, consumes both async failure queues, and routes poison recovery messages to a separately alarmed processor DLQ. Inputs: `env`, `account_id`, `kms_key_arn`, `raw_bucket_name`, `raw_bucket_arn`, `tables` (names + arns), `layer_arn`, `alerts_topic_arn`, `common_env`. Outputs: `api_routes` (4 routes), `collection_id`, `recognize_function_name`. One role per Lambda following the IAM matrix in ARCHITECTURE 6.1 exactly. S3 notification for **both** prefixes defined here, with `aws_lambda_permission` for S3. DLQ (SQS, KMS-encrypted) for `recognize` and `enroll`, CloudWatch log groups with 30-day retention, alarms on Errors and DLQ depth.
 
 ## Tests you must write (`tests/unit/test_recognition_*.py`)
 Use moto for S3 and DynamoDB; mock Rekognition (`unittest.mock` or botocore Stubber).
 - presign: row created pending; fields/conditions correct; key = `captures/{id}.jpg`.
-- recognize: matched (calls record_scan with right args), no_face, multiple_faces, low_quality, no_match, inactive, missing employee, duplicate event is a no-op, image always deleted (including on exception), warmup returns fast.
-- enroll: every enroll code; photo_count increments; image deleted.
+- recognize: matched (uses the original request timestamp and request ID), no_face, multiple_faces, low_quality, no_match, inactive, missing employee, duplicate event, transient exception remains pending and retains image, terminal duplicate delivery only cleans up, warmup returns fast.
+- failure worker: converts exhausted async failures to terminal error, deletes capture/enrollment images, preserves already-terminal outcomes, and returns malformed SQS records for retry.
+- enroll: every enroll code; request marker prevents double increment after result-write failure; lease serializes concurrent attempts; transient exception remains pending and retains image.
+- failure worker: handles both capture and enrollment event envelopes and partial batch failures.
 - faces-delete: clears fields, writes audit.
 - contract test: scan-results items you write have exactly the contract attributes and a `ttl`.
 
@@ -65,3 +67,11 @@ Enroll each teammate with 4 photos (different light/angles). Run 20 scans per pe
 - [ ] `captures/` and `enroll/` are empty 10 min after tests
 - [ ] p95 scan latency 3 s or less on 20 warm scans (numbers in STATUS)
 - [ ] IAM matches the matrix; alarms created; DLQ tested once
+
+
+## Reliability hardening (solo implementation)
+- The attendance helper accepts an optional UUID v4 `request_id`. For recognition it is mandatory. Its outcome is stored under `attendance.scan_events[request_id]` in the same conditional attendance write, so a replay cannot turn the original clock-in into a clock-out.
+- Presign `created_at` is the authoritative capture request timestamp. Worker retries must not substitute invocation time.
+- Retryable exceptions never set `error` in the recognition/enrollment workers and never delete the source image.
+- The internal `failure` Lambda consumes the async on-failure SQS destinations, marks still-pending results `error`, and removes the image. Its own unprocessable messages move to a processor DLQ after five receives; that queue has a CloudWatch alarm.
+- Biometric images remain in the private raw bucket only while retries/recovery are possible; the existing one-day lifecycle rule is the final backstop.
