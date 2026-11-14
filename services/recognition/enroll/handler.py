@@ -15,7 +15,7 @@ LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
 REGION = "ap-south-1"
-_LOCK_SECONDS = 90
+_LOCK_SECONDS = 45
 
 
 def _required_env(name: str) -> str:
@@ -92,8 +92,7 @@ def _acquire_employee_lock(employees, employee_id: str, request_id: str) -> None
             UpdateExpression="SET enrollment_lock_request=:request, enrollment_lock_until=:until",
             ConditionExpression=(
                 "active=:active AND "
-                "(attribute_not_exists(enrollment_lock_until) OR "
-                "enrollment_lock_until < :now OR enrollment_lock_request=:request)"
+                "(attribute_not_exists(enrollment_lock_until) OR enrollment_lock_until < :now)"
             ),
             ExpressionAttributeValues={
                 ":active": True,
