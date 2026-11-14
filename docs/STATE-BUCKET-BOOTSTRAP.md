@@ -51,19 +51,19 @@ The plan and apply policies are split by environment:
 - Plan: GetObject on that environment's state object; GetObject/PutObject/DeleteObject only on its .tflock; ListBucket restricted to the state and lock prefixes.
 - Apply: GetObject/PutObject on that environment's state object; GetObject/PutObject/DeleteObject only on its .tflock; ListBucket restricted to the state and lock prefixes.
 - No dev policy references prod state; no prod policy references dev state.
-- The billing root has a separate state key. A dedicated billing plan/apply role policy must be created before billing deployment; environment plan/apply roles must not receive access to the billing state key.
+- The billing root has a separate state key and dedicated billing plan/apply policy templates (T37); environment plan/apply roles must not receive access to the billing state key.
 
 The plan/apply templates include GetBucketLocation and GetBucketVersioning on the state bucket. No state KMS permissions are required for SSE-S3.
 
 ## Manual bootstrap sequence (not executed)
 
-1. Confirm the 12-digit AWS account ID and us-east-1 region from the owner's authenticated AWS identity.
+1. Confirm the 12-digit AWS account ID from the owner's authenticated STS identity; confirm the region equals the canonical `config/deployment.json` value.
 2. Choose a globally unique bucket suffix and confirm the final bucket name is available.
 3. Present the exact bucket name, configuration, policy JSON and bootstrap IAM permissions to the owner for approval.
 4. Only after approval, create the bucket and apply ownership controls, all four public-access-block settings, versioning, default SSE-S3 encryption and the TLS-only bucket policy.
 5. Verify with read-only S3 API calls: bucket location, ownership controls, public access block, versioning, encryption and policy.
 6. Render the dev/prod plan/apply state policies with the final bucket name; validate JSON and exact state/lock paths.
-7. Configure TF_STATE_BUCKET in the four GitHub environments. Only after the owner separately approves deployment preparation may remote terraform init be run.
+7. Configure TF_STATE_BUCKET in all six GitHub environments (`dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan`, `billing-apply`). Only after the owner separately approves deployment preparation may remote terraform init be run.
 
 ## Rollback and recovery
 
