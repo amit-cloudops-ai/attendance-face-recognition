@@ -52,7 +52,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T33 | Pin Terraform AWS provider and commit environment lockfiles | IN_PROGRESS | Exact provider version tested in CI is pinned; dev/prod lockfiles committed with runner platform checks |
 | T34 | Isolate AWS Budgets from normal deployment roles | IN_PROGRESS | Budget resources move to a separate root and dedicated role; normal apply roles do not need aws-portal:ModifyBilling |
 | T35 | Scope CloudFront KMS key policy to the exact distribution | DONE | KMS key policy authorizes only the project CloudFront distribution ARN; no distribution wildcard remains |
-| T36 | Add DynamoDB customer-managed-key service access and deployment KMS permissions | DONE | KMS key policy supports DynamoDB direct key metadata access; dev/prod apply policies grant required KMS operations only via DynamoDB and only for the matching key |
+| T36 | Add DynamoDB customer-managed-key service access and deployment KMS permissions | DONE | KMS key policy supports DynamoDB customer-managed-key ViaService authorization; dev/prod apply policies grant required KMS operations only via DynamoDB and only for the matching key |
 
 ## Phase C — release and operations
 
