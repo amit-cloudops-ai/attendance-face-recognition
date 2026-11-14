@@ -67,6 +67,8 @@ def validate() -> None:
         content = (ROOT / relative).read_text(encoding="utf-8")
         if re.search(r"^\s*region\s*=", content, re.MULTILINE):
             errors.append(f"{relative} must not duplicate the canonical region")
+        if "attendance-tf-state-" not in content or "attendance-tfstate-" in content:
+            errors.append(f"{relative} must use the approved attendance-tf-state bucket naming pattern")
 
     # Every SDK-using Lambda handler must resolve its region from the Lambda runtime.
     for path in (ROOT / "services").rglob("*.py"):
