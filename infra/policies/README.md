@@ -104,3 +104,14 @@ All templates use `account_id` and the state policy uses `state_bucket`. Each re
 - KMS key ARN IDs are service-generated; key operations use the project alias condition. The DynamoDB key permissions are separately scoped to the matching environment alias and `kms:ViaService`.
 
 These are policy templates for review, not attached roles. No AWS resources or IAM policies have been created. The dev apply role still requires a separately reviewed GitHub OIDC trust, a pre-created permissions boundary, and the manual bootstrap gate.
+
+
+## Production Terraform plan-role policies (T11)
+
+The prod plan role mirrors the dev plan role with production-only resource tags, ARNs and state paths:
+
+- `github-plan-prod-core.json.tftpl`
+- `github-plan-prod-edge.json.tftpl`
+- `github-plan-prod-state.json.tftpl`
+
+The production state object is read-only. Only `attendance/prod/terraform.tfstate.tflock` receives Get/Put/Delete for native S3 backend locking. The prod plan policy contains no dev resource ARNs or dev state path, and contains no infrastructure mutation actions. As with dev, API Gateway v2 GET permissions remain at the API path family because child API resources are not independently tagged in this configuration. CI checks the prod action set, policy size, exact Scheduler group, and dev/prod state/resource separation.
