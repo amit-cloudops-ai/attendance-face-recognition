@@ -212,8 +212,8 @@ locals {
         Resource = [var.tables.scan_results.arn, var.tables.employees.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:Query"]
+        Effect = "Allow"
+        Action = ["dynamodb:Query"]
         Resource = [
           var.tables.attendance.arn,
           "${var.tables.attendance.arn}/index/date-index"
