@@ -67,15 +67,19 @@ done < <(find scripts -type f -name '*.sh' -print0)
 echo "=== Terraform formatting ==="
 terraform fmt -check -recursive infra
 
-echo "=== Terraform offline initialization and validation ==="
+echo "=== Terraform offline initialization and validation: modules ==="
 for root in \
   infra/modules/foundation \
   infra/modules/data \
   infra/modules/recognition \
-  infra/modules/access \
-  infra/envs/dev \
-  infra/envs/prod \
-  infra/billing; do
+  infra/modules/access; do
+  echo "--- $root ---"
+  terraform -chdir="$root" init -backend=false -input=false
+  terraform -chdir="$root" validate -no-color
+done
+
+echo "=== Terraform offline initialization and validation: roots ==="
+for root in infra/envs/dev infra/envs/prod infra/billing; do
   echo "--- $root ---"
   terraform -chdir="$root" init -backend=false -input=false -lockfile=readonly
   terraform -chdir="$root" validate -no-color
