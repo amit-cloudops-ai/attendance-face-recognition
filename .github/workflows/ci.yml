@@ -302,7 +302,7 @@ jobs:
 
           access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
           wrapper = Path("scripts/terraform.sh").read_text(encoding="utf-8")
-          for path in ("infra/envs/dev/versions.tf", "infra/envs/prod/versions.tf"):
+          for path in ("infra/envs/dev/versions.tf", "infra/envs/prod/versions.tf", "infra/billing/versions.tf"):
               source = Path(path).read_text(encoding="utf-8")
               if "allowed_account_ids = [var.account_id]" not in source:
                   raise SystemExit(f"{path} does not restrict provider account identity")
