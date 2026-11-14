@@ -1,0 +1,145 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DynamoDBTableRead",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:DescribeTable",
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:DescribeContinuousBackups",
+        "dynamodb:ListTagsOfResource"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-*"
+    },
+    {
+      "Sid": "DynamoDBIndexRead",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:DescribeTable"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-*/index/*"
+    },
+    {
+      "Sid": "IamRoleRead",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListRoleTags"
+      ],
+      "Resource": "arn:aws:iam::${account_id}:role/attendance-prod-*"
+    },
+    {
+      "Sid": "LambdaFunctionRead",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:GetFunctionConcurrency",
+        "lambda:GetFunctionEventInvokeConfig",
+        "lambda:GetPolicy",
+        "lambda:ListTags"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-*"
+    },
+    {
+      "Sid": "LambdaEventSourceMappingRead",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetEventSourceMapping"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:${account_id}:event-source-mapping:*",
+      "Condition": {
+        "StringEquals": {
+          "lambda:FunctionArn": "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-failure"
+        }
+      }
+    },
+    {
+      "Sid": "LambdaLayerRead",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetLayerVersion"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:${account_id}:layer:attendance-prod-common:*"
+    },
+    {
+      "Sid": "SchedulerRead",
+      "Effect": "Allow",
+      "Action": [
+        "scheduler:GetSchedule"
+      ],
+      "Resource": "arn:aws:scheduler:us-east-1:${account_id}:schedule/attendance-prod/attendance-prod-*"
+    },
+    {
+      "Sid": "SqsQueueRead",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:ListQueueTags"
+      ],
+      "Resource": "arn:aws:sqs:us-east-1:${account_id}:attendance-prod-*"
+    },
+    {
+      "Sid": "RekognitionCollectionRead",
+      "Effect": "Allow",
+      "Action": [
+        "rekognition:DescribeCollection"
+      ],
+      "Resource": "arn:aws:rekognition:us-east-1:${account_id}:collection/attendance-prod-faces"
+    },
+    {
+      "Sid": "CloudWatchLogRead",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchLogGroupTags",
+      "Effect": "Allow",
+      "Action": [
+        "logs:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-east-1:${account_id}:log-group:/aws/lambda/attendance-prod-*:*",
+        "arn:aws:logs:us-east-1:${account_id}:log-group:/aws/apigateway/attendance-prod-http-api:*"
+      ]
+    },
+    {
+      "Sid": "CloudWatchAlarmRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:DescribeAlarms"
+      ],
+      "Resource": "arn:aws:cloudwatch:us-east-1:${account_id}:alarm:attendance-prod-*"
+    },
+    {
+      "Sid": "SnsTopicRead",
+      "Effect": "Allow",
+      "Action": [
+        "sns:GetTopicAttributes"
+      ],
+      "Resource": "arn:aws:sns:us-east-1:${account_id}:attendance-prod-alerts"
+    },
+    {
+      "Sid": "SnsSubscriptionRead",
+      "Effect": "Allow",
+      "Action": [
+        "sns:GetSubscriptionAttributes"
+      ],
+      "Resource": "arn:aws:sns:us-east-1:${account_id}:attendance-prod-alerts:*"
+    },
+    {
+      "Sid": "SchedulerGroupRead",
+      "Effect": "Allow",
+      "Action": [
+        "scheduler:GetScheduleGroup",
+        "scheduler:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:scheduler:us-east-1:${account_id}:schedule-group/attendance-prod"
+    }
+  ]
+}
