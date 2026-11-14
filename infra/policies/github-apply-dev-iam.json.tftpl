@@ -22,18 +22,12 @@
       "Action": [
         "iam:GetRole",
         "iam:UpdateAssumeRolePolicy",
-        "iam:PutRolePermissionsBoundary",
         "iam:DeleteRole",
         "iam:ListRoleTags",
         "iam:TagRole",
         "iam:UntagRole"
       ],
-      "Resource": "arn:aws:iam::${account_id}:role/attendance-dev-*",
-      "Condition": {
-        "StringEquals": {
-          "iam:PermissionsBoundary": "arn:aws:iam::${account_id}:policy/attendance-dev-execution-boundary"
-        }
-      }
+      "Resource": "arn:aws:iam::${account_id}:role/attendance-dev-*"
     },
     {
       "Sid": "IamInlinePolicies",
@@ -68,6 +62,17 @@
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": "scheduler.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "IamRoleBoundaryEnforcement",
+      "Effect": "Allow",
+      "Action": "iam:PutRolePermissionsBoundary",
+      "Resource": "arn:aws:iam::${account_id}:role/attendance-dev-*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::${account_id}:policy/attendance-dev-execution-boundary"
         }
       }
     }
