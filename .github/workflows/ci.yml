@@ -16,6 +16,8 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: pytest -q
+      - name: Enforce canonical AWS region across contracts, code and infrastructure
+        run: python scripts/check_region_consistency.py
       - name: Check browser JavaScript syntax and HTML CSP hygiene
         run: |
           for file in web/*.js web/shared/*.js web/admin/*.js; do
@@ -27,7 +29,9 @@ jobs:
             exit 1
           fi
       - name: Check shell script syntax
-        run: bash -n scripts/e2e_smoke.sh
+        run: |
+          bash -n scripts/e2e_smoke.sh
+          bash -n scripts/terraform.sh
       - name: Validate GitHub Actions workflow YAML
         run: |
           python - <<'PY'
