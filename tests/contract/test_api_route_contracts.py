@@ -1,4 +1,5 @@
 """Static integration-contract checks across Terraform route outputs and API docs."""
+import ast
 import re
 from pathlib import Path
 
@@ -54,3 +55,16 @@ def test_access_module_applies_cognito_jwt_authorization_to_all_exported_routes(
     assert re.search(r"for_each\s*=\s*var.api_routes", source)
     assert 'authorization_type = "JWT"' in source
     assert "authorizer_id      = aws_apigatewayv2_authorizer.jwt.id" in source
+
+
+def test_record_scan_request_idempotency_is_documented_and_optional():
+    source = (ROOT / "shared" / "python" / "attendance_common" / "record_scan.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "record_scan")
+    names = [arg.arg for arg in function.args.args]
+    assert names[-1] == "request_id"
+    assert isinstance(function.args.defaults[-1], ast.Constant)
+    assert function.args.defaults[-1].value is None
+    contracts = (ROOT / "docs" / "contracts.md").read_text(encoding="utf-8")
+    assert "request_id: str | None = None" in contracts
+    assert "Production recognition calls must supply" in contracts
