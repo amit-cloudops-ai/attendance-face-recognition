@@ -98,6 +98,13 @@
 - API Gateway v2 uses `apigateway:GET/POST/PATCH/PUT/DELETE` HTTP-verb actions; policy resources use `/apis` and its exact API subresource paths. CloudFront global ARNs omit region. Cognito IAM resource granularity is user-pool level, not individual app client/group/domain.
 - Full provider-source and action/resource matrix: `docs/security/ACCESS-PROVIDER-IAM.md`.
 
+### T08 — access Terraform provider IAM mapping
+
+- **Status:** complete on `ai/T08-access-provider-iam`.
+- Mapped Cognito user pool/client/domain/groups, API Gateway v2 API/authorizer/integrations/routes/stage, CloudFront distribution/OAC/cache/origin-request/response-header policies/function, S3 web bucket policy and frontend objects, and Lambda API permissions.
+- API Gateway v2 uses `apigateway:GET/POST/PATCH/PUT/DELETE`; CloudFront is global and uses resource-specific action names; Cognito IAM granularity is user-pool level. Exact provider source/API matrix: `docs/security/ACCESS-PROVIDER-IAM.md`.
+- CI run [43615508377](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43615508377), commit `59ad7e0c1ccd`: Python and Terraform jobs passed, including access module and dev/prod root validation.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
