@@ -99,12 +99,12 @@ locals {
   lambda_kms_permissions = {
     daily_job = [{
       Effect   = "Allow"
-      Action   = ["kms:GenerateDataKey"]
+      Action   = ["kms:Decrypt", "kms:GenerateDataKey*"]
       Resource = [var.kms_key_arn]
     }]
     weekly_job = [{
       Effect   = "Allow"
-      Action   = ["kms:GenerateDataKey"]
+      Action   = ["kms:Decrypt", "kms:GenerateDataKey*"]
       Resource = [var.kms_key_arn]
     }]
     reports = [{
