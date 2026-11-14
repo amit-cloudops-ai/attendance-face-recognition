@@ -4,7 +4,7 @@
 
 - Repository rules are defined in `AGENTS.md`; the task queue is `docs/TASKS.md`; reusable ChatGPT operating instructions are in `docs/CHATGPT_PROJECT_INSTRUCTIONS.md`.
 - Work is task-ID based and isolated on `ai/T##-short-description` branches. One task is active at a time. The owner prefers to continue in the current ChatGPT conversation until it becomes too long; do not force a new chat between tasks.
-- The implementation baseline for this task is `solo/amit-monday` at `92e9bf53066145949bd430dd8dcbc0e7850df46d`. The governance task branch is `ai/T01-repository-governance`; T02 will continue from this branch so the restored rules stay in the working history.
+- The solo implementation baseline is `solo/amit-monday` at `92e9bf53066145949bd430dd8dcbc0e7850df46d`. Work is now stacked in task branches; the current active branch is `ai/T32-scheduler-trust`, based on the completed T09 work. Task PRs remain open and unmerged pending owner review.
 - Do not commit to `main` or `develop`, alter teammate branches, or merge teammate PRs into solo work without explicit direction.
 - Target AWS account: the owner's existing account. Target region: `us-east-1`.
 
@@ -12,7 +12,7 @@
 
 - **Status:** complete.
 - Restored `AGENTS.md`, `docs/TASKS.md`, and `docs/CHATGPT_PROJECT_INSTRUCTIONS.md`.
-- Created a 30-task queue. T01 is complete; T02 is the next task and covers KMS key-policy validation for Lambda asynchronous failure destinations.
+- Created the task queue. T01 is complete; T02–T09 and T31 are complete. T32 is the active cross-cutting task.
 - Updated CI push triggers to include `ai/**` so task branches receive the repository's existing Python and Terraform checks.
 - The CI workflow currently runs Ruff, pytest, browser JavaScript/CSP checks, Bash syntax, workflow YAML parsing, Terraform formatting, and Terraform module/environment-root validation. A `cfn-lint` step is not present in the checked workflow, and no `template.yaml` was found in the checked repository tree; T17 explicitly verifies whether a CloudFormation template exists before adding linting.
 - T01 branch validation: GitHub Actions runs [43611844694](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43611844694) and [43611848777](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43611848777) completed successfully. Both `python` and `terraform-fmt` jobs passed.
@@ -93,13 +93,6 @@
 
 ### T08 — access Terraform provider IAM mapping
 
-- **Status:** static mapping drafted; CI validation pending.
-- Mapped Cognito user pool/client/domain/groups, API Gateway v2 API/authorizer/integrations/routes/stage, CloudFront distribution/OAC/cache/origin-request/response-header policies/function, S3 web bucket policy and frontend objects, and Lambda API permissions.
-- API Gateway v2 uses `apigateway:GET/POST/PATCH/PUT/DELETE` HTTP-verb actions; policy resources use `/apis` and its exact API subresource paths. CloudFront global ARNs omit region. Cognito IAM resource granularity is user-pool level, not individual app client/group/domain.
-- Full provider-source and action/resource matrix: `docs/security/ACCESS-PROVIDER-IAM.md`.
-
-### T08 — access Terraform provider IAM mapping
-
 - **Status:** complete on `ai/T08-access-provider-iam`.
 - Mapped Cognito user pool/client/domain/groups, API Gateway v2 API/authorizer/integrations/routes/stage, CloudFront distribution/OAC/cache/origin-request/response-header policies/function, S3 web bucket policy and frontend objects, and Lambda API permissions.
 - API Gateway v2 uses `apigateway:GET/POST/PATCH/PUT/DELETE`; CloudFront is global and uses resource-specific action names; Cognito IAM granularity is user-pool level. Exact provider source/API matrix: `docs/security/ACCESS-PROVIDER-IAM.md`.
@@ -120,13 +113,12 @@
 
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
-- T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
-- Region migration and separate dev/prod Terraform state keys are present on the solo implementation branch. The state bucket remains a manual prerequisite.
-- The manual deployment workflow uses GitHub OIDC, separate plan/apply role variables, encrypted saved plans using age, commit/branch checks, and GitHub Environment gates. Its workflow logic still requires a dedicated least-privilege and protection review.
-- The IAM inventory is a candidate review document, not an attachable policy. Runtime KMS grants have been narrowed by handler in the data and recognition modules; exact key-policy conditions and remaining runtime IAM mappings are not yet fully verified.
-- Required execution-role boundary inputs exist, but dev/prod boundary policy documents and the four GitHub plan/apply policies are not finalized.
-- Remaining gates are tracked as T02–T18 in `docs/TASKS.md`; PR promotion, dev deployment, production deployment, and acceptance tasks follow as T19–T24.
-- CI validation on the implementation baseline is green as noted above. T01 branch CI is green; subsequent tasks will continue on their own `ai/T##` branches.
+- Complete: T01–T09 and T31. PRs #3–#12 are open in a task-by-task stack and remain unmerged.
+- Active: T32. It adds separate `attendance-dev` and `attendance-prod` Scheduler schedule groups and scopes each Scheduler execution-role trust policy to the matching schedule-group ARN plus the owning account. AWS requires the group ARN, not an individual schedule ARN.
+- Remaining cross-cutting blockers: T33 provider pin/lockfiles; T34 isolate AWS Budgets from normal apply roles; T35 restrict CloudFront KMS access to the exact distribution; T36 add DynamoDB CMK service access and exact deployment-role KMS permissions.
+- Remaining deployment policies: dev apply (T10), prod plan (T11), prod apply (T12). T09 dev plan policies are complete.
+- Remaining operational/security gates: state bucket specification (T13), OIDC/workflow permissions (T14), encrypted plan lifecycle (T15), GitHub environment/secrets/protection (T16), CI template linting (T17), exact bootstrap plan (T18), then solo-only readiness PR (T19).
+- No AWS resource creation, remote backend initialization, Terraform plan or apply has occurred. These actions remain approval-gated.
 
 ### Release acceptance
 
