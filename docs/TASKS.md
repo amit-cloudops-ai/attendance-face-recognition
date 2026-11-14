@@ -48,7 +48,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 
 | ID | Task | Status | Acceptance criteria |
 |---|---|---|---|
-| T32 | Constrain EventBridge Scheduler execution-role trust policy to source account and schedule ARN | TODO | Trust policy is scoped to the owning account and exact schedule ARN; no wildcard service trust beyond required schedule group |
+| T32 | Constrain EventBridge Scheduler execution-role trust policy to source account and environment schedule-group ARN | IN_PROGRESS | Dev/prod use separate named schedule groups; trust requires the exact environment schedule-group ARN and owning account. AWS requires a schedule-group ARN, not an individual schedule ARN.
 | T33 | Pin Terraform AWS provider and commit environment lockfiles | TODO | Exact provider version tested in CI is pinned; dev/prod lockfiles committed with runner platform checks |
 | T34 | Isolate AWS Budgets from normal deployment roles | TODO | Budget resources move to a separate root and dedicated role; normal apply roles do not need aws-portal:ModifyBilling |
 | T35 | Scope CloudFront KMS key policy to the exact distribution | TODO | KMS key policy authorizes only the project CloudFront distribution ARN; no distribution wildcard remains |
