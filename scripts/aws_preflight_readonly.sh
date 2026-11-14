@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 command -v aws >/dev/null || { echo "AWS CLI v2 is required." >&2; exit 2; }
+python scripts/check_region_consistency.py
 REGION="$(python scripts/check_region_consistency.py --print-region)"
 
 for variable in AWS_REGION AWS_DEFAULT_REGION; do
