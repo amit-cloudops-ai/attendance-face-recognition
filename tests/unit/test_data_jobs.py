@@ -2,6 +2,7 @@ import json
 
 import boto3
 import pytest
+from attendance_common import config
 from moto import mock_aws
 
 from attendance_common import config
