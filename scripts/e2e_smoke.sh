@@ -57,12 +57,14 @@ cleanup() {
   local cleanup_failed=0
   if [[ "$CREATED" == "1" ]]; then
     echo "Cleaning up test employee $EMPLOYEE_ID (attendance history is retained)…"
-    curl -sS --max-time 20 -o /dev/null -X DELETE \
+    employee_cleanup_status="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' -X DELETE \
       -H "Authorization: Bearer $ADMIN_TOKEN" \
-      "$API_BASE/admin/employees/$EMPLOYEE_ID" || cleanup_failed=1
-    curl -sS --max-time 20 -o /dev/null -X DELETE \
+      "$API_BASE/admin/employees/$EMPLOYEE_ID")" || cleanup_failed=1
+    faces_cleanup_status="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' -X DELETE \
       -H "Authorization: Bearer $ADMIN_TOKEN" \
-      "$API_BASE/admin/employees/$EMPLOYEE_ID/faces" || cleanup_failed=1
+      "$API_BASE/admin/employees/$EMPLOYEE_ID/faces")" || cleanup_failed=1
+    [[ "$employee_cleanup_status" =~ ^(200|204|404)$ ]] || cleanup_failed=1
+    [[ "$faces_cleanup_status" =~ ^(200|204|404)$ ]] || cleanup_failed=1
   fi
   # Remove only raw objects uploaded by this smoke test if application cleanup failed.
   for key in "${RAW_KEYS[@]}"; do
