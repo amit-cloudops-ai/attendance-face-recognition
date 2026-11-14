@@ -39,6 +39,71 @@ Both trust policies must require audience `sts.amazonaws.com`. GitHub Environmen
 
 The workflow deliberately permits dev deployment only from `develop` and prod only from `main`. It will not deploy directly from `solo/amit-monday`. When the solo implementation is ready, promote it through a reviewed solo-only PR into `develop`; keep teammate branches and PRs separate.
 
+### 3. OIDC trust and state access policy templates
+
+Use the following trust relationship for each role. Substitute the AWS account ID and set the environment subject to exactly `dev` or `prod`; the plan and apply role for one environment use the same environment-bound subject because the GitHub Environment is the branch gate.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:amit-cloudops-ai/attendance-face-recognition:environment:dev"
+        }
+      }
+    }
+  ]
+}
+```
+
+For prod, change only the subject suffix from `environment:dev` to `environment:prod`. Do not add wildcard subjects.
+
+Example state permissions for the dev role (the prod role gets only the prod key and lock-file ARNs):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListOnlyDevStatePrefix",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::<STATE_BUCKET>",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "attendance/dev/terraform.tfstate",
+            "attendance/dev/terraform.tfstate.tflock"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ReadWriteDevState",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Resource": "arn:aws:s3:::<STATE_BUCKET>/attendance/dev/terraform.tfstate"
+    },
+    {
+      "Sid": "ManageDevStateLock",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::<STATE_BUCKET>/attendance/dev/terraform.tfstate.tflock"
+    }
+  ]
+}
+```
+
+The plan role needs these state permissions because Terraform acquires/releases the native S3 lock while planning. This policy does not grant access to the prod state. Confirm the exact S3 backend calls against the pinned Terraform version before attaching it.
+
 ### 3. Public-repository plan artifact protection
 
 The repository is public. GitHub Actions artifacts are available to repository readers, while Terraform saved plan files may contain sensitive values in clear text. The deployment workflow was updated to encrypt the plan with `age` before artifact upload and decrypt it only in the matching apply run.
