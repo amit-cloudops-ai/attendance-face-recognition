@@ -147,6 +147,15 @@
         "aws-portal:ViewBilling"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "SchedulerGroupRead",
+      "Effect": "Allow",
+      "Action": [
+        "scheduler:GetScheduleGroup",
+        "scheduler:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:scheduler:us-east-1:${account_id}:schedule-group/attendance-dev"
     }
   ]
 }
