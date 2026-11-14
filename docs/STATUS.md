@@ -158,7 +158,9 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T34 — AWS Budget isolation
 
-- **Status:** implementation drafted; CI validation pending.
+- **Status:** complete on `ai/T35-cloudfront-kms-scope`.
+- The final key policy is owned by the access module and installed only after the CloudFront distribution is created. Its OAC decrypt grant requires exact `aws:SourceAccount` and `ArnEquals aws:SourceArn = aws_cloudfront_distribution.site.arn`; no distribution wildcard remains.
+- CI on descendant branch run [43617044959](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43617044959), commit `fdd6513176`: Python and Terraform jobs passed, validating the exact KMS policy source and both environment roots.
 - Removed `aws_budgets_budget.monthly` from the shared foundation module. Normal dev/prod Terraform roots no longer create or update account-level budgets.
 - Added independent `infra/billing` Terraform root with its own backend state key `attendance/billing/terraform.tfstate`; it manages the dev and prod USD 15 monthly budgets and their 80%/100% actual-cost notifications.
 - Removed `budgets:ViewBudget` and `aws-portal:ViewBilling` from the dev environment plan-role core policy. Billing access belongs only to a dedicated billing plan/apply role; no such role or policy is attached/created here.
@@ -167,7 +169,11 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T35 — exact CloudFront KMS scope
 
-- **Status:** implementation drafted; CI validation pending.
+- **Status:** complete on `ai/T36-dynamodb-kms-access`.
+- The access-module KMS policy includes the AWS-documented DynamoDB customer-managed-key path: account principal, `kms:CallerAccount`, exact `kms:ViaService=dynamodb.us-east-1.amazonaws.com`, required crypto/grant/describe actions, and direct DynamoDB service-principal metadata reads.
+- Added separate dev/prod apply-policy fragments scoped to the matching KMS alias and DynamoDB ViaService. `kms:CreateGrant` is separately constrained by `kms:GrantIsForAWSResource=true`.
+- CI run [43617044959](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43617044959), commit `fdd6513176`: Python and Terraform jobs passed, including the new KMS policy validator, formatting, module validation and both environment roots.
+- AWS reference: [DynamoDB encryption at rest usage notes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/encryption.usagenotes.html).
 - Removed the CloudFront service statement from the foundation key policy. Foundation now creates the KMS key with the default account-root policy; it no longer needs the distribution ID before that resource exists.
 - Added `kms_key_id` output from foundation and input to access. The access module now owns `aws_kms_key_policy.attendance` and installs the complete key policy after creating the CloudFront distribution.
 - CloudFront's `kms:Decrypt` grant uses `aws:SourceAccount` plus `ArnEquals aws:SourceArn = aws_cloudfront_distribution.site.arn`; the former `distribution/*` wildcard is removed. SNS alert and Lambda async DLQ service statements and account-root administration remain in the final policy.
