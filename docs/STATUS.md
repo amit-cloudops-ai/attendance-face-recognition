@@ -6,7 +6,7 @@ The solo application and the T01–T38 deployment-security and region-guard task
 
 The region-consistency implementation is complete on this branch: `config/deployment.json` is the canonical AWS region manifest; Terraform provider roots read it; the deployment workflow and local Terraform wrapper export it for the S3 backend; Lambda clients use the Lambda-reserved `AWS_REGION`; contracts and examples are aligned; CI rejects any noncanonical AWS region literal, regional ARN or regional endpoint. The full consolidated CI run 43622495235 passed on commit `65f82c6597bd9705c334b5cb2f6b3bfc528c946d` (27 Python/security steps and 21 Terraform formatting/validation steps).
 
-**No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
+**No attendance-project AWS resources have been provisioned by this deployment work.** The read-only preflight did not find the expected GitHub OIDC provider, deployment roles, runtime boundaries or project state bucket. Unrelated resources in the existing account have not yet been fully inventoried. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
 
 Target region: `us-east-1`, sourced from `config/deployment.json`. Read-only STS verification on 14 November 2026 confirmed AWS account `924422830139`, IAM user `Amit-admin`, through the `default` profile. This is the verified target account for the next planning step; no AWS mutation was performed.
 
