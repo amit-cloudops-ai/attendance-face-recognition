@@ -57,7 +57,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | ID | Task | Status | Acceptance criteria |
 |---|---|---|---|
 | T25 | Establish operational runbooks and incident response | TODO | Alert ownership, severity, triage, recovery, escalation and rollback documented |
-| T26 | Verify budget alarms and cost guardrails | TODO | Budgets, thresholds, notification paths and expected monthly cost documented and tested |
+| T26 | Verify budget alarms and cost guardrails | BLOCKED | Owner must choose one account-wide budget or separate Environment-tag-filtered dev/prod budgets; current two budgets both track total account spend |
 | T27 | Verify backup, restore and disaster recovery procedures | TODO | Recovery objectives, backup configuration and restore test evidence recorded |
 | T28 | Add dependency and container/code supply-chain checks | TODO | Dependency scanning and pinned/reviewed CI actions with actionable failure policy |
 | T29 | Complete end-to-end release documentation | TODO | Architecture, deployment, configuration, operator and user documentation agree with implementation |
