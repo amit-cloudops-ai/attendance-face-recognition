@@ -146,3 +146,11 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - Added a dedicated `attendance-<env>` schedule group in the data module, assigned daily/weekly schedules to it, and scoped Scheduler role trust to the exact group ARN plus `aws:SourceAccount=var.account_id` using `StringEquals`.
 - Added `account_id` as an explicit data-module input in both environment roots. Provider IAM follow-up includes Create/Get/DeleteScheduleGroup and tagging actions.
 - AWS evidence: [EventBridge Scheduler confused-deputy prevention](https://docs.aws.amazon.com/scheduler/latest/UserGuide/cross-service-confused-deputy-prevention.html) states the source ARN must be the schedule group ARN and recommends combining it with source account.
+
+
+### T33 — Terraform provider reproducibility
+
+- **Status:** active on `ai/T33-provider-lockfiles`.
+- CI previously resolved AWS provider `6.73.0` and archive provider `2.8.1`, while dev/prod roots still allowed broad ranges (`>= 5.0, < 7.0` and `>= 2.4, < 3.0`) and no lockfiles were committed.
+- Objective: pin the exact provider versions verified by the current CI baseline, generate `linux_amd64` and `windows_amd64` checksums for both environment roots, commit the lockfiles, and make CI fail if the lockfiles need modification.
+- No backend initialization against AWS, plan, apply, or resource provisioning is part of this task.

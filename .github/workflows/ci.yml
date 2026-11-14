@@ -191,6 +191,10 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - uses: actions/checkout@v4
       - run: terraform fmt -check -diff -recursive infra
+      - name: Verify committed dev and prod provider lockfiles
+        run: |
+          terraform -chdir=infra/envs/dev init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/envs/prod init -backend=false -input=false -lockfile=readonly
       - run: terraform -chdir=infra/modules/recognition init -backend=false -input=false
       - run: terraform -chdir=infra/modules/recognition validate
       - run: terraform -chdir=infra/modules/data init -backend=false -input=false
