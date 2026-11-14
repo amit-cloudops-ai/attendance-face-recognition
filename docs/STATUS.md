@@ -17,8 +17,17 @@
 - The CI workflow currently runs Ruff, pytest, browser JavaScript/CSP checks, Bash syntax, workflow YAML parsing, Terraform formatting, and Terraform module/environment-root validation. A `cfn-lint` step is not present in the checked workflow, and no `template.yaml` was found in the checked repository tree; T17 explicitly verifies whether a CloudFormation template exists before adding linting.
 - T01 branch validation: GitHub Actions runs [43611844694](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43611844694) and [43611848777](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43611848777) completed successfully. Both `python` and `terraform-fmt` jobs passed.
 
+### T02 — Lambda asynchronous destination KMS policy
+
+- **Status:** complete on `ai/T02-lambda-dlq-kms-policy`.
+- Root cause: the Lambda service-principal key-policy statement used a wildcard matching all environment DLQs, including the failure-processor queue which is not an asynchronous destination.
+- Fix: replaced the wildcard with `ArnEquals` and the exact `recognize-dlq` and `enroll-dlq` queue ARNs, retaining the source-account condition. The execution-role KMS and SQS permissions remain separately scoped to the actual producer/consumer functions.
+- AWS documentation reviewed: Lambda requires execution-role destination permissions and both the role and key resource policy to permit KMS use for customer-managed encrypted destinations; SQS documents the Lambda service as a supported event source for encrypted queues and supports source-ARN confused-deputy conditions.
+- Validation: run [43612039939](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43612039939), commit `598a6e013ffb1861941ca33c2a9611fae304482b`: Python and Terraform jobs passed, including `terraform fmt`, all four module validations and both environment-root validations.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
+- T03 is now active: reconcile every recognition Lambda SDK call against the handler-specific IAM statements and KMS/SQS permissions.
 - Region migration and separate dev/prod Terraform state keys are present on the solo implementation branch. The state bucket remains a manual prerequisite.
 - The manual deployment workflow uses GitHub OIDC, separate plan/apply role variables, encrypted saved plans using age, commit/branch checks, and GitHub Environment gates. Its workflow logic still requires a dedicated least-privilege and protection review.
 - The IAM inventory is a candidate review document, not an attachable policy. Runtime KMS grants have been narrowed by handler in the data and recognition modules; exact key-policy conditions and remaining runtime IAM mappings are not yet fully verified.
