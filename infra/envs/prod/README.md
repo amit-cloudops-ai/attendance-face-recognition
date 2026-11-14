@@ -5,8 +5,9 @@ This root wires the shared foundation, data/automation, recognition and access m
 ## Prerequisites
 
 - Complete the one-time state-bucket and GitHub OIDC bootstrap described in `infra/bootstrap/README.md`.
-- Create `backend.hcl` from `backend.hcl.example` and `terraform.tfvars` from `terraform.tfvars.example`. Both are ignored by Git.
-- Use a dedicated GitHub `prod` environment with a required reviewer for any deployment workflow.
+- Create `backend.hcl` from `backend.hcl.example` and `terraform.tfvars` from `terraform.tfvars.example`. Both are ignored by Git. The tfvars file must include the matching prod execution boundary ARN.
+- From the repository root, export `AWS_PROFILE=default` and `EXPECTED_AWS_ACCOUNT_ID=924422830139` before using the local wrapper. The wrapper verifies STS identity; the provider restricts operations to `var.account_id`.
+- The GitHub deployment path uses the `prod-plan` and `prod-apply` environments and the solo-owner approval checkpoint; verify their settings before use.
 
 ## Two-pass first deployment
 
