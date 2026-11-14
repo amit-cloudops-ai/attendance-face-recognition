@@ -202,3 +202,12 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - Added CI validation for JSON rendering, size, dev-only ARNs, exact PassRole roles/service conditions, mandatory execution boundary, state/lock isolation, DynamoDB tables, Lambda event source mapping scope and API Gateway path family.
 - Residual service limitations are documented in `infra/policies/README.md`: API Gateway v2 child-resource paths remain scoped at the API path family until generated API ID can be pinned; several create APIs require `Resource: "*"` with tag or function conditions where supported. This is a policy template, not an attached AWS role.
 - No AWS resources, IAM roles or policies created; no remote backend initialization, Terraform plan or apply.
+
+
+### T11 — production Terraform plan-role policy
+
+- **Status:** policy templates drafted; CI validation pending.
+- Cloned the dev read-only plan policy into three production-specific policy templates (core, edge, state), changing environment tags, S3/DynamoDB/Lambda/KMS/Scheduler resource names and state key to prod.
+- The production state object is read-only; only the production `.tflock` object can be Get/Put/Deleted for native S3 locking.
+- CI checks read-only action sets, 6,144-character policy size, exact `attendance-prod` Scheduler group/schedule ARNs, and rejects dev resources/state paths from prod policies.
+- No AWS resources or IAM roles created; no remote backend initialization, plan or apply.
