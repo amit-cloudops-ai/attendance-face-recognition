@@ -1,6 +1,6 @@
 # AWS Cost Sheet
 
-**Assumptions:** 100 employees, 2 scans per employee per day (clock-in, clock-out), 22 working days/month, region ap-south-1, 3 enrolled photos per employee, no free tier (worst case). **Prices below are estimates; confirm every line in the AWS Pricing Calculator for ap-south-1 and attach the saved estimate link before submission.**
+**Assumptions:** 100 employees, 2 scans per employee per day (clock-in, clock-out), 22 working days/month, region us-east-1, 3 enrolled photos per employee, no free tier (worst case). **Prices below are estimates; confirm every line in the AWS Pricing Calculator for us-east-1 and attach the saved estimate link before submission.**
 
 | Item | Calculation | Est. monthly |
 |---|---|---|
