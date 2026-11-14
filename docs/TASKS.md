@@ -69,6 +69,6 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 
 - T01 is complete: governance files restored and branch CI passed on commits `be5b4e94c41f760d6bd750bf283f76dec222b2ef` and `aa293276cc8d35961ac75b6cd70ccd681105ae0f`.
 - T07 is complete: provider v6.73.0 operations for DynamoDB, CloudWatch, IAM, Lambda, Scheduler, SQS, Rekognition and S3 notifications are mapped in `docs/security/DATA-RECOGNITION-PROVIDER-IAM.md`. CI run [43614059591](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43614059591) passed Python and Terraform jobs.
-- T08 is complete (PR #11); T09 is complete (PR #12); T32 is complete (PR #13). T33 is next: pin the provider and commit environment lockfiles before finalizing deployment policies.
+- T08 is complete (PR #11); T09 is complete (PR #12); T32 is complete (PR #13). T33 is complete (PR #17). T34 is complete (PR #14); T35 and T36 are complete (PRs #15–#16). T10 is now active: finish and validate the dev apply-role policy set.
 - Do not reorder or mark tasks complete without evidence.
 - The task board is a plan, not proof that implementation or AWS validation has occurred.
