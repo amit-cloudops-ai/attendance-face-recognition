@@ -16,6 +16,16 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: pytest -q
+      - name: Check browser JavaScript syntax and HTML CSP hygiene
+        run: |
+          for file in web/*.js web/shared/*.js web/admin/*.js; do
+            [ -f "$file" ] || continue
+            node --input-type=module --check < "$file"
+          done
+          if grep -R --include='*.html' -n 'style="' web; then
+            echo "Inline styles conflict with the strict Content-Security-Policy."
+            exit 1
+          fi
 
   terraform-fmt:
     runs-on: ubuntu-latest
