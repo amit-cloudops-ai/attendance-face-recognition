@@ -10,7 +10,8 @@ module "foundation" {
 module "data" {
   source = "../../modules/data"
 
-  env                 = var.env
+  env                          = var.env
+  execution_role_boundary_arn = var.execution_role_boundary_arn
   kms_key_arn         = module.foundation.kms_key_arn
   raw_bucket_name     = module.foundation.raw_bucket_name
   reports_bucket_name = module.foundation.reports_bucket_name
@@ -24,7 +25,8 @@ module "data" {
 module "recognition" {
   source = "../../modules/recognition"
 
-  env              = var.env
+  env                          = var.env
+  execution_role_boundary_arn = var.execution_role_boundary_arn
   account_id       = var.account_id
   kms_key_arn      = module.foundation.kms_key_arn
   raw_bucket_name  = module.foundation.raw_bucket_name
