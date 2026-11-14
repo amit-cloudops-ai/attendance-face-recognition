@@ -35,7 +35,7 @@ Turn "an image landed in S3" into "a correct, safe, fast recognition result", an
 
 **6. `enroll` Lambda** (512 MB, 15 s, reserved concurrency 5). Triggered by `enroll/`. Parse `employee_id` and `request_id` from the key. Check the employee exists and is active, then acquire a 45-second per-employee lease. Check the photo limit; run `DetectFaces` for `no_face` / `multiple_faces` / `low_quality`; run `SearchFacesByImage` at the match threshold and return `duplicate_face` if a different employee owns the match. Before indexing, search results are checked for a FaceId whose ExternalImageId exactly matches `employee_id#request_id`; reuse it when found, otherwise call `IndexFaces`. Persist the FaceId, increment `photo_count`, and write the request-specific `enrollment_{request_id}` marker in one conditional employee update while releasing the lease. Then set `code=enrolled`. The marker lets a retry finish result persistence without indexing or incrementing again. Delete the image only after a durable terminal result; unexpected exceptions preserve the image and remain retryable.
 
-**7. `faces-delete` Lambda.** Read `face_ids` from the employee; `DeleteFaces` in batches; set `face_ids=[]`, `photo_count=0`; write an audit row (`action=faces_delete`, `actor` from `auth.get_username`). Return `{"deleted": N}`.
+**7. `faces-delete` Lambda.** Requires the employee to be inactive (the admin UI deactivates first). Delete all face IDs in Rekognition batches and verify every ID is deleted or already absent; do not clear the employee record on partial failure. Write a deterministic audit record before the conditional employee update, then set `face_ids=[]`, `photo_count=0` and persist the audit marker. This makes retries safe if Rekognition deletion, audit persistence or the employee update fails. Return `{"deleted": N}`.
 
 **8. Keep-warm (SHOULD).** Scheduler schedule `attendance-{env}-recognize-warm`, every 5 min, 08:00-20:00 IST, payload `{"warmup": true}`.
 
@@ -48,7 +48,7 @@ Use moto for S3 and DynamoDB; mock Rekognition (`unittest.mock` or botocore Stub
 - failure worker: converts exhausted async failures to terminal error, deletes capture/enrollment images, preserves already-terminal outcomes, and returns malformed SQS records for retry.
 - enroll: every enroll code; request marker prevents double increment after result-write failure; lease serializes concurrent attempts; transient exception remains pending and retains image.
 - failure worker: handles both capture and enrollment event envelopes and partial batch failures.
-- faces-delete: clears fields, writes audit.
+- faces-delete: rejects active employees, verifies complete Rekognition deletion, handles already-missing IDs, and keeps the audit/update retry-safe.
 - contract test: scan-results items you write have exactly the contract attributes and a `ttl`.
 
 ## Accuracy work (Day 3 to 4)
