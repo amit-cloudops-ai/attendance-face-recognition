@@ -163,3 +163,13 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - Added independent `infra/billing` Terraform root with its own backend state key `attendance/billing/terraform.tfstate`; it manages the dev and prod USD 15 monthly budgets and their 80%/100% actual-cost notifications.
 - Removed `budgets:ViewBudget` and `aws-portal:ViewBilling` from the dev environment plan-role core policy. Billing access belongs only to a dedicated billing plan/apply role; no such role or policy is attached/created here.
 - This isolates the privileged account-level `aws-portal:ModifyBilling` permission from standard environment deployment roles. Bootstrap, billing role trust and billing plan/apply policy remain separate manual review items.
+
+
+### T35 — exact CloudFront KMS scope
+
+- **Status:** implementation drafted; CI validation pending.
+- Removed the CloudFront service statement from the foundation key policy. Foundation now creates the KMS key with the default account-root policy; it no longer needs the distribution ID before that resource exists.
+- Added `kms_key_id` output from foundation and input to access. The access module now owns `aws_kms_key_policy.attendance` and installs the complete key policy after creating the CloudFront distribution.
+- CloudFront's `kms:Decrypt` grant uses `aws:SourceAccount` plus `ArnEquals aws:SourceArn = aws_cloudfront_distribution.site.arn`; the former `distribution/*` wildcard is removed. SNS alert and Lambda async DLQ service statements and account-root administration remain in the final policy.
+- Added the `kms:GetKeyPolicy`/`kms:PutKeyPolicy` provider action mapping for the access-module policy resource.
+- Also corrected a latent T31 omission: `user_pool_issuer` output was still hard-coded to `ap-south-1`; it now emits the `us-east-1` issuer used by the deployed Cognito pool.
