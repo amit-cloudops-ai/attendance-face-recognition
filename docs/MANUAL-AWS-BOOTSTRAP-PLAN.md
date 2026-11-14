@@ -5,7 +5,7 @@
 ## Target account and region
 
 - AWS account: existing owner account; exact 12-digit account ID must be confirmed from the authenticated AWS identity before any mutation.
-- Region: us-east-1.
+- Region: `us-east-1`, sourced from `config/deployment.json`. Do not configure a second region value in local backend files or GitHub variables.
 - Repository: amit-cloudops-ai/attendance-face-recognition.
 - GitHub OIDC issuer: https://token.actions.githubusercontent.com.
 - OIDC audience: sts.amazonaws.com.
@@ -51,7 +51,7 @@ Billing has dedicated plan/apply policy templates and OIDC trust templates in T3
 
 ### 1. Read-only identity and existence checks
 
-After approval, verify the active AWS identity and region. Inspect whether the OIDC provider, state bucket, boundary policies, deployment roles and policy names already exist. Record exact ARNs and current trust/permission documents. No writes in this step.
+Before any write operation, use an authenticated read-only AWS session to verify the active STS identity and region. Inspect whether the OIDC provider, state bucket, boundary policies, deployment roles and policy names already exist. Record exact ARNs and current trust/permission documents. No writes in this step. No live inventory has been performed by this repository session.
 
 ### 2. State bucket
 
@@ -114,10 +114,10 @@ Billing has a dedicated plan/apply policy and OIDC role pair. It must not share 
 ## Approval request required before any mutation
 
 Before performing any bootstrap write, present to the owner:
-1. Verified 12-digit account ID and us-east-1 confirmation.
+1. Verified 12-digit account ID and region confirmation against `config/deployment.json` and the authenticated STS identity.
 2. Final state bucket name and exact bucket configuration/policy.
 3. Whether the OIDC provider already exists.
-4. Exact IAM resource inventory (provider, two boundaries, four roles, 22 managed policy attachments).
+4. Exact IAM resource inventory (one OIDC provider if absent, two boundaries, six roles and 26 managed policy attachments/templates).
 5. Fully rendered trust policies, boundaries and all role policy documents.
 6. Exact GitHub environment names, variables, secrets and branch/reviewer controls.
 7. Planned first Terraform backend init and dev plan scope.
