@@ -7,6 +7,15 @@
 - Finish and validate Phase A reliability/security work on the solo branch before preparing the AWS development release candidate. Do not deploy or provision AWS resources until the reviewed dev Terraform plan is explicitly approved.
 - `main`, `develop`, and teammate branches remain untouched by solo implementation work.
 
+## Phase B deployment readiness (in progress; no AWS provisioning)
+
+- Reviewed the S3 backend and manual deployment workflow on `solo/amit-monday`. Dev and prod use separate S3 state keys and Terraform native S3 lock files (`use_lockfile = true`, Terraform >= 1.10); the state bucket remains a manual prerequisite.
+- Identified a security issue: this repository is public, and the original workflow uploaded the raw saved Terraform plan as an artifact. Updated `.github/workflows/deploy.yml` to encrypt the plan with `age` before upload and decrypt only during the corresponding apply run. Added separate per-environment age recipient/identity setup to `infra/bootstrap/README.md`.
+- Added `docs/PHASE-B-DEPLOYMENT-READINESS.md` with backend object permissions, OIDC subject constraints, environment branch gates, IAM action inventory and remaining deployment gates.
+- The exact deployment IAM policy is not yet approved or created. It needs a complete action/resource review and a decision on permissions boundaries for application roles. Do not use `AdministratorAccess`.
+- The workflow only allows dev from `develop` and prod from `main`; solo promotion will require a reviewed PR from `solo/amit-monday` to `develop`. Team branches remain separate.
+- No AWS resources, OIDC provider/roles, state bucket, backend initialization, Terraform plan or apply have been created/run. The workflow encryption change still needs CI validation.
+
 ## Phase A reliability hardening (solo implementation validated; AWS validation outstanding)
 - Recognition now leaves retryable failures pending and retains raw images. Terminal results are persisted before image deletion. The original presign `created_at` is used as the scan timestamp.
 - Shared `record_scan` accepts a UUID request ID and stores the exact outcome in the attendance row's `scan_events` map alongside the conditional attendance transition. Replays return the original outcome rather than creating a second clock action.
