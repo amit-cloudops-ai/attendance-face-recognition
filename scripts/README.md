@@ -51,7 +51,7 @@ TF_STATE_BUCKET=<known-candidate-bucket> AWS_PROFILE=<approved-profile> bash scr
 
 - Run against **dev only**, never production.
 - Use a consenting test participant and set `CONSENT_CONFIRMED=YES`.
-- Set `AWS_ACCOUNT_ID` to the verified dev account and `RAW_BUCKET` to the dev raw bucket. The AWS CLI profile must have read-only STS, `s3:GetObject` on the test object prefixes and `s3:ListBucket` on the dev raw bucket. The script refuses a mismatched account or noncanonical region.
+- Set `AWS_ACCOUNT_ID` to the verified dev account and `RAW_BUCKET` to the dev raw bucket. The AWS CLI profile must have read-only STS, `s3:GetObject` on the test object prefixes, `s3:ListBucket` on the dev raw bucket, and `s3:DeleteObject` on the test object prefixes for failure cleanup. The script refuses a mismatched account or noncanonical region.
 - Do not put biometric photos or tokens in Git, screenshots, logs or shared shell history.
 - Photos must be JPEGs between 1 KB and 1 MB. Supply three varied enrollment photos and a scan photo of the same consenting participant.
 - Use an admin token and a kiosk-group token from the dev Cognito user pool.
