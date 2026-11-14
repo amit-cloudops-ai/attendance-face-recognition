@@ -59,3 +59,7 @@ The raw bucket is created by the foundation module, while the CloudFront distrib
 | Safari iOS | Test if device available; otherwise mark not tested | Device + version |
 
 Do not use real employee biometrics in screenshots, logs, test fixtures or Git. Use consenting test participants and delete test data after the approved dev test.
+
+## Deployed-stack API smoke test
+
+After a reviewed dev deployment, use `scripts/e2e_smoke.sh` to create a consented test employee, enroll three local JPEGs, run at least 20 repeated scans, verify debounce and query attendance. See [scripts/README.md](../scripts/README.md) for required environment variables and cleanup behaviour. The script leaves attendance/audit history but deactivates the test employee and removes its indexed face templates. Its latency metric excludes browser capture/rendering, so it does not replace the browser/device N01 test.
