@@ -113,9 +113,11 @@
 
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
-- Complete: T01–T09 and T31. PRs #3–#12 are open in a task-by-task stack and remain unmerged.
-- Active: T32. It adds separate `attendance-dev` and `attendance-prod` Scheduler schedule groups and scopes each Scheduler execution-role trust policy to the matching schedule-group ARN plus the owning account. AWS requires the group ARN, not an individual schedule ARN.
-- Remaining cross-cutting blockers: T33 provider pin/lockfiles; T34 isolate AWS Budgets from normal apply roles; T35 restrict CloudFront KMS access to the exact distribution; T36 add DynamoDB CMK service access and exact deployment-role KMS permissions.
+- Complete: T01–T09, T31–T36. PRs #3–#17 are open and remain unmerged pending owner review.
+- Active: T10 dev apply-role policy. The policy set is drafted and CI validation is pending.
+- Remaining deployment policies: T11 prod plan, T12 prod apply. T09 dev plan is complete; T10 is being finalized.
+- Remaining operational/security gates: T13 state bucket bootstrap specification; T14 GitHub OIDC/workflow permissions; T15 encrypted plan artifact lifecycle; T16 GitHub environment variables/secrets/protection; T17 template linting; T18 exact manual bootstrap plan; T19 solo-only deployment-readiness PR.
+- Release gates T20–T24 remain explicitly approval-gated.
 - Remaining deployment policies: dev apply (T10), prod plan (T11), prod apply (T12). T09 dev plan policies are complete.
 - Remaining operational/security gates: state bucket specification (T13), OIDC/workflow permissions (T14), encrypted plan lifecycle (T15), GitHub environment/secrets/protection (T16), CI template linting (T17), exact bootstrap plan (T18), then solo-only readiness PR (T19).
 - No AWS resource creation, remote backend initialization, Terraform plan or apply has occurred. These actions remain approval-gated.
