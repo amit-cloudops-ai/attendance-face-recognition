@@ -1,11 +1,13 @@
-# Contracts (FROZEN v1.0)
+# Contracts (FROZEN v1.1)
+
+**Region amendment (14 Nov 2026):** The deployment region is `us-east-1`. `config/deployment.json` is the repository's canonical region manifest. Terraform providers read it directly; deployment/local Terraform wrappers export the same value for the S3 backend. Lambda SDK clients use the Lambda-reserved `AWS_REGION`. Do not add independent region literals.
 
 Every name, schema, endpoint and code in this file is a promise between Parts. **Do not rename or reshape anything here.** If you think something must change, tell the lead; the lead changes it here first, then everyone updates. AIs and humans: copy names exactly.
 
 ## 0. Global conventions
 | Item | Value |
 |---|---|
-| Region | `ap-south-1` |
+| Region | `us-east-1` (canonical value in `config/deployment.json`) |
 | Environments | `dev`, `prod` (`{env}` below) |
 | Resource prefix | `attendance-{env}-` |
 | Time zone | `Asia/Kolkata` (IST, UTC+05:30) for all business dates |
@@ -107,13 +109,13 @@ Definitions: `present_days` = days with a clock-in (present + late); `late_days`
 CSV columns: daily `employee_id,name,date,status,clock_in,clock_out,flags`; weekly `employee_id,name,present_days,late_days,absent_days,present_pct,late_pct,absent_pct`.
 
 ## 9. Rekognition parameters
-Scan: `DetectFaces` (must find exactly 1 face; Brightness and Sharpness at or above settings minimums) then `SearchFacesByImage` with `FaceMatchThreshold=settings.face_match_threshold`, `MaxFaces=1`, `QualityFilter="AUTO"`; matched `ExternalImageId` is either the legacy `employee_id` or the new `employee_id#request_id` format; the recognition worker resolves the employee ID from the prefix. Enroll: `IndexFaces` with `MaxFaces=1`, `QualityFilter="AUTO"`, `ExternalImageId=employee_id#request_id` so retries can recover the exact indexed FaceId. The S3 client used for pre-signing must be created with `region_name="ap-south-1"` and `signature_version="s3v4"`.
+Scan: `DetectFaces` (must find exactly 1 face; Brightness and Sharpness at or above settings minimums) then `SearchFacesByImage` with `FaceMatchThreshold=settings.face_match_threshold`, `MaxFaces=1`, `QualityFilter="AUTO"`; matched `ExternalImageId` is either the legacy `employee_id` or the new `employee_id#request_id` format; the recognition worker resolves the employee ID from the prefix. Enroll: `IndexFaces` with `MaxFaces=1`, `QualityFilter="AUTO"`, `ExternalImageId=employee_id#request_id` so retries can recover the exact indexed FaceId. The S3 client used for pre-signing must use the Lambda-reserved `AWS_REGION` value and `signature_version="s3v4"`; do not hard-code a region.
 
 ## 10. Manual and scheduled invocation events
 `daily-job`: `{}` (uses today IST) or `{"date": "YYYY-MM-DD"}` for a re-run. `weekly-job`: `{}` (previous ISO week) or `{"week": "YYYY-Www"}`. `recognize`: `{"warmup": true}` returns immediately without touching AWS services (keep-warm schedule, SHOULD). Scheduler schedules: `attendance-{env}-daily` cron `59 23 * * ? *`, `attendance-{env}-weekly` cron `30 0 ? * MON *`, both with timezone `Asia/Kolkata`.
 
 ## 11. Frontend runtime config (Part C)
-Terraform uploads `/config.json` to the web bucket: `{"region":"ap-south-1","userPoolId","clientId","cognitoDomain","apiBase":"/api","rawBucketUrl":"https://<raw bucket>.s3.ap-south-1.amazonaws.com"}`. Kiosk lives at `/`, admin at `/admin/`, shared OAuth callback at `/callback.html`. `config.json` and `*.html` are served with `Cache-Control: no-cache`.
+Terraform uploads `/config.json` to the web bucket: `{"region":"us-east-1","userPoolId","clientId","cognitoDomain","apiBase":"/api","rawBucketUrl":"https://<raw bucket>.s3.us-east-1.amazonaws.com"}`. Kiosk lives at `/`, admin at `/admin/`, shared OAuth callback at `/callback.html`. `config.json` and `*.html` are served with `Cache-Control: no-cache`.
 
 
 ## 12. Internal retry metadata (additive implementation detail)
