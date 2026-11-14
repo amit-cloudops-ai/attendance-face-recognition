@@ -192,7 +192,7 @@ def test_enroll_rejects_unknown_employee_limit_and_duplicate_face(aws_env, monke
         assert fake_s3.deleted == [f"enroll/EMP001/{request_id}.jpg"]
 
 
-def test_enroll_exception_marks_error_and_deletes_image(aws_env, monkeypatch):
+def test_enroll_retryable_exception_preserves_pending_result_and_image(aws_env, monkeypatch):
     scans, employees, _ = aws_env
     request_id = str(uuid.uuid4())
     seed_pending(scans, request_id)
@@ -206,8 +206,8 @@ def test_enroll_exception_marks_error_and_deletes_image(aws_env, monkeypatch):
     setup_worker(monkeypatch, scans, employees, BrokenRekognition(), fake_s3)
     with pytest.raises(RuntimeError):
         enroll.lambda_handler(s3_event("EMP001", request_id), None)
-    assert scans.get_item(Key={"request_id": request_id})["Item"]["code"] == "error"
-    assert fake_s3.deleted == [f"enroll/EMP001/{request_id}.jpg"]
+    assert scans.get_item(Key={"request_id": request_id})["Item"]["code"] == "pending"
+    assert fake_s3.deleted == []
 
 
 def test_faces_delete_removes_templates_clears_employee_and_audits(aws_env, monkeypatch):
@@ -230,3 +230,41 @@ def test_faces_delete_removes_templates_clears_employee_and_audits(aws_env, monk
 def test_faces_delete_requires_admin_and_existing_employee(aws_env):
     assert faces_delete.lambda_handler(event("kiosk"), None)["statusCode"] == 403
     assert faces_delete.lambda_handler(event(employee_id="EMP999"), None)["statusCode"] == 404
+
+ 
+
+def test_enrollment_retry_after_employee_commit_does_not_index_twice(aws_env, monkeypatch):
+    scans, employees, _ = aws_env
+    request_id = str(uuid.uuid4())
+    seed_pending(scans, request_id)
+    employees.put_item(Item={"employee_id": "EMP001", "name": "Priya", "active": True,
+        "photo_count": 0, "face_ids": []})
+    fake_s3, fake_rekognition = FakeS3(), FakeRekognition()
+    setup_worker(monkeypatch, scans, employees, fake_rekognition, fake_s3)
+
+    original_finish = enroll._update_result
+    calls = {"count": 0}
+
+    def fail_once(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("temporary DynamoDB failure")
+        return original_finish(*args, **kwargs)
+
+    monkeypatch.setattr(enroll, "_update_result", fail_once)
+    with pytest.raises(RuntimeError):
+        enroll.lambda_handler(s3_event("EMP001", request_id), None)
+
+    committed = employees.get_item(Key={"employee_id": "EMP001"})["Item"]
+    assert committed["photo_count"] == 1
+    assert committed["enrollment_" + request_id] == "face-001"
+    assert scans.get_item(Key={"request_id": request_id})["Item"]["code"] == "pending"
+    assert fake_s3.deleted == []
+
+    monkeypatch.setattr(enroll, "_update_result", original_finish)
+    enroll.lambda_handler(s3_event("EMP001", request_id), None)
+    result = scans.get_item(Key={"request_id": request_id})["Item"]
+    assert result["code"] == "enrolled"
+    assert committed["photo_count"] == 1
+    assert fake_rekognition.index_calls == 1
+    assert fake_s3.deleted == [f"enroll/EMP001/{request_id}.jpg"]
