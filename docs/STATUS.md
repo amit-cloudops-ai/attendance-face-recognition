@@ -2,86 +2,112 @@
 
 ## Executive status
 
-The solo implementation and Phase B deployment-security preparation have advanced substantially. T01–T15, T17 and T32–T37 are complete at the code/documentation/CI level. T16 and T18 are blocked on owner/repository-administrator actions.
+The solo application and the T01–T37 deployment-security task chain have been consolidated on the release-preparation branch. The T01–T15, T17 and T31–T37 implementation tasks are complete at the code/documentation level with historical CI evidence recorded in their task PRs. T16 and T18 remain blocked on repository-administrator and owner-controlled AWS-account information/actions.
 
-**No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key, or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
+A new region-consistency change is in progress on this branch: `config/deployment.json` is the canonical AWS region manifest; Terraform provider roots read it; the deployment workflow and local Terraform wrapper export it for the S3 backend; Lambda clients use the Lambda-reserved `AWS_REGION`; contracts and examples are being aligned; CI will reject the superseded region and mismatched regional settings. This branch's new CI run is the acceptance gate for this work.
 
-Target region: us-east-1. Target account: the owner's existing AWS account; the exact 12-digit account ID has not been verified in this session.
+**No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
+
+Target region: `us-east-1`, sourced from `config/deployment.json`. Target account: the owner's existing AWS account; the exact 12-digit account ID has not been verified in this session.
 
 ## Source of truth and branch discipline
 
-- Repository: amit-cloudops-ai/attendance-face-recognition.
-- Governance: AGENTS.md, docs/TASKS.md and docs/CHATGPT_PROJECT_INSTRUCTIONS.md.
-- Solo baseline: solo/amit-monday at 92e9bf53066145949bd430dd8dcbc0e7850df46d.
-- Current work branch: ai/T37-billing-roles.
-- Task work is isolated in ai/T## branches and promoted through stacked PRs. Do not commit to main/develop, alter teammate branches or merge teammate PRs.
-- All task PRs are open and unmerged pending owner review. Teammate Part B PR #2 remains separate and untouched.
+- Repository: `amit-cloudops-ai/attendance-face-recognition`.
+- Governance: `AGENTS.md`, `docs/TASKS.md` and `docs/CHATGPT_PROJECT_INSTRUCTIONS.md`.
+- Application baseline: `solo/amit-monday`.
+- Security task chain: `ai/T01-repository-governance` through `ai/T37-billing-roles`, including T31–T36 cross-cutting tasks.
+- Current consolidation branch: `release/phase-b-region-guard`, created from `ai/T37-billing-roles`. It contains the stacked task work and the new region-consistency changes.
+- The task PRs remain open and unmerged. This branch is intended to produce one reviewed consolidation PR into `solo/amit-monday`; it does not promote anything to `develop` or `main`.
+- Teammate Part B PR #2 remains separate and untouched. Do not merge teammate work into the solo release.
 
-## Completed Phase B tasks
+## Completed security implementation
 
-| Tasks | Scope | Evidence |
+| Work | Scope | Evidence |
 |---|---|---|
-| T01–T05, T31 | Governance, Lambda async DLQ KMS, runtime IAM, region alignment and runtime boundaries | PRs #3–#8; CI runs 43611844694, 43612039939, 43612245039, 43612668343, 43612832683, 43613054015 |
-| T06–T08 | Terraform provider IAM mapping for foundation, data/recognition and access modules | PRs #9–#11; CI runs 43613487881, 43614059591, 43615508377 |
-| T09 | Dev read-only plan policies | PR #12; CI run 43615873597 |
-| T32 | Environment-specific Scheduler groups and exact account/group trust | PR #13; CI run 43616332197 |
-| T33 | Pin AWS provider 6.73.0/archive 2.8.1 and commit dev/prod lockfiles | PR #17; CI run 43617191177 |
-| T34 | Move AWS Budgets into isolated infra/billing root and remove billing actions from normal roles | PR #14; CI run 43616787686 |
-| T35–T36 | Exact CloudFront KMS distribution scope and DynamoDB customer-managed KMS ViaService authorization | PRs #15–#16; CI run 43617044959 |
-| T10–T12 | Dev apply, prod plan and prod apply policy sets; split managed policies, exact resource/role/state scopes | PRs #18–#20; CI runs 43617809368, 43617967197, 43618294918 |
-| T13 | Manual S3 state bucket bootstrap specification | PR #21; CI run 43618372200 |
-| T14 | Operation-specific GitHub OIDC subjects, role selection and deployment workflow boundaries | PR #22; CI run 43618685801 |
-| T15 | Encrypted plan artifact provenance, run-attempt binding and cleanup | PR #23; CI run 43618692691 |
-| T17 | Infrastructure template lint audit and CI guard for future CloudFormation/SAM templates | PR #25; CI run 43619026006 passed |
+| T01–T05, T31 | Governance, async DLQ KMS, recognition/data runtime IAM, runtime region selection and execution boundaries | PRs #3–#8; CI runs 43611844694, 43612039939, 43612245039, 43612668343, 43612832683, 43613054015 |
+| T06–T08 | Terraform provider IAM action mapping for foundation, data/recognition and access modules | PRs #9–#11; CI runs 43613487881, 43614059591, 43615508377 |
+| T09–T12 | Dev/prod plan and apply policy sets, split managed policies, state isolation, exact PassRole scopes and runtime boundaries | PRs #12, #18–#20; CI runs 43615873597, 43617809368, 43617967197, 43618294918 |
+| T13–T15 | State-bucket security specification, OIDC trust and encrypted plan-artifact provenance | PRs #21–#23; CI runs 43618372200, 43618685801, 43618692691 |
+| T17 | Terraform/JSON policy template linting and guard for future SAM/CloudFormation | PR #25; CI run 43619026006 |
+| T32–T36 | Scheduler trust isolation, provider lockfiles, billing isolation, CloudFront KMS scope and DynamoDB KMS authorization | PRs #13–#17; CI runs 43616332197, 43616787686, 43617044959, 43617191177 |
+| T37 | Dedicated billing plan/apply policy and OIDC roles, isolated billing state root | PR #27; CI run 43620012088 |
 
-The policy templates are not attached to AWS roles. IAM Access Analyzer and live AWS authorization tests have not been performed.
+The task PR CI runs are historical evidence for their respective commits. The new consolidation branch must pass its own complete CI before it can be considered validated. IAM templates have not been attached to AWS roles. IAM Access Analyzer and live AWS authorization tests have not been performed.
 
-## Remaining blockers
+## Region-consistency implementation
+
+- Canonical value: `config/deployment.json` → `aws_region: us-east-1`.
+- Dev, prod and billing Terraform providers load the canonical manifest rather than carrying separate provider-region literals.
+- S3 backend region is supplied from the same manifest through `scripts/terraform.sh` locally and the deployment workflow in GitHub Actions.
+- Lambda SDK clients use the Lambda-reserved `AWS_REGION`; the local/test fallback remains `us-east-1`.
+- Contracts are amended to v1.1 for the region-only change. SPEC is amended to v1.1; functional scope and acceptance criteria are unchanged.
+- Frontend runtime examples, Cognito domain examples, raw-bucket endpoints, architecture decision log and cost assumptions are aligned.
+- Moto test fixtures are aligned to the target region.
+- CI runs `scripts/check_region_consistency.py`, which checks the manifest, Terraform roots, backend configuration, documentation and absence of the superseded region. This branch's CI result is pending.
+
+No system can guarantee that a future contributor never writes an incorrect region, but the new automated gate is designed to fail every pull request/push that reintroduces a conflicting region into tracked project files.
+
+## Remaining Phase B blockers
 
 ### T16 — GitHub environment variables, secrets and protections
 
-**Status: BLOCKED**
+**Status: BLOCKED — repository administrator action required.**
 
-PR #24 contains the environment setup guide, and T37 extends it to six environments. The required names are dev-plan, dev-apply, prod-plan, prod-apply, billing-plan and billing-apply, with environment-scoped AWS_ROLE_ARN values, plan-only age recipients, apply-only private age identity secrets, branch restrictions and independent apply reviewers.
+The required environments are `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan` and `billing-apply`. Each must have the correct environment-scoped `AWS_ROLE_ARN`, account/bucket values, plan-only age recipient, apply-only private age identity secret, branch restriction and independent apply reviewer.
 
-The GitHub connector cannot inspect or configure repository Actions environments. Branch protection API reads returned 403 Resource not accessible by integration. Actual environment existence, variable values, secret presence, reviewer assignments and branch restrictions remain unverified.
+The GitHub connector cannot inspect or configure Actions environment secrets/protection settings, and branch-protection reads returned 403. Their actual existence and values remain unverified.
 
-**Owner action:** configure the six environments and protection settings using docs/GITHUB-ENVIRONMENT-SETUP.md, then confirm or provide an authorized read-only verification path.
+**Owner action:** configure the six environments using `docs/GITHUB-ENVIRONMENT-SETUP.md` and provide confirmation or an authorized read-only verification path.
 
 ### T18 — exact manual AWS bootstrap plan
 
-**Status: BLOCKED**
+**Status: BLOCKED — account identity and owner approval required.**
 
-PR #26 contains docs/MANUAL-AWS-BOOTSTRAP-PLAN.md. It enumerates the state bucket, OIDC provider, two runtime boundaries, six GitHub plan/apply roles, policy attachments, manual order, dev-first rollout, prod approval and rollback. CI run [43619095037](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43619095037), commit `f3aa1e85a6`: Python and Terraform jobs passed, including the bootstrap-plan inventory validator, all policy validators, lockfiles and environment roots.
+The plan enumerates:
+- One dedicated S3 state bucket in `us-east-1`, with a globally unique account-specific name.
+- One GitHub Actions OIDC provider, reused if already present.
+- Two pre-created runtime permissions boundaries (dev and prod).
+- Six GitHub plan/apply roles across dev, prod and billing.
+- 26 managed policy templates/attachments across the three isolated roots.
+- Six matching GitHub environments and the required variables/secrets.
+- Read-only existence checks, bootstrap order, rollback and approval gates.
 
-The exact 12-digit account ID and globally unique state bucket suffix remain unknown. The bootstrap plan must be rendered with verified account values and presented to the owner before any write operation. T16 must also be resolved before role federation can be enabled.
+The exact 12-digit AWS account ID, final bucket suffix and current resource inventory are not known. No live AWS read-only preflight has been performed in this session. The bootstrap plan must be rendered with verified account values and presented to the owner before any write operation.
 
-**Owner action:** provide/confirm the account ID and approve the exact rendered resource inventory and permissions before bootstrap.
+**Owner action:** provide/confirm the account ID and final bucket suffix, run or authorize read-only inventory, then review and explicitly approve the exact resource and policy inventory. Approval for bootstrap writes and approval for Terraform plan/apply remain separate.
 
-### T37 — dedicated billing deployment roles
+## IAM design limitations requiring explicit review
 
-The billing root now has separate plan/apply budget and state policies plus exact billing-plan/billing-apply OIDC trust templates. The deployment workflow supports infra/billing on main, selects the billing root, requires the committed provider lockfile and uses separate billing environments. PR #27; CI run [43620012088](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43620012088), commit `cfa7e40f83`: Python and Terraform jobs passed, including billing policy action sets, state paths, OIDC subjects, workflow root/branch gates, all policy templates, provider lockfiles, modules and all environment/billing roots. Normal dev/prod roles are validated to exclude all budgets:* and aws-portal:* permissions.
+- API Gateway v2 child-resource paths remain scoped to the `/apis/*` resource family until the generated API ID can be pinned.
+- Some AWS create APIs require `Resource: "*"`; request-tag, function and service conditions are used where supported.
+- Billing's `aws-portal:ModifyBilling` is account-level and cannot be scoped to an individual budget ARN. It is isolated to the billing-apply role, main branch and independent reviewer gate; it must never be attached to dev/prod roles.
+- Static template validation does not prove live AWS authorization. Rendered policies still require IAM Access Analyzer/review and a controlled dev deployment.
 
-## Deployment policy notes and residual scope
+## Exact bootstrap inventory — not executed
 
-- Dev and prod plan roles are read-only for infrastructure. They can write/delete only their own S3 backend .tflock object.
-- Dev/prod apply roles use separate policy sets, exact role ARNs for PassRole, exact runtime boundaries, environment-specific resources and isolated state keys.
-- Billing is isolated from normal environment roles.
-- DynamoDB customer-managed KMS permissions use the matching environment alias and kms:ViaService=dynamodb.us-east-1.amazonaws.com; CreateGrant also requires kms:GrantIsForAWSResource=true.
-- CloudFront KMS decrypt is scoped to the exact distribution ARN.
-- Scheduler trust requires the exact environment schedule-group ARN and source account.
-- API Gateway v2 child-resource paths remain scoped to the /apis/* resource family until the generated API ID can be pinned. Several AWS create APIs require Resource="*" and use request-tag or function conditions where supported. These limitations are documented in infra/policies/README.md.
-- The state bucket is SSE-S3 encrypted, versioned, BucketOwnerEnforced, blocked from public access and TLS-only. The bucket has not been created.
+| Category | Count | Names/scope |
+|---|---:|---|
+| S3 state bucket | 1 | `attendance-tf-state-<account-id>-<approved-suffix>` |
+| IAM OIDC provider | 1 | `token.actions.githubusercontent.com` |
+| Runtime permissions boundaries | 2 | `attendance-dev-execution-boundary`, `attendance-prod-execution-boundary` |
+| GitHub plan/apply roles | 6 | dev-plan, dev-apply, prod-plan, prod-apply, billing-plan, billing-apply |
+| Managed policy templates | 26 | 22 dev/prod plan/apply + 4 billing plan/apply |
+| GitHub environments | 6 | dev-plan, dev-apply, prod-plan, prod-apply, billing-plan, billing-apply |
+
+The exact role trust documents, managed policy JSON, account IDs and bucket name must be rendered and reviewed before creation. Existing resources must be inspected first; no duplicate provider, bucket, role or policy should be created.
 
 ## Next sequence
 
-1. Obtain repository-admin confirmation for T16, including all six environments.
-2. Confirm the AWS account ID locally and select the globally unique state bucket suffix; obtain explicit bootstrap approval for T18.
-3. Open T19 solo-only readiness PR to develop only after T16/T18 gates are resolved.
-4. Only after separate approval, bootstrap state/OIDC/roles, run dev plan, present the exact plan and request apply approval.
-5. Complete dev smoke/integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
+1. Finish the region-consistency CI gate and validate the full consolidation branch.
+2. Reconcile any remaining IAM policy/runtime call-site gaps found by the final CI/static audit.
+3. Obtain repository-admin confirmation for T16.
+4. Verify the AWS account ID and existing resource inventory using read-only AWS calls; select the state bucket suffix.
+5. Present the exact bootstrap plan and obtain explicit approval before any AWS write.
+6. After T16/T18 are resolved, open/review the solo-only deployment-readiness PR. Keep teammate PR #2 separate.
+7. Only after separate approval, bootstrap the state bucket/OIDC/roles, run a dev plan, present the complete plan and request apply approval.
+8. Complete dev integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
 
-T20–T24 remain release approval gates, not completed deployment tasks. Phase B is not yet fully closed because T16/T18/T37 and the later deployment acceptance tasks remain outstanding.
+T19–T24 and T25–T30 remain release, deployment and operational acceptance work. Phase B is not fully closed until the repository-admin and owner-controlled blockers are resolved.
 
 ## Safety boundary
 
