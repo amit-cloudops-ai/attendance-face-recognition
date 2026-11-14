@@ -2,6 +2,8 @@
 
 **Status:** prepared for owner review only. A read-only STS identity and inventory pass was executed on 14 November 2026. No AWS resource creation, IAM role/policy attachment, remote backend initialization, Terraform plan or apply has been performed.
 
+> **Readiness limitation:** this is an inventory and approval outline, not an executable bootstrap. `infra/bootstrap/` contains no Terraform bootstrap root, and there is no AWS create/attach script. The policy templates are validated with dummy values in CI; they have not yet been rendered with the verified account ID and final state bucket name. Before any AWS write, the expanded read-only inventory must be run, the owner must choose the state-bucket suffix, all trust/boundary/26 managed-policy documents must be rendered with exact values, and the exact AWS CLI/API create and attachment operations must be presented for review. T18 remains BLOCKED until that package is complete.
+>
 ## Target account and region
 
 - AWS account: `924422830139`, confirmed by `aws sts get-caller-identity` using the `default` profile.
