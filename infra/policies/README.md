@@ -131,3 +131,13 @@ The production apply role mirrors the dev split with production-only role ARNs, 
 - `github-apply-prod-dynamodb-kms.json.tftpl`
 
 The prod role requires the exact prod execution boundary; PassRole is limited to the exact prod Lambda and Scheduler roles and service principals. The prod state object is Get/Put only; the prod lockfile is the only state path that receives Get/Put/Delete. The policy set contains no dev resource/state paths and no AWS Budgets or account billing actions. CI renders and validates each policy, checks managed-policy size, exact role/boundary/KMS conditions, state isolation and service-specific function constraints.
+
+
+## Billing plan/apply policies (T37)
+
+- github-plan-billing-core.json.tftpl: budgets:ViewBudget on the exact dev/prod budget ARNs and aws-portal:ViewBilling on Resource=*.
+- github-plan-billing-state.json.tftpl: billing state GetObject and billing .tflock lifecycle only.
+- github-apply-billing-core.json.tftpl: budgets:ModifyBudget/ViewBudget on the exact dev/prod budget ARNs plus account-level aws-portal:ModifyBilling/ViewBilling.
+- github-apply-billing-state.json.tftpl: billing state Get/Put and billing .tflock lifecycle only.
+
+The billing role pair is distinct from the dev/prod plan/apply roles. Account-level billing permissions must never be attached to environment roles. Billing OIDC subjects are billing-plan and billing-apply, both restricted to main. The billing root is selected by the deployment workflow as infra/billing and uses the attendance/billing state key.
