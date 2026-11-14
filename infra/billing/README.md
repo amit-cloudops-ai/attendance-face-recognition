@@ -6,7 +6,7 @@ This root provisions the project's AWS Budgets. It uses the shared state bucket 
 
 - Complete the approved AWS bootstrap and create the shared state bucket.
 - Copy `backend.hcl.example` to `backend.hcl` and replace the placeholder with the approved bucket name.
-- Copy `terraform.tfvars.example` to `terraform.tfvars` and set the alert email.
+- Copy `terraform.tfvars.example` to `terraform.tfvars` and set the verified account ID and alert email.
 - Export the intended profile and expected account from the repository root:
 
 ```bash
