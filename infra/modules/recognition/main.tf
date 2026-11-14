@@ -42,6 +42,11 @@ locals {
       timeout                        = 15
       reserved_concurrent_executions = null
     }
+    failure = {
+      memory_size                    = 128
+      timeout                        = 10
+      reserved_concurrent_executions = 2
+    }
   }
 
   lambda_environment = merge(var.common_env, {
@@ -195,6 +200,26 @@ locals {
         Resource = [var.tables.audit.arn]
       }
     ]
+    failure = [
+      {
+        Effect   = "Allow"
+        Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"]
+        Resource = [for queue in aws_sqs_queue.dlq : queue.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:UpdateItem"]
+        Resource = [var.tables.scan_results.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:DeleteObject"]
+        Resource = [
+          "${var.raw_bucket_arn}/captures/*",
+          "${var.raw_bucket_arn}/enroll/*"
+        ]
+      }
+    ]
   }
 }
 
@@ -209,10 +234,8 @@ resource "aws_rekognition_collection" "faces" {
   collection_id = "attendance-${var.env}-faces"
 }
 
-resource "aws_sqs_queue" "dlq" {
-  for_each = toset(["recognize", "enroll"])
-
-  name                      = "attendance-${var.env}-${each.key}-dlq"
+resource "aws_sqs_queue" "failure_processor_dlq" {
+  name                      = "attendance-${var.env}-failure-processor-dlq"
   kms_master_key_id         = var.kms_key_arn
   message_retention_seconds = 1209600
 
@@ -221,6 +244,32 @@ resource "aws_sqs_queue" "dlq" {
     Environment = var.env
     Component   = "recognition"
   }
+}
+
+resource "aws_sqs_queue" "dlq" {
+  for_each = toset(["recognize", "enroll"])
+
+  name                      = "attendance-${var.env}-${each.key}-dlq"
+  kms_master_key_id         = var.kms_key_arn
+  message_retention_seconds = 1209600
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.failure_processor_dlq.arn
+    maxReceiveCount     = 5
+  })
+
+  tags = {
+    Project     = "attendance"
+    Environment = var.env
+    Component   = "recognition"
+  }
+}
+
+resource "aws_sqs_queue_redrive_allow_policy" "failure_processor" {
+  queue_url = aws_sqs_queue.failure_processor_dlq.id
+  redrive_allow_policy = jsonencode({
+    redrivePermission = "byQueue"
+    sourceQueueArns   = [for queue in aws_sqs_queue.dlq : queue.arn]
+  })
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
@@ -313,6 +362,18 @@ resource "aws_lambda_function_event_invoke_config" "dlq" {
       destination = aws_sqs_queue.dlq[each.key].arn
     }
   }
+}
+
+resource "aws_lambda_event_source_mapping" "failure" {
+  for_each = aws_sqs_queue.dlq
+
+  event_source_arn                   = each.value.arn
+  function_name                      = aws_lambda_function.lambda["failure"].arn
+  batch_size                         = 1
+  function_response_types            = ["ReportBatchItemFailures"]
+  maximum_batching_window_in_seconds = 0
+
+  depends_on = [aws_iam_role_policy.lambda]
 }
 
 resource "aws_lambda_permission" "s3" {
@@ -419,5 +480,24 @@ resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
 
   dimensions = {
     QueueName = each.value.name
+  }
+}
+
+
+resource "aws_cloudwatch_metric_alarm" "failure_processor_dlq_depth" {
+  alarm_name          = "attendance-${var.env}-failure-processor-dlq-depth"
+  alarm_description   = "Failure events could not be converted into terminal scan or enrollment results."
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  statistic           = "Maximum"
+  period              = 60
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [var.alerts_topic_arn]
+
+  dimensions = {
+    QueueName = aws_sqs_queue.failure_processor_dlq.name
   }
 }
