@@ -324,6 +324,26 @@ jobs:
               raise SystemExit("Billing tfvars example is missing the expected account ID")
           PY
 
+      - name: Validate tagged Rekognition collection creation
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("infra/modules/recognition/main.tf").read_text(encoding="utf-8")
+          if 'tags = {' not in source[source.index('resource "aws_rekognition_collection" "faces"'):]:
+              raise SystemExit("Rekognition collection must be tagged at creation")
+          for env in ("dev", "prod"):
+              path = Path(f"infra/policies/github-apply-{env}-core.json.tftpl")
+              policy = json.loads(path.read_text(encoding="utf-8").replace("${account_id}", "123456789012"))
+              statement = next(s for s in policy["Statement"] if s["Sid"] == "RekognitionCollectionCreate")
+              conditions = statement.get("Condition", {}).get("StringEquals", {})
+              if conditions.get("aws:RequestTag/Project") != "attendance":
+                  raise SystemExit(f"{env} Rekognition collection create is missing the Project tag guard")
+              if conditions.get("aws:RequestTag/Environment") != env:
+                  raise SystemExit(f"{env} Rekognition collection create is missing the Environment tag guard")
+          PY
+
       - name: Validate foundation dependency ordering
         run: |
           python - <<'PY'
