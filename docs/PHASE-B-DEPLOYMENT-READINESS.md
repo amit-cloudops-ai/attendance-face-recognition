@@ -34,7 +34,7 @@ The action inventory in `docs/IAM-LEAST-PRIVILEGE-INVENTORY.md` is an initial ca
 
 ## Remaining Phase B sequence
 
-1. Verify all post-format CI runs are green.
+1. Finish Terraform formatting for `infra/modules/data/main.tf` and `infra/modules/recognition/main.tf` using the pinned Terraform 1.10.5 CLI; the last CI run still reports formatting differences in these two files. Then rerun CI and verify the full Terraform validation matrix.
 2. Inspect every Lambda handler and reconcile exact runtime actions with each Terraform execution-role policy.
 3. Verify AWS service action names, resource ARN support, request condition keys and provider read/write calls for all four modules.
 4. Produce the two execution-role boundary policies and four deployment policies, including strict state object/lock isolation.
