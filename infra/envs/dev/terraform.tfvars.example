@@ -1,0 +1,3 @@
+env        = "dev"
+account_id = "123456789012"
+alert_email = "replace-with-your-alert-email@example.com"
