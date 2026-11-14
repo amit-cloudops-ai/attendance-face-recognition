@@ -2,7 +2,7 @@
 
 ## Executive status
 
-The solo implementation and Phase B deployment-security preparation have advanced substantially. T01–T15 and T17 are complete at the code/documentation/CI level. T16 and T18 are blocked on owner/repository-administrator actions. T37 (dedicated billing role policies) is in progress.
+The solo implementation and Phase B deployment-security preparation have advanced substantially. T01–T15, T17 and T32–T37 are complete at the code/documentation/CI level. T16 and T18 are blocked on owner/repository-administrator actions.
 
 **No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key, or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
 
@@ -60,7 +60,7 @@ The exact 12-digit account ID and globally unique state bucket suffix remain unk
 
 ### T37 — dedicated billing deployment roles
 
-The billing root now has separate plan/apply budget and state policies plus exact billing-plan/billing-apply OIDC trust templates. The deployment workflow supports infra/billing on main, selects the billing root, requires the committed provider lockfile and uses separate billing environments. CI validation is pending. Normal dev/prod roles continue to exclude budgets:* and aws-portal:* permissions.
+The billing root now has separate plan/apply budget and state policies plus exact billing-plan/billing-apply OIDC trust templates. The deployment workflow supports infra/billing on main, selects the billing root, requires the committed provider lockfile and uses separate billing environments. PR #27; CI run [43620012088](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43620012088), commit `cfa7e40f83`: Python and Terraform jobs passed, including billing policy action sets, state paths, OIDC subjects, workflow root/branch gates, all policy templates, provider lockfiles, modules and all environment/billing roots. Normal dev/prod roles are validated to exclude all budgets:* and aws-portal:* permissions.
 
 ## Deployment policy notes and residual scope
 
@@ -75,12 +75,11 @@ The billing root now has separate plan/apply budget and state policies plus exac
 
 ## Next sequence
 
-1. Finish T37 billing workflow and policy validation; open its PR.
-2. Obtain repository-admin confirmation for T16, including all six environments.
-3. Obtain verified account ID and explicit bootstrap approval for T18.
-4. Open T19 solo-only readiness PR to develop only after all security/CI gates pass.
-5. Only after separate approval, bootstrap state/OIDC/roles, run dev plan, present the exact plan and request apply approval.
-6. Complete dev smoke/integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
+1. Obtain repository-admin confirmation for T16, including all six environments.
+2. Confirm the AWS account ID locally and select the globally unique state bucket suffix; obtain explicit bootstrap approval for T18.
+3. Open T19 solo-only readiness PR to develop only after T16/T18 gates are resolved.
+4. Only after separate approval, bootstrap state/OIDC/roles, run dev plan, present the exact plan and request apply approval.
+5. Complete dev smoke/integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
 
 T20–T24 remain release approval gates, not completed deployment tasks. Phase B is not yet fully closed because T16/T18/T37 and the later deployment acceptance tasks remain outstanding.
 
