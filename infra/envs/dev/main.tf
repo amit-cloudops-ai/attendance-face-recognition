@@ -29,12 +29,12 @@ module "recognition" {
   execution_role_boundary_arn = var.execution_role_boundary_arn
   account_id                  = var.account_id
   kms_key_arn                 = module.foundation.kms_key_arn
-  raw_bucket_name              = module.foundation.raw_bucket_name
-  raw_bucket_arn               = module.foundation.raw_bucket_arn
+  raw_bucket_name             = module.foundation.raw_bucket_name
+  raw_bucket_arn              = module.foundation.raw_bucket_arn
   tables                      = module.data.tables
   layer_arn                   = module.foundation.layer_arn
-  alerts_topic_arn             = module.foundation.alerts_topic_arn
-  common_env                   = module.foundation.common_env
+  alerts_topic_arn            = module.foundation.alerts_topic_arn
+  common_env                  = module.foundation.common_env
 }
 
 module "access" {
