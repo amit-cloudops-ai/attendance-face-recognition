@@ -212,8 +212,8 @@ locals {
         Resource = [var.tables.scan_results.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["s3:DeleteObject"]
+        Effect = "Allow"
+        Action = ["s3:DeleteObject"]
         Resource = [
           "${var.raw_bucket_arn}/captures/*",
           "${var.raw_bucket_arn}/enroll/*"
@@ -235,9 +235,9 @@ resource "aws_rekognition_collection" "faces" {
 }
 
 resource "aws_sqs_queue" "failure_processor_dlq" {
-  name                      = "attendance-${var.env}-failure-processor-dlq"
-  kms_master_key_id         = var.kms_key_arn
-  message_retention_seconds = 1209600
+  name                       = "attendance-${var.env}-failure-processor-dlq"
+  kms_master_key_id          = var.kms_key_arn
+  message_retention_seconds  = 1209600
   visibility_timeout_seconds = 60
 
   tags = {
@@ -250,9 +250,9 @@ resource "aws_sqs_queue" "failure_processor_dlq" {
 resource "aws_sqs_queue" "dlq" {
   for_each = toset(["recognize", "enroll"])
 
-  name                      = "attendance-${var.env}-${each.key}-dlq"
-  kms_master_key_id         = var.kms_key_arn
-  message_retention_seconds = 1209600
+  name                       = "attendance-${var.env}-${each.key}-dlq"
+  kms_master_key_id          = var.kms_key_arn
+  message_retention_seconds  = 1209600
   visibility_timeout_seconds = 60
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.failure_processor_dlq.arn
