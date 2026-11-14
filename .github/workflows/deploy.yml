@@ -11,13 +11,17 @@ on:
           - dev
           - prod
       operation:
-        description: Plan only, or apply the freshly generated plan
+        description: Create a plan, or apply a previously reviewed plan artifact
         required: true
         default: plan
         type: choice
         options:
           - plan
           - apply
+      plan_run_id:
+        description: Required for apply; run ID of the successful plan workflow
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -47,6 +51,7 @@ jobs:
       TF_VAR_callback_urls: ${{ vars.COGNITO_CALLBACK_URLS }}
       TF_VAR_logout_urls: ${{ vars.COGNITO_LOGOUT_URLS }}
       TF_VAR_allowed_origins: ${{ vars.ALLOWED_ORIGINS }}
+      PLAN_RUN_ID: ${{ inputs.plan_run_id }}
 
     steps:
       - name: Check out selected release branch
@@ -62,6 +67,10 @@ jobs:
               exit 1
             fi
           done
+          if [[ "${{ inputs.operation }}" == "apply" && ! "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "Apply requires the numeric run ID of a successful plan workflow."
+            exit 1
+          fi
           python - <<'PY'
           import json
           import os
@@ -95,19 +104,30 @@ jobs:
       - name: Validate Terraform root
         run: terraform -chdir="$TF_ROOT" validate
 
-      - name: Create deployment plan
+      - name: Create plan
+        if: ${{ inputs.operation == 'plan' }}
         run: terraform -chdir="$TF_ROOT" plan -input=false -out=tfplan
 
       - name: Upload plan for review
         if: ${{ inputs.operation == 'plan' }}
         uses: actions/upload-artifact@v4
         with:
-          name: attendance-${{ inputs.environment }}-terraform-plan
+          name: attendance-${{ inputs.environment }}-terraform-plan-${{ github.run_id }}
           path: infra/envs/${{ inputs.environment }}/tfplan
           retention-days: 1
           if-no-files-found: error
 
-      - name: Apply the reviewed-in-run plan
+      - name: Download the previously reviewed plan
+        if: ${{ inputs.operation == 'apply' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: attendance-${{ inputs.environment }}-terraform-plan-${{ inputs.plan_run_id }}
+          path: ${{ env.TF_ROOT }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.plan_run_id }}
+
+      - name: Apply the exact reviewed plan
         if: ${{ inputs.operation == 'apply' }}
         run: terraform -chdir="$TF_ROOT" apply -input=false -auto-approve tfplan
 
