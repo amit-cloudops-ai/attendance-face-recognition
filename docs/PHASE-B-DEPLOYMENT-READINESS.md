@@ -5,6 +5,10 @@
 
 ## Current findings
 
+**Deployment target confirmed:** the user's existing AWS account, region `us-east-1`. Region literals in the workflow, dev/prod provider and backend blocks, bootstrap instructions, KMS/SNS policy ARN, Cognito issuer/domain and frontend CSP/config were updated on `solo/amit-monday`. Do not use `ap-south-1` for this deployment.
+
+The detailed resource/action inventory and permissions-boundary design are maintained in [`docs/IAM-LEAST-PRIVILEGE-INVENTORY.md`](./IAM-LEAST-PRIVILEGE-INVENTORY.md). The inventory is a draft requiring API-level action/resource-scope validation before role creation.
+
 ### 1. Terraform state backend
 
 Both environment roots use Terraform's S3 backend with distinct keys:
@@ -138,7 +142,8 @@ The exact deployment policy is intentionally not guessed in this phase. It must 
 - [x] Encrypt saved Terraform plan artifacts before upload.
 - [x] Separate Terraform plan and apply role selection in the deployment workflow.
 - [x] Document age key setup and environment isolation.
-- [ ] Complete deployment-role action inventory and least-privilege policy review.
+- [x] Draft Terraform resource/action inventory and least-privilege role separation (API-level validation remains).
+- [x] Require a pre-created environment-specific permissions boundary on every application Lambda/Scheduler role.
 - [ ] Decide and document permissions-boundary treatment for application IAM roles.
 - [ ] Confirm state bucket encryption and exact bucket policy.
 - [ ] Configure GitHub dev/prod environments and variables/secrets.
