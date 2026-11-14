@@ -10,6 +10,7 @@
 ## Phase B deployment readiness (in progress; no AWS provisioning)
 
 - Reviewed the S3 backend and manual deployment workflow on `solo/amit-monday`. Dev and prod use separate S3 state keys and Terraform native S3 lock files (`use_lockfile = true`, Terraform >= 1.10); the state bucket remains a manual prerequisite.
+- Split OIDC role selection into separate plan and apply roles for dev and prod. Plan roles are intended to be read-only apart from state-lock operations; apply roles hold the reviewed resource mutation permissions.
 - Identified a security issue: this repository is public, and the original workflow uploaded the raw saved Terraform plan as an artifact. Updated `.github/workflows/deploy.yml` to encrypt the plan with `age` before upload and decrypt only during the corresponding apply run. Added separate per-environment age recipient/identity setup to `infra/bootstrap/README.md`.
 - Added `docs/PHASE-B-DEPLOYMENT-READINESS.md` with backend object permissions, OIDC subject constraints, environment branch gates, IAM action inventory and remaining deployment gates.
 - The exact deployment IAM policy is not yet approved or created. It needs a complete action/resource review and a decision on permissions boundaries for application roles. Do not use `AdministratorAccess`.
