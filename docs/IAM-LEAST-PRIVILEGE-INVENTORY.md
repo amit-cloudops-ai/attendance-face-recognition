@@ -117,11 +117,13 @@ The earlier candidate action inventory must be expanded to exact IAM action name
 
 ## 5. Execution-role permissions boundaries
 
-Create two customer-managed boundary policies during a separately reviewed manual bootstrap:
-- `attendance-dev-execution-boundary`
-- `attendance-prod-execution-boundary`
+Two environment-specific boundary policy templates have been drafted:
+- `infra/policies/execution-role-boundary-dev.json.tftpl` — rendered policy name: `attendance-dev-execution-boundary`.
+- `infra/policies/execution-role-boundary-prod.json.tftpl` — rendered policy name: `attendance-prod-execution-boundary`.
 
-Each boundary caps the union of the runtime permissions required by the application roles in that environment. A permissions boundary does not grant permissions; each role still needs its own least-privilege inline policy.
+The templates cap the union of runtime permissions identified by the data and recognition call-site audits. They use exact environment resource ARNs and an account-ID template variable. KMS use is limited to the environment key alias via `kms:ResourceAliases` and to S3/SQS forward access sessions via `kms:ViaService`. The templates are allow-list boundaries: they contain no IAM management, STS, provisioning, `iam:PassRole`, or boundary self-management actions. `rekognition:DetectFaces` is the only runtime action with `Resource: "*"`, because AWS does not support resource-level authorization for that action.
+
+A permissions boundary does not grant permissions; each role still needs its own least-privilege inline policy. The templates are not yet attachable because the verified 12-digit account ID must be supplied at render time. Rendered JSON and ARNs must be validated before bootstrap.
 
 The GitHub apply role may attach the expected boundary to approved `attendance-<env>-*` roles, but must not modify, delete or detach the boundary or create an unbounded application role. Apply role policies must constrain role creation and policy attachment by resource ARN/name and supported boundary conditions. Validate provider support before role creation.
 
