@@ -65,7 +65,7 @@ Render the dev/prod boundary templates with the verified account ID. Validate JS
 
 ### 5. GitHub deployment roles
 
-Create the four roles with trust policies:
+Create the six roles with trust policies:
 - attendance-github-dev-plan trusts only repo:amit-cloudops-ai/attendance-face-recognition:environment:dev-plan.
 - attendance-github-dev-apply trusts only ...:environment:dev-apply.
 - attendance-github-prod-plan trusts only ...:environment:prod-plan.
@@ -95,7 +95,7 @@ Do not deploy prod until dev acceptance criteria pass and the owner explicitly a
 
 ### 9. Billing root
 
-Billing deployment is a separate follow-up after dedicated billing plan/apply policies and roles are added. It must not share the dev/prod deployment role permissions.
+Billing has a dedicated plan/apply policy and OIDC role pair. It must not share the dev/prod deployment role permissions.
 
 ## IAM security checks before approval
 
