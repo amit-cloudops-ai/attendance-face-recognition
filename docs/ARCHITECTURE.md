@@ -63,9 +63,9 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 | reports | `s3:GetObject` on reports `reports/*` |
 | override | `dynamodb:GetItem` employees; `GetItem`/`UpdateItem`/`PutItem` attendance; `PutItem` audit |
 | settings | `dynamodb:GetItem`/`PutItem`/`UpdateItem` config; `PutItem` audit |
-| daily-job | `dynamodb:Scan` employees; `Query` attendance; `PutItem` attendance; `GetItem` config; `s3:PutObject` reports `reports/daily/*`; `sns:Publish` alerts topic |
+| daily-job | `dynamodb:Scan` employees; `Query` attendance and `attendance/index/date-index`; `PutItem`/`UpdateItem` attendance; `GetItem` config; `s3:PutObject` reports `reports/daily/*`; `sns:Publish` alerts topic |
 | weekly-job | `dynamodb:Scan` employees; `Query` attendance (+ index); `GetItem` config; `s3:PutObject` reports `reports/weekly/*`; `sns:Publish` alerts topic |
-`rekognition:DetectFaces` does not support resource-level permissions, so `*` is acceptable only for that one action.
+`rekognition:DetectFaces` does not support resource-level permissions, so `*` is acceptable only for that one action. `daily-job` needs `dynamodb:UpdateItem` on attendance to add the `missing_clock_out` flag after checking a clock-in without a clock-out.
 
 ### 6.2 Controls
 - Encryption at rest: DynamoDB (KMS), S3 (SSE-KMS with bucket key), CloudWatch logs unencrypted of PII by design (no PII logged). TLS enforced by bucket policies (`aws:SecureTransport`) and CloudFront (redirect to HTTPS, TLS 1.2+).
