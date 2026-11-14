@@ -1,16 +1,14 @@
 """Create a short-lived, constrained S3 POST for a kiosk capture."""
-import json
 import logging
 import os
 import time
 import uuid
 
 import boto3
-from botocore.config import Config
-
 from attendance_common.auth import require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist, to_iso
+from botocore.config import Config
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
