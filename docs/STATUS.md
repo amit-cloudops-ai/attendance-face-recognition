@@ -107,7 +107,12 @@
 
 ### T09 — dev plan-role policy
 
-- **Status:** policy templates drafted; CI validation pending.
+- **Status:** complete on `ai/T09-dev-plan-policy`.
+- Three managed-policy templates: `github-plan-dev-core.json.tftpl`, `github-plan-dev-edge.json.tftpl`, and `github-plan-dev-state.json.tftpl`. The split keeps each under the 6,144-character IAM managed-policy limit.
+- Core/edge policies contain read-only service actions. State policy reads only `attendance/dev/terraform.tfstate` and permits Get/Put/Delete only on `attendance/dev/terraform.tfstate.tflock`; the state object cannot be written. No prod state path is present.
+- Documented read-only residual scope: API Gateway v2 GET permissions span the `/apis` family because IDs are generated and child resources are not independently tagged by this configuration. CloudFront read actions use per-resource-family wildcards where IDs are opaque; no CloudFront mutation actions are granted.
+- First CI attempt exposed an overbroad validator prefix that rejected `iam:GetRole` and other read-only IAM calls. Root cause was isolated; the policy was not changed. Fix attempt 1 narrowed the validator to explicit write/admin action prefixes.
+- Final CI run [43615873597](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43615873597), commit `dcde60d5e339`: Python and Terraform jobs passed, including policy template rendering, JSON parsing, size checks, read-only action checks and dev-only state path checks.
 - Added three read-only policy templates: `github-plan-dev-core.json.tftpl` (DynamoDB/IAM/Lambda/Scheduler/SQS/Rekognition/CloudWatch/SNS/Budgets reads), `github-plan-dev-edge.json.tftpl` (KMS/S3/Cognito/API Gateway v2/CloudFront reads), and `github-plan-dev-state.json.tftpl` (dev state read plus dev lockfile lifecycle only).
 - The three rendered managed policies are each below 6,144 characters with dummy values. The state object is read-only; PutObject/DeleteObject are restricted to the dev `.tflock` object. No production state path is included.
 - The plan role has no infrastructure create/update/delete actions. `s3:ListBucket` on the three app buckets is retained because the reviewed AWS provider v6.73.0 bucket refresh path calls HeadBucket, which requires ListBucket; no raw-object read permission is granted.
