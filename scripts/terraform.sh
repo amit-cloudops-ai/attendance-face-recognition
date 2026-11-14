@@ -30,7 +30,7 @@ case "$terraform_command" in
   init)
     (( backend_false == 1 )) || needs_account_guard=1
     ;;
-  plan|apply|destroy|import|refresh|output|state|workspace|force-unlock|test)
+  plan|apply|destroy|import|refresh|output|state|workspace|force-unlock|taint|untaint|test)
     needs_account_guard=1
     ;;
 esac
