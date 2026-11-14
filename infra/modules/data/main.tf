@@ -491,6 +491,12 @@ resource "aws_iam_role" "scheduler" {
   name                 = "attendance-${var.env}-${replace(each.key, "_", "-")}-scheduler"
   assume_role_policy   = data.aws_iam_policy_document.scheduler_assume_role.json
   permissions_boundary = var.execution_role_boundary_arn
+
+  tags = {
+    Project     = "attendance"
+    Environment = var.env
+    Component   = "scheduler"
+  }
 }
 
 resource "aws_iam_role_policy" "scheduler" {
