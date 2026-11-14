@@ -71,7 +71,7 @@ jobs:
               exit 1
             fi
           done
-          if "${{ inputs.environment }}" != "billing"; then
+          if [[ "${{ inputs.environment }}" != "billing" ]]; then
             for name in TF_VAR_execution_role_boundary_arn TF_VAR_callback_urls TF_VAR_logout_urls TF_VAR_allowed_origins; do
               if [[ -z "${!name}" ]]; then
                 echo "Missing environment-specific configuration for ${name}."
