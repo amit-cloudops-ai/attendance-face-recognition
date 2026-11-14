@@ -10,6 +10,16 @@ data "aws_iam_policy_document" "lambda_assume_role" {
   }
 }
 
+resource "aws_scheduler_schedule_group" "attendance" {
+  name = "attendance-${var.env}"
+
+  tags = {
+    Project     = "attendance"
+    Environment = var.env
+    Component   = "scheduler"
+  }
+}
+
 data "aws_iam_policy_document" "scheduler_assume_role" {
   statement {
     effect  = "Allow"
@@ -18,6 +28,18 @@ data "aws_iam_policy_document" "scheduler_assume_role" {
     principals {
       type        = "Service"
       identifiers = ["scheduler.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_scheduler_schedule_group.attendance.arn]
     }
   }
 }
@@ -491,6 +513,7 @@ resource "aws_scheduler_schedule" "jobs" {
   for_each = toset(["daily_job", "weekly_job"])
 
   name                         = "attendance-${var.env}-${replace(each.key, "_", "-")}"
+  group_name                   = aws_scheduler_schedule_group.attendance.name
   description                  = "Run the attendance ${replace(each.key, "_", " ")} in Asia/Kolkata."
   schedule_expression          = each.key == "daily_job" ? "cron(59 23 * * ? *)" : "cron(30 0 ? * MON *)"
   schedule_expression_timezone = "Asia/Kolkata"
