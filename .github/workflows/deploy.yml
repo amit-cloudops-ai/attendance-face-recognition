@@ -64,8 +64,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/check_region_consistency.py
-          region="$(python scripts/check_region_consistency.py --print-region)"
+          python3 scripts/check_region_consistency.py
+          region="$(python3 scripts/check_region_consistency.py --print-region)"
           echo "AWS_REGION=$region" >> "$GITHUB_ENV"
 
       - name: Validate deployment configuration
@@ -85,7 +85,7 @@ jobs:
                 exit 1
               fi
             done
-            python - <<'PY'
+            python3 - <<'PY'
           import json
           import os
 
@@ -115,6 +115,16 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: attendance-${{ inputs.environment }}-${{ github.run_id }}
+
+      - name: Verify assumed AWS account
+        run: |
+          set -euo pipefail
+          actual_account="$(aws sts get-caller-identity --query Account --output text)"
+          if [[ "$actual_account" != "$TF_VAR_account_id" ]]; then
+            echo "Refusing deployment: assumed AWS account $actual_account does not match configured account $TF_VAR_account_id." >&2
+            exit 1
+          fi
+          echo "Verified AWS account: $actual_account"
 
       - name: Initialize remote state
         run: |
