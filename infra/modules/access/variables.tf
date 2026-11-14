@@ -66,3 +66,8 @@ variable "allowed_origins" {
   description = "Additional browser origins allowed by API Gateway CORS; CloudFront web/API traffic is same-origin."
   type        = list(string)
 }
+
+variable "kms_key_id" {
+  description = "Foundation customer-managed KMS key ID whose final key policy is attached after the CloudFront distribution is created."
+  type        = string
+}
