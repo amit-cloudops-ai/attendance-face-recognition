@@ -1,7 +1,9 @@
+data "aws_region" "current" {}
+
 locals {
-  region            = "us-east-1"
+  region            = data.aws_region.current.name
   cognito_prefix    = "attendance-${var.account_id}-${var.env}"
-  cognito_base_url  = "${aws_cognito_user_pool_domain.hosted.domain}.auth.us-east-1.amazoncognito.com"
+  cognito_base_url  = "${aws_cognito_user_pool_domain.hosted.domain}.auth.${local.region}.amazoncognito.com"
   api_origin_domain = replace(aws_apigatewayv2_api.http.api_endpoint, "https://", "")
   api_log_format = jsonencode({
     requestId      = "$context.requestId"
@@ -11,7 +13,7 @@ locals {
     sourceIp       = "$context.identity.sourceIp"
     userAgent      = "$context.identity.userAgent"
   })
-  web_content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://cognito-idp.us-east-1.amazonaws.com https://${local.cognito_base_url} https://s3.us-east-1.amazonaws.com https://*.s3.us-east-1.amazonaws.com; form-action 'self' https://${local.cognito_base_url}; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+  web_content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://cognito-idp.${local.region}.amazonaws.com https://${local.cognito_base_url} https://s3.${local.region}.amazonaws.com https://*.s3.${local.region}.amazonaws.com; form-action 'self' https://${local.cognito_base_url}; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 }
 
 resource "aws_cognito_user_pool" "main" {
@@ -144,7 +146,7 @@ resource "aws_apigatewayv2_authorizer" "jwt" {
 
   jwt_configuration {
     audience = [aws_cognito_user_pool_client.web.id]
-    issuer   = "https://cognito-idp.us-east-1.amazonaws.com/${aws_cognito_user_pool.main.id}"
+    issuer   = "https://cognito-idp.${local.region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
   }
 }
 
@@ -420,38 +422,6 @@ resource "aws_cloudfront_distribution" "site" {
 
 data "aws_iam_policy_document" "web_bucket" {
   statement {
-    sid    = "AllowDynamoDBUseOfKeyThroughService"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = ["*"]
-    }
-
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:CreateGrant",
-      "kms:DescribeKey"
-    ]
-    resources = ["*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "kms:CallerAccount"
-      values   = [var.account_id]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "kms:ViaService"
-      values   = ["dynamodb.us-east-1.amazonaws.com"]
-    }
-  }
-
-  statement {
     sid    = "AllowCloudFrontOACRead"
     effect = "Allow"
 
@@ -506,6 +476,68 @@ data "aws_iam_policy_document" "attendance_kms_key" {
   }
 
   statement {
+    sid    = "AllowDynamoDBUseOfKeyThroughService"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey"
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:CallerAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["dynamodb.${local.region}.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid    = "AllowDynamoDBCreateGrantThroughService"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    actions   = ["kms:CreateGrant"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:CallerAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["dynamodb.${local.region}.amazonaws.com"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "kms:GrantIsForAWSResource"
+      values   = ["true"]
+    }
+  }
+
+  statement {
     sid    = "AllowEncryptedAlertsTopic"
     effect = "Allow"
 
@@ -526,7 +558,7 @@ data "aws_iam_policy_document" "attendance_kms_key" {
     condition {
       test     = "ArnEquals"
       variable = "aws:SourceArn"
-      values   = ["arn:aws:sns:us-east-1:${var.account_id}:attendance-${var.env}-alerts"]
+      values   = ["arn:aws:sns:${local.region}:${var.account_id}:attendance-${var.env}-alerts"]
     }
   }
 
@@ -552,8 +584,8 @@ data "aws_iam_policy_document" "attendance_kms_key" {
       test     = "ArnEquals"
       variable = "aws:SourceArn"
       values = [
-        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-recognize-dlq",
-        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-enroll-dlq"
+        "arn:aws:sqs:${local.region}:${var.account_id}:attendance-${var.env}-recognize-dlq",
+        "arn:aws:sqs:${local.region}:${var.account_id}:attendance-${var.env}-enroll-dlq"
       ]
     }
   }
