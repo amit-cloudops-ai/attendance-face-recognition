@@ -103,8 +103,10 @@ This is a code-call-site review, not a complete AWS authorization verification. 
 Foundation module provider actions have been mapped against the exact AWS provider v6.73.0 source and AWS Service Authorization References in `docs/security/FOUNDATION-PROVIDER-IAM.md`. This mapping includes the S3 bucket read actions that the monolithic `aws_s3_bucket` provider resource calls even when split resources own configuration. It also identifies the account-wide `aws-portal:ModifyBilling` dependency introduced by the Budget resource.
 
 Remaining provider-action tasks:
-- Data and recognition module: T07.
+- Data and recognition module: T07 (in progress).
 - Access module: T08.
+
+Important deployment KMS dependency: the five DynamoDB tables use the foundation CMK. AWS requires the principal selecting a customer-managed key for a DynamoDB table to have `kms:Encrypt`, `kms:Decrypt`, `kms:ReEncryptFrom`, `kms:ReEncryptTo`, `kms:GenerateDataKey`, `kms:GenerateDataKeyWithoutPlaintext`, `kms:DescribeKey`, and `kms:CreateGrant` via DynamoDB. These are deployment-role permissions, not runtime Lambda permissions. The current foundation key policy lacks the DynamoDB service-principal direct metadata statement; T36 tracks the key-policy correction.
 - All deployment policies must use exact API action names, resource ARNs, resource tags and supported condition keys. Use `iam:PassRole` only for exact environment-specific execution role ARNs and condition it by `iam:PassedToService`.
 
 ## 5. Execution-role permissions boundaries
