@@ -12,6 +12,14 @@ for command in python3 node bash terraform; do
   fi
 done
 
+python3 -c 'import sys; assert sys.version_info[:2] == (3, 12), f"Python 3.12 required; found {sys.version.split()[0]}"'
+
+TERRAFORM_VERSION="$(terraform version -json | python3 -c 'import json,sys; print(json.load(sys.stdin)["terraform_version"])')"
+if [[ "$TERRAFORM_VERSION" != "1.10.5" ]]; then
+  echo "Terraform 1.10.5 required to match CI/deployment; found $TERRAFORM_VERSION" >&2
+  exit 2
+fi
+
 python3 -m ruff --version >/dev/null 2>&1 || {
   echo "Ruff is missing. Install repository dev dependencies first: python3 -m pip install -r requirements-dev.txt" >&2
   exit 2
@@ -34,6 +42,22 @@ echo "=== Browser JavaScript syntax ==="
 while IFS= read -r -d '' file; do
   node --input-type=module --check < "$file"
 done < <(find web -type f -name '*.js' -print0)
+
+echo "=== HTML CSP hygiene ==="
+if grep -R --include='*.html' -n 'style="' web; then
+  echo "Inline HTML styles are not allowed by the deployed CSP." >&2
+  exit 1
+fi
+
+echo "=== GitHub Actions workflow YAML ==="
+python3 - <<'PY'
+from pathlib import Path
+import yaml
+
+for path in Path(".github/workflows").glob("*.yml"):
+    yaml.safe_load(path.read_text(encoding="utf-8"))
+    print(f"Validated {path}")
+PY
 
 echo "=== Shell syntax ==="
 while IFS= read -r -d '' file; do
