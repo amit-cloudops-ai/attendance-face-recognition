@@ -24,7 +24,7 @@ Turn "an image landed in S3" into "a correct, safe, fast recognition result", an
 3. Load settings (`get_settings()`).
 4. **try:** `DetectFaces` on the S3 object. 0 faces to `no_face`; more than 1 to `multiple_faces`; Brightness or Sharpness below settings minimums to `low_quality`.
 5. `SearchFacesByImage` (threshold from settings, MaxFaces 1, QualityFilter AUTO). No match to `no_match`.
-6. `ExternalImageId` is the `employee_id`: load the employee. Missing record to `no_match` (log a warning). `active=false` to `inactive`.
+6. `ExternalImageId` is either the legacy `employee_id` or the new `employee_id#request_id`; resolve the employee ID from the prefix and load the employee. Missing record to `no_match` (log a warning). `active=false` to `inactive`.
 7. Call `record_scan(employee_id, captured_at, similarity, request_id=request_id)`. The original `created_at` written by `presign` is the timestamp for the scan; do not use the worker's current time.
 8. Update the scan-results row **only if `code = pending`** (conditional write): set `code=matched`, `action`, `name`, `time`, `status`, `message`.
 9. Delete the image only after the terminal result is durable. If the result write or image deletion fails, raise; a retry sees the terminal result and repeats only the safe delete.
