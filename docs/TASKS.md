@@ -50,7 +50,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T36 | Add DynamoDB customer-managed KMS authorization | DONE | Customer-managed key policy and dev/prod apply fragments use exact DynamoDB ViaService and environment alias; CreateGrant is AWS-resource constrained |
 | T37 | Build dedicated billing plan/apply policies and OIDC roles | DONE | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
 
-| T38 | Establish canonical AWS region manifest and CI drift prevention | IN_PROGRESS | Terraform providers, backend initialization, Lambda SDKs, contracts, frontend config, IAM regional ARNs and documentation resolve to config/deployment.json; CI fails on any conflicting region or legacy region reference |
+| T38 | Establish canonical AWS region manifest and CI drift prevention | DONE | Terraform providers, backend initialization, Lambda SDKs, contracts, frontend config, IAM regional ARNs and documentation resolve to config/deployment.json; CI fails on any conflicting region or legacy region reference |
 
 ## Phase C — release and operations
 
@@ -76,6 +76,6 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T17 template linting: PR #25; CI run 43619026006 passed. No CloudFormation/SAM templates exist; Terraform and JSON policy templates are validated in CI.
 - T18 manual bootstrap plan: PR #26; plan is documented and CI run 43619095037 passed. Exact account ID, globally unique bucket suffix and owner approval remain required.
 - T37 implementation is complete: billing plan/apply policy and OIDC trust templates, isolated billing workflow path and six-environment documentation are validated by CI run 43620012088. PR #27.
-- T38 is in progress on release/phase-b-region-guard: canonical region manifest, Terraform provider loading, backend wrapper/workflow export, contract/example updates, Moto fixture alignment and CI drift guard. Mark DONE only after this branch's complete CI passes.
+- T38 is complete on release/phase-b-region-guard: canonical region manifest, Terraform provider loading, backend wrapper/workflow export, contract/example updates, Moto fixture alignment and repository-wide region drift guard. Consolidated CI run 43622495235 passed all 27 Python/security steps and all 21 Terraform formatting/validation steps on commit 65f82c6597bd9705c334b5cb2f6b3bfc528c946d.
 - All task PRs remain unmerged pending owner review. PR #27 contains the dedicated billing roles/workflow. Do not merge teammate PRs or promote to main/develop without explicit direction.
 - No AWS resources, OIDC provider, IAM roles, boundaries, state bucket or KMS keys have been created. No remote backend init, Terraform plan or apply has been run.
