@@ -145,7 +145,7 @@ echo
 echo "=== Check globally unique application bucket names (read-only) ==="
 for env in dev prod; do
   for kind in raw reports web; do
-    candidate="attendance-$env-$kind-$ACCOUNT_ID"
+    candidate="attendance-$env-$ACCOUNT_ID-$kind"
     error_file="$(mktemp)"
     if aws s3api head-bucket --bucket "$candidate" 2>"$error_file"; then
       echo "EXISTS in this account: $candidate"
