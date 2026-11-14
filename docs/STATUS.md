@@ -134,3 +134,5 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 ## Session log
 
 - 14 Nov 2026: Audited repository governance and found the three expected governance files absent from the solo implementation branch. Created `ai/T01-repository-governance` from the verified solo baseline, restored the governance files, created the task board, and added AI task-branch push CI coverage. T01 closed after both CI jobs passed. The next task is T02; no AWS changes. No AWS changes.
+
+- First CI attempt [43615741764](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43615741764) failed in the new policy validator, not in pytest or Terraform. Root cause: the validator treated every `iam:` action as a mutation, incorrectly rejecting required read-only `iam:GetRole`, `iam:GetRolePolicy` and `iam:ListRoleTags`. The policy itself was not changed. Fix attempt 1 narrows the validator to explicit IAM write/administrative prefixes and also checks API Gateway, DynamoDB, Lambda, SQS, Scheduler and other service mutation verbs. Revalidation is pending.
