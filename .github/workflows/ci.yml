@@ -101,6 +101,22 @@ jobs:
               policies[name] = policy
 
           core_edge = policies[names[0]]["Statement"] + policies[names[1]]["Statement"]
+          scheduler_read = next(
+              statement for statement in policies[names[0]]["Statement"]
+              if statement["Sid"] == "SchedulerRead"
+          )
+          scheduler_group_read = next(
+              statement for statement in policies[names[0]]["Statement"]
+              if statement["Sid"] == "SchedulerGroupRead"
+          )
+          if scheduler_read["Resource"] != (
+              "arn:aws:scheduler:us-east-1:${account_id}:schedule/attendance-dev/attendance-dev-*"
+          ):
+              raise SystemExit("Dev plan schedule read must use the dedicated dev schedule group")
+          if scheduler_group_read["Resource"] != (
+              "arn:aws:scheduler:us-east-1:${account_id}:schedule-group/attendance-dev"
+          ):
+              raise SystemExit("Dev plan schedule-group read must be environment-scoped")
           forbidden_prefixes = (
               "iam:Create", "iam:Put", "iam:Update", "iam:Delete", "iam:PassRole",
               "iam:Attach", "iam:Detach", "iam:Tag", "iam:Untag", "sts:Assume",
