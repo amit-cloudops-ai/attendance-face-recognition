@@ -388,7 +388,8 @@ resource "aws_iam_role" "lambda" {
   for_each = local.function_specs
 
   name               = "attendance-${var.env}-${replace(each.key, "_", "-")}"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+  assume_role_policy  = data.aws_iam_policy_document.lambda_assume_role.json
+  permissions_boundary = var.execution_role_boundary_arn
 
   tags = {
     Project     = "attendance"
@@ -453,7 +454,8 @@ resource "aws_iam_role" "scheduler" {
   for_each = toset(["daily_job", "weekly_job"])
 
   name               = "attendance-${var.env}-${replace(each.key, "_", "-")}-scheduler"
-  assume_role_policy = data.aws_iam_policy_document.scheduler_assume_role.json
+  assume_role_policy  = data.aws_iam_policy_document.scheduler_assume_role.json
+  permissions_boundary = var.execution_role_boundary_arn
 }
 
 resource "aws_iam_role_policy" "scheduler" {
