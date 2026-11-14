@@ -15,7 +15,7 @@
 - Added `docs/PHASE-B-DEPLOYMENT-READINESS.md` with backend object permissions, OIDC subject constraints, environment branch gates, IAM action inventory and remaining deployment gates.
 - The exact deployment IAM policy is not yet approved or created. It needs a complete action/resource review and a decision on permissions boundaries for application roles. Do not use `AdministratorAccess`.
 - The workflow only allows dev from `develop` and prod from `main`; solo promotion will require a reviewed PR from `solo/amit-monday` to `develop`. Team branches remain separate.
-- No AWS resources, OIDC provider/roles, state bucket, backend initialization, Terraform plan or apply have been created/run. The workflow encryption change still needs CI validation.
+- No AWS resources, OIDC provider/roles, state bucket, backend initialization, Terraform plan or apply have been created/run. The workflow encryption and plan/apply role-selection changes passed CI at commit `df98ed0`; the latest documentation-only commit is awaiting its CI run.
 
 ## Phase A reliability hardening (solo implementation validated; AWS validation outstanding)
 - Recognition now leaves retryable failures pending and retains raw images. Terminal results are persisted before image deletion. The original presign `created_at` is used as the scan timestamp.
