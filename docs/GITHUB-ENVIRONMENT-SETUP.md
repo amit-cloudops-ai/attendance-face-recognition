@@ -45,7 +45,7 @@ The role ARNs are non-secret configuration values. The account ID, bucket name a
 
 ## Branch protection
 
-For both main and develop, configure:
+For `main`, `develop` and `solo/amit-monday`, configure:
 - Require pull requests before merging.
 - Require at least one approving review from someone other than the PR author.
 - Dismiss stale approvals after new commits.
