@@ -68,11 +68,12 @@ jobs:
                       raise SystemExit(f"Boundary must not manage IAM/STS: {path}")
                   if statement.get("Resource") == "*" and actions != ["rekognition:DetectFaces"]:
                       raise SystemExit(f"Unexpected unscoped resource in {path}: {actions}")
-              kms = next(s for s in statements if s["Sid"] == "KmsRuntimeAccessViaS3AndSqs")
+              kms = next(s for s in statements if s["Sid"] == "KmsRuntimeAccessViaS3SqsAndSns")
               if kms["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != expected_alias:
                   raise SystemExit(f"Wrong KMS alias scope in {path}")
               if set(kms["Condition"]["StringEquals"]["kms:ViaService"]) != {
-                  "s3.us-east-1.amazonaws.com", "sqs.us-east-1.amazonaws.com"
+                  "s3.us-east-1.amazonaws.com", "sqs.us-east-1.amazonaws.com",
+                  "sns.us-east-1.amazonaws.com"
               }:
                   raise SystemExit(f"Wrong KMS ViaService scope in {path}")
               compact = json.dumps(policy, separators=(",", ":"))
@@ -292,6 +293,41 @@ jobs:
               for item in required:
                   if item not in source:
                       raise SystemExit(f"{module} Lambda logging configuration missing: {item}")
+          PY
+
+      - name: Validate encrypted SNS notification KMS permissions
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          data = Path("infra/modules/data/main.tf").read_text(encoding="utf-8")
+          key_policy = access.split('data "aws_iam_policy_document" "attendance_kms_key"', 1)[1].split(
+              'resource "aws_kms_key_policy"', 1
+          )[0]
+          sns = key_policy.split('sid    = "AllowEncryptedAlertsTopic"', 1)[1].split("  statement {", 1)[0]
+          cloudwatch = key_policy.split(
+              'sid    = "AllowCloudWatchAlarmsToPublishToEncryptedAlertsTopic"', 1
+          )[1].split("  statement {", 1)[0]
+          if "sns.amazonaws.com" not in sns or "kms:Decrypt" not in sns or "kms:GenerateDataKey*" not in sns:
+              raise SystemExit("Encrypted SNS topic must permit SNS to use the customer-managed key")
+          if "cloudwatch.amazonaws.com" not in cloudwatch:
+              raise SystemExit("CloudWatch alarm service principal is missing from the alerts KMS key policy")
+          for required in ("kms:Decrypt", "kms:GenerateDataKey*", "aws:SourceAccount", "aws:SourceArn", "ArnLike"):
+              if required not in cloudwatch:
+                  raise SystemExit(f"CloudWatch encrypted SNS KMS statement missing {required}")
+          for job in ("daily_job", "weekly_job"):
+              section = data.split(f"{job} = [{{", 1)[1].split("}]", 1)[0]
+              if "kms:Decrypt" not in section or "kms:GenerateDataKey*" not in section:
+                  raise SystemExit(f"{job} role lacks KMS permissions required for encrypted SNS publishing")
+          for env in ("dev", "prod"):
+              path = Path(f"infra/policies/execution-role-boundary-{env}.json.tftpl")
+              policy = json.loads(path.read_text(encoding="utf-8").replace("${account_id}", "123456789012"))
+              kms = next(s for s in policy["Statement"] if s["Sid"] == "KmsRuntimeAccessViaS3SqsAndSns")
+              via = set(kms["Condition"]["StringEquals"]["kms:ViaService"])
+              if "sns.us-east-1.amazonaws.com" not in via:
+                  raise SystemExit(f"{env} runtime boundary blocks KMS use through SNS")
           PY
 
       - name: Validate DynamoDB customer-managed KMS policies
