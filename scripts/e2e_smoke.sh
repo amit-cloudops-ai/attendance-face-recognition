@@ -67,10 +67,12 @@ cleanup() {
     [[ "$faces_cleanup_status" =~ ^(200|204|404)$ ]] || cleanup_failed=1
   fi
   # Remove only raw objects uploaded by this smoke test if application cleanup failed.
-  for key in "${RAW_KEYS[@]}"; do
-    aws s3api delete-object --bucket "$RAW_BUCKET" --key "$key" \
-      --region "$DEPLOY_REGION" >/dev/null || cleanup_failed=1
-  done
+  if [[ -n "${RAW_KEYS[*]-}" ]]; then
+    for key in "${RAW_KEYS[@]}"; do
+      aws s3api delete-object --bucket "$RAW_BUCKET" --key "$key" \
+        --region "$DEPLOY_REGION" >/dev/null || cleanup_failed=1
+    done
+  fi
   rm -rf "$TMP_DIR"
   if (( cleanup_failed )); then
     echo "WARNING: E2E cleanup was incomplete; inspect employee $EMPLOYEE_ID and tracked raw keys." >&2
