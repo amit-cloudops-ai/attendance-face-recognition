@@ -75,7 +75,7 @@ Create these exact environments:
 - `prod-plan` and `prod-apply` — branch `main`
 - `billing-plan` and `billing-apply` — branch `main`
 
-Apply environments require an independent reviewer and self-review prevention. Each environment defines its own `AWS_ROLE_ARN`. Configure account/state bucket and environment-specific values as described in `docs/GITHUB-ENVIRONMENT-SETUP.md`.
+Apply environments require the repository owner's manual approval checkpoint, with self-review allowed. This is not independent separation of duties; no teammate reviewer is required. Each environment defines its own `AWS_ROLE_ARN`. Configure account/state bucket and environment-specific values as described in `docs/GITHUB-ENVIRONMENT-SETUP.md`.
 
 Plan environments receive only their public `TF_PLAN_AGE_RECIPIENT`. Apply environments receive the matching private `TF_PLAN_AGE_IDENTITY` secret. Never store private age identities in repository variables, source control, artifacts or logs. Dev, prod and billing use separate age key pairs.
 
@@ -83,10 +83,10 @@ Plan environments receive only their public `TF_PLAN_AGE_RECIPIENT`. Apply envir
 
 The workflow is `.github/workflows/deploy.yml`. It is manual-only and uses GitHub OIDC with short-lived credentials. It loads the region from `config/deployment.json`, initializes the selected remote state root, and supports plan then apply of the exact encrypted plan artifact. Apply verifies the successful plan run, workflow path, branch, commit and attempt before decrypting and applying.
 
-The deployment workflow has not been run. GitHub environment variables, secrets, reviewer settings and branch restrictions have not been verified by the current repository connection.
+The deployment workflow has not been run. GitHub environment variables, secrets, owner-approval settings and branch restrictions have not been verified by the current repository connection.
 
 ## Safety gate
 
 The first AWS interaction must be read-only: verify the active STS account, inspect existing OIDC provider, bucket, boundaries, roles, trust policies and policy attachments. Distinguish missing resources from access-denied responses. Do not create duplicates.
 
-The exact account ID and final bucket suffix remain unverified. The bootstrap inventory and rendered policies must be presented to the owner for explicit approval before any AWS write. State-bucket creation, IAM/OIDC bootstrap, remote backend initialization, Terraform plan and Terraform apply are separate approval-gated actions.
+The target account is verified as `924422830139` by read-only STS in `us-east-1`. The 14 November 2026 read-only inventory returned `NoSuchEntity` for the expected OIDC provider and six roles, did not return the expected runtime boundary policies, and found no matching `attendance-tf-state-924422830139-*` bucket. Treat unconfirmed visibility as unknown where IAM read permissions may be incomplete. The final bucket suffix and rendered policies must be presented to the owner for explicit approval before any AWS write. State-bucket creation, IAM/OIDC bootstrap, remote backend initialization, Terraform plan and Terraform apply are separate approval-gated actions.
