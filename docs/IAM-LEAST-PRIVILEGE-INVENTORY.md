@@ -104,7 +104,9 @@ Foundation module provider actions have been mapped against the exact AWS provid
 
 Remaining provider-action tasks:
 - Data and recognition module: T07 (in progress).
-- Access module: T08.
+- Access module: T08 (in progress).
+
+Access module provider-source mapping is drafted in `docs/security/ACCESS-PROVIDER-IAM.md`, including Cognito pool-level IAM granularity, API Gateway v2 HTTP-verb action model, CloudFront global resource ARNs, web S3 object/bucket-policy operations, and API Gateway Lambda permission actions.
 
 Important deployment KMS dependency: the five DynamoDB tables use the foundation CMK. AWS requires the principal selecting a customer-managed key for a DynamoDB table to have `kms:Encrypt`, `kms:Decrypt`, `kms:ReEncryptFrom`, `kms:ReEncryptTo`, `kms:GenerateDataKey`, `kms:GenerateDataKeyWithoutPlaintext`, `kms:DescribeKey`, and `kms:CreateGrant` via DynamoDB. These are deployment-role permissions, not runtime Lambda permissions. The current foundation key policy lacks the DynamoDB service-principal direct metadata statement; T36 tracks the key-policy correction.
 - All deployment policies must use exact API action names, resource ARNs, resource tags and supported condition keys. Use `iam:PassRole` only for exact environment-specific execution role ARNs and condition it by `iam:PassedToService`.
