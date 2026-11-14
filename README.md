@@ -33,15 +33,18 @@ flowchart LR
 ## Tech stack
 AWS (us-east-1): S3, CloudFront, API Gateway (HTTP API), Cognito, Lambda (Python 3.12), Rekognition, DynamoDB, EventBridge Scheduler, KMS, SNS, CloudWatch. Infrastructure as code: Terraform. CI/CD: GitHub Actions (OIDC to AWS, no stored keys). Frontend: static HTML + vanilla JS (no build step).
 
+**Region invariant:** `config/deployment.json` is the single canonical region manifest. Terraform providers, the local Terraform wrapper and the GitHub deployment workflow read/export that value. Lambda SDK clients use the Lambda-reserved `AWS_REGION`. CI rejects conflicting regional ARNs, AWS endpoints, legacy region references or duplicate backend-region settings.
+
 ## Repository layout
 ```
 docs/        SPEC (finish line), contracts, architecture, team brief, per-part guides, status
-infra/       bootstrap (state + OIDC), foundation, modules/{data,recognition,access}, envs/{dev,prod}
+config/     canonical deployment region manifest
+infra/       bootstrap (state + OIDC), foundation, modules/{data,recognition,access}, envs/{dev,prod,billing}
 shared/      attendance_common Python layer (config, time, auth, responses, record_scan)
 services/    Lambda source: recognition/ (Part A), data/ (Part B)
 web/         kiosk/, admin/, shared/ (Part C)
 tests/       unit/, contract/, integration/
-scripts/     seed data, e2e smoke test
+scripts/     region guard, Terraform wrapper, read-only AWS preflight, e2e smoke test
 ```
 
 ## Environments and branches
