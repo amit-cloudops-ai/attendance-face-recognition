@@ -55,6 +55,14 @@
 - Confirmed per-function CloudWatch log writes are scoped to Terraform-managed log groups; Scheduler invoke policies target only their matching Lambda functions.
 - Found the Scheduler trust policy lacks source account/schedule ARN conditions. Added T32 to harden it separately.
 
+### T05 — environment runtime permissions boundaries
+
+- **Status:** templates drafted; CI validation and final review pending.
+- Added dev/prod IAM policy templates in `infra/policies/`, scoped to the audited runtime union across DynamoDB, S3, KMS, Rekognition, SQS, SNS, Lambda Scheduler invocation and CloudWatch Logs.
+- KMS actions are constrained by the environment-specific alias condition and `kms:ViaService` for S3/SQS. AWS documents `kms:ResourceAliases` as an IAM-policy condition and lists S3/SQS as supported `kms:ViaService` integrations.
+- Boundaries are allow-list ceilings and include no IAM management, `iam:PassRole`, STS, provisioning or self-management actions. They do not grant permissions; the handler-specific role policies remain the grant layer.
+- Account ID is a template variable because the verified 12-digit account ID is not in the repository. Templates must be rendered and validated before manual bootstrap. No policy has been created or attached.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
