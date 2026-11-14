@@ -49,7 +49,7 @@ Latency budget (target p95 under 3 s): client resize + upload about 0.5 s, S3 ev
 Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee over a date range (PK query), by date for all employees (GSI `date-index`), employee list (about 100 items; Scan is acceptable at this scale), result polling by `request_id` (TTL 1 day).
 
 ## 6. Security
-### 6.1 IAM matrix (one role per Lambda; all also get CloudWatch Logs on their own log group and `kms:Decrypt`/`kms:GenerateDataKey` on the attendance KMS key)
+### 6.1 IAM matrix (one role per Lambda; all get CloudWatch Logs on their own log group; KMS permissions are granted only to handlers that need encrypted S3/SQS/SNS operations)
 | Lambda | Allowed actions and resources |
 |---|---|
 | presign | `s3:PutObject` on raw `captures/*`; `dynamodb:PutItem` on scan-results |
