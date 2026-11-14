@@ -1,0 +1,9 @@
+env         = "prod"
+account_id  = "123456789012"
+alert_email = "replace-with-your-alert-email@example.com"
+
+# Initial values for the first deployment only. After CloudFront exists,
+# replace these with the exact HTTPS site URL and apply the reviewed update.
+callback_urls  = ["http://localhost:8000/callback.html"]
+logout_urls    = ["http://localhost:8000/"]
+allowed_origins = ["http://localhost:8000"]
