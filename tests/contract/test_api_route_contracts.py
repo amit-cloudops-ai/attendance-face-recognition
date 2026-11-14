@@ -51,6 +51,6 @@ def test_each_api_route_has_an_existing_lambda_handler_and_group():
 def test_access_module_applies_cognito_jwt_authorization_to_all_exported_routes():
     source = (ROOT / "infra" / "modules" / "access" / "main.tf").read_text(encoding="utf-8")
     assert 'resource "aws_apigatewayv2_route" "api"' in source
-    assert "for_each           = var.api_routes" in source
+    assert re.search(r"for_each\\s*=\\s*var.api_routes", source)
     assert 'authorization_type = "JWT"' in source
     assert "authorizer_id      = aws_apigatewayv2_authorizer.jwt.id" in source
