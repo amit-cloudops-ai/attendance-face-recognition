@@ -36,6 +36,10 @@ Static review also confirmed the shared Lambda layer source layout (`shared/pyth
 The previous recommendation to bypass OIDC and apply locally as the broad `Amit-admin` user is **not accepted as the default path**. The local Terraform wrapper has no STS account guard, the tfvars examples omit a required boundary ARN, and the proposed shortcut weakens the least-privilege deployment model. Any local apply would need its own exact plan and explicit approval.
 
 ## 3. Additional findings
+### GitHub governance inspection
+
+The repository rulesets endpoint returned an empty list. The branch-protection endpoints for `main` and `develop` returned HTTP 403 (`Resource not accessible by integration`), and the GitHub connection cannot inspect environment secrets/variables. Therefore branch protection and environment reviewer settings are **unverified**, not confirmed absent. The helper scripts remain dry-run by default; do not claim governance is ready until an administrator verifies the settings in GitHub or runs the helpers with appropriate permissions.
+
 
 ### P1 — resolve before the first AWS build
 
