@@ -1,6 +1,7 @@
 env          = "dev"
 account_id   = "123456789012"
+execution_role_boundary_arn = "arn:aws:iam::123456789012:policy/attendance-dev-execution-boundary"
 alert_email  = "replace-with-your-alert-email@example.com"
-callback_urls = ["http://localhost:8000/auth/callback/"]
+callback_urls = ["http://localhost:8000/callback.html"]
 logout_urls   = ["http://localhost:8000/"]
 allowed_origins = ["http://localhost:8000"]
