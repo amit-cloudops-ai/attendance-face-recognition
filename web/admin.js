@@ -1,4 +1,4 @@
-import { accessToken, hasGroup, login, logout, requireGroup } from "./shared/auth.js";
+import { accessToken, hasGroup, login, logout } from "./shared/auth.js";
 import { api, uploadPresigned } from "./shared/api.js";
 
 const message = document.querySelector("#message");
@@ -7,7 +7,6 @@ const attendanceBody = document.querySelector("#attendance-body");
 const reportOutput = document.querySelector("#report-output");
 const csvDownload = document.querySelector("#csv-download");
 let nextCursor = null;
-let lastAttendanceQuery = "";
 
 function status(text, isError = false) {
   message.textContent = text;
@@ -171,7 +170,6 @@ async function loadAttendance(cursor = null) {
   }
   nextCursor = data.next_cursor;
   document.querySelector("#next-page").disabled = !nextCursor;
-  lastAttendanceQuery = query;
 }
 
 document.querySelector("#employee-form").addEventListener("submit", async event => {
