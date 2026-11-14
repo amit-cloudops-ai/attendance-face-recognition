@@ -677,17 +677,18 @@ jobs:
               "token.actions.githubusercontent.com", "sts.amazonaws.com",
               "attendance-github-dev-plan", "attendance-github-dev-apply",
               "attendance-github-prod-plan", "attendance-github-prod-apply",
+              "attendance-github-billing-plan", "attendance-github-billing-apply",
               "attendance-dev-execution-boundary", "attendance-prod-execution-boundary",
               "docs/STATE-BUCKET-BOOTSTRAP.md", "docs/GITHUB-ENVIRONMENT-SETUP.md",
               "explicitly approves", "No action may proceed",
-              "Billing deployment is a separate follow-up",
+              "billing-plan", "billing-apply", "26 managed policies",
           ):
               if required not in plan:
                   raise SystemExit(f"Manual bootstrap plan missing: {required}")
           if "aws s3api create-bucket" in plan or "terraform apply -auto-approve" in plan:
               raise SystemExit("Bootstrap plan must not contain executable auto-approval commands")
           policy_dir = Path("infra/policies")
-          for env in ("dev", "prod"):
+          for env in ("dev", "prod", "billing"):
               for operation in ("plan", "apply"):
                   if not list(policy_dir.glob(f"github-{operation}-{env}-*.json.tftpl")):
                       raise SystemExit(f"Missing {env} {operation} role policy templates")
