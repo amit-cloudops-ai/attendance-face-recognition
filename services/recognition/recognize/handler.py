@@ -5,7 +5,6 @@ from urllib.parse import unquote_plus
 from uuid import UUID
 
 import boto3
-
 from attendance_common.config import get_settings
 from attendance_common.record_scan import record_scan
 from attendance_common.tz import now_ist
