@@ -33,8 +33,8 @@ Contactless attendance for ~100 employees: face capture in browser, recognition 
 ## 4. Non-functional acceptance criteria
 | ID | Criterion | How we prove it |
 |---|---|---|
-| N01 | p95 capture-click to result-on-screen is 3 s or less over 20 consecutive scans (warm) | `scripts/e2e_smoke` timing output pasted in STATUS |
-| N02 | No raw image remains in the raw bucket 10 minutes after any test | List `captures/` and `enroll/` after test: empty |
+| N01 | p95 capture-click to result-on-screen is 3 s or less over 20 consecutive scans (warm) | Browser/device stopwatch or automated browser timing evidence; API smoke p95 is supplemental only |
+| N02 | No raw image remains in the raw bucket 10 minutes after any test | `scripts/e2e_smoke.sh` checks each uploaded key and confirms `captures/` and `enroll/` are empty |
 | N03 | Encryption at rest on DynamoDB and S3 (KMS); TLS-only bucket policies | Screenshots + Terraform |
 | N04 | One IAM role per Lambda; no `*` resources except where AWS requires it (logs) | IAM matrix in ARCHITECTURE section 6 matches Terraform |
 | N05 | No public bucket; only CloudFront reads the web bucket | Block Public Access screenshot |
@@ -57,8 +57,8 @@ Contactless attendance for ~100 employees: face capture in browser, recognition 
 1. **Unit tests** (each Part, `pytest`, moto for S3/DynamoDB, mocks for Rekognition).
 2. **Contract tests** (`tests/contract`): assert every Lambda reads and writes exactly the shapes in contracts.md.
 3. **Integration on dev**: API calls against the deployed dev stack.
-4. **E2E smoke** (`scripts/e2e_smoke`): enroll, scan, scan again, query, run daily job, fetch report.
-5. **Pilot**: the whole team uses the prod kiosk for real for at least 1 working day before submission.
+4. **E2E smoke** (`scripts/e2e_smoke.sh`): verify AWS account, enroll, run at least 20 scans, verify duplicate debounce, verify raw-image deletion, and query attendance. **Scheduled-job acceptance** is a separate dev-only check: invoke daily/weekly jobs with controlled test periods and verify JSON/CSV reports and absence calculations.
+5. **Pilot**: a consenting cohort of intended employees uses the dev kiosk under supervision for at least 1 working day; record false matches, missed matches, usability issues and latency before production approval.
 
 ## 7. Project Definition of Done (release gate, 15 Nov)
 - [ ] All MUST criteria pass (F01-F10, F12, N01-N11); evidence linked in STATUS
