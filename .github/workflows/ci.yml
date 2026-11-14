@@ -187,6 +187,38 @@ jobs:
                   raise SystemExit(f"{env} data module must receive account_id")
           PY
 
+      - name: Validate exact CloudFront KMS key policy scope
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          foundation = Path("infra/modules/foundation/main.tf").read_text(encoding="utf-8")
+          outputs = Path("infra/modules/foundation/outputs.tf").read_text(encoding="utf-8")
+          access_vars = Path("infra/modules/access/variables.tf").read_text(encoding="utf-8")
+          if 'resource "aws_kms_key_policy" "attendance"' not in access:
+              raise SystemExit("Access module must own final KMS key policy")
+          if "aws_cloudfront_distribution.site.arn" not in access:
+              raise SystemExit("CloudFront KMS policy must use exact distribution ARN")
+          if 'variable = "aws:SourceArn"' not in access or 'test     = "ArnEquals"' not in access:
+              raise SystemExit("CloudFront KMS grant must use ArnEquals SourceArn")
+          if "distribution/*" in access or "distribution/*" in foundation:
+              raise SystemExit("CloudFront distribution wildcard remains in KMS policy")
+          if 'policy                  = data.aws_iam_policy_document.kms_key.json' in foundation:
+              raise SystemExit("Foundation must not install a pre-distribution KMS policy")
+          if 'output "kms_key_id"' not in outputs or 'variable "kms_key_id"' not in access_vars:
+              raise SystemExit("Foundation key ID must be passed into access module")
+          for env in ("dev", "prod"):
+              root = Path(f"infra/envs/{env}/main.tf").read_text(encoding="utf-8")
+              start = root.index('module "access"')
+              end = root.find('\n}', start)
+              if "kms_key_id" not in root[start:end]:
+                  raise SystemExit(f"{env} access module must receive foundation KMS key ID")
+          access_outputs = Path("infra/modules/access/outputs.tf").read_text(encoding="utf-8")
+          if "cognito-idp.us-east-1.amazonaws.com" not in access_outputs:
+              raise SystemExit("Cognito issuer output must match us-east-1")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
