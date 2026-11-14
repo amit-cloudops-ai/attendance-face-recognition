@@ -12,9 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 REGION_FILE = ROOT / "config" / "deployment.json"
 LEGACY_REGION = "ap-" + "south-1"
 EXPECTED_REGION = "us-east-1"
-REGIONAL_ARN = re.compile(r"arn:aws:[^:\s\"']+:([a-z]{2}(?:-[a-z0-9]+)+-\d):")
+REGIONAL_ARN = re.compile(r"arn:aws:[^:\\s\"']+:([a-z]{2}(?:-[a-z0-9]+)+-\\d):")
 REGIONAL_ENDPOINT = re.compile(
-    r"\b[a-z0-9-]+\.([a-z]{2}(?:-[a-z0-9]+)+-\d)\.amazonaws\.com\b"
+    r"\\b[a-z0-9-]+\\.([a-z]{2}(?:-[a-z0-9]+)+-\\d)\\.(?:amazonaws|amazoncognito)\\.com\\b"
 )
 
 
@@ -57,7 +57,7 @@ def validate() -> None:
         if manifest_path not in content or "region = local.deployment_region" not in content:
             errors.append(f"{relative} must load its provider region from {manifest_path}")
         backend = content.split('backend "s3" {', 1)[1].split("}", 1)[0]
-        if re.search(r"^\s*region\s*=", backend, re.MULTILINE):
+        if re.search(r"^\\s*region\\s*=", backend, re.MULTILINE):
             errors.append(f"{relative} must not duplicate the backend region; use AWS_REGION")
 
     for relative in (
@@ -65,7 +65,7 @@ def validate() -> None:
         "infra/envs/prod/backend.hcl.example",
     ):
         content = (ROOT / relative).read_text(encoding="utf-8")
-        if re.search(r"^\s*region\s*=", content, re.MULTILINE):
+        if re.search(r"^\\s*region\\s*=", content, re.MULTILINE):
             errors.append(f"{relative} must not duplicate the canonical region")
 
     # Every SDK-using Lambda handler must resolve its region from the Lambda runtime.
@@ -85,25 +85,25 @@ def validate() -> None:
 
     ignored_parts = {".git", ".terraform", "__pycache__", ".venv", "node_modules"}
     for path in ROOT.rglob("*"):
-            if not path.is_file() or ignored_parts.intersection(path.parts):
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError):
-                continue
-            relative = path.relative_to(ROOT)
-            if LEGACY_REGION in text:
-                errors.append(f"{relative} contains a superseded region reference")
-            for pattern, label in (
-                (REGIONAL_ARN, "regional ARN"),
-                (REGIONAL_ENDPOINT, "regional AWS endpoint"),
-            ):
-                for match in pattern.finditer(text):
-                    if match.group(1) != region:
-                        errors.append(
-                            f"{relative} contains {label} in {match.group(1)}, expected {region}"
-                        )
-                        break
+        if not path.is_file() or ignored_parts.intersection(path.parts):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        relative = path.relative_to(ROOT)
+        if LEGACY_REGION in text:
+            errors.append(f"{relative} contains a superseded region reference")
+        for pattern, label in (
+            (REGIONAL_ARN, "regional ARN"),
+            (REGIONAL_ENDPOINT, "regional AWS endpoint"),
+        ):
+            for match in pattern.finditer(text):
+                if match.group(1) != region:
+                    errors.append(
+                        f"{relative} contains {label} in {match.group(1)}, expected {region}"
+                    )
+                    break
 
     if errors:
         print("AWS region consistency check failed:", file=sys.stderr)
