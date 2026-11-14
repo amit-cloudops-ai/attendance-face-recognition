@@ -1,6 +1,6 @@
 # Terraform state bucket bootstrap specification
 
-**Status:** specification only. No AWS API call, resource creation, remote backend initialization, Terraform plan or apply has been performed.
+**Status:** specification only. A read-only STS identity and inventory pass was performed on 14 November 2026. No resource creation, remote backend initialization, Terraform plan or apply has been performed.
 
 ## Purpose and naming
 
@@ -57,7 +57,7 @@ The plan/apply templates include GetBucketLocation and GetBucketVersioning on th
 
 ## Manual bootstrap sequence (not executed)
 
-1. Confirm the 12-digit AWS account ID from the owner's authenticated STS identity; confirm the region equals the canonical `config/deployment.json` value.
+1. Confirm the target account is `924422830139` from the recorded STS identity; confirm the region equals the canonical `config/deployment.json` value. The read-only preflight returned `NoSuchEntity` for the expected OIDC provider and six roles, did not return the expected runtime boundary policies, and found no matching project state bucket. Treat permission-limited results as unknown.
 2. Choose a globally unique bucket suffix and confirm the final bucket name is available.
 3. Present the exact bucket name, configuration, policy JSON and bootstrap IAM permissions to the owner for approval.
 4. Only after approval, create the bucket and apply ownership controls, all four public-access-block settings, versioning, default SSE-S3 encryption and the TLS-only bucket policy.
