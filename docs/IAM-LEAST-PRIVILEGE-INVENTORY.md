@@ -1,6 +1,6 @@
 # IAM least-privilege inventory — deployment and runtime roles
 
-**Implementation baseline:** `solo/amit-monday`; task work is isolated on `ai/T02-lambda-dlq-kms-policy`  
+**Implementation baseline:** `solo/amit-monday`; current task work is isolated on `ai/T04-data-runtime-iam`  
 **Target region:** `us-east-1`  
 **Status:** candidate inventory only. This document is not an attachable policy and does not authorize AWS changes.
 
@@ -55,14 +55,14 @@ The following is a reconciliation checklist based on the current Terraform polic
 Important runtime review points:
 - The foundation module creates the KMS key and uses it for DynamoDB tables, raw/report/web buckets and SQS encryption. Verify whether application roles need `kms:Decrypt` and `kms:GenerateDataKey` for each resource's actual encryption context and the chosen AWS service integration. Do not assume a broad KMS grant is necessary.
 - The current Terraform adds KMS decrypt/data-key actions to every Lambda execution role. This is a candidate overgrant until the data paths and KMS key policy are validated. Narrow the grants to only handlers that actually call KMS or need direct KMS access.
-- Verify DynamoDB update actions for override/settings and every handler; compare code call-sites with Terraform statements.
-- Verify SQS permissions for Lambda asynchronous destinations versus the explicit failure consumer queues; keep each role scoped to its actual queue set.
-- Verify the `rekognition:DetectFaces` action's resource-level support. Retain `Resource: "*"` only if AWS documents that resource scope is unsupported.
+- Data DynamoDB call sites are reconciled below. In particular, override uses GetItem/PutItem (not UpdateItem), and settings uses GetItem/PutItem plus audit PutItem.
+- SQS asynchronous destination producer and event-source consumer permissions are reconciled in the recognition review below; keep these distinct from data-handler policies.
+- Rekognition resource-level scope is verified in section 3B: DetectFaces requires `Resource: "*"`; collection actions are collection-ARN scoped.
 - Lambda logging requires scoped `logs:CreateLogStream` and `logs:PutLogEvents` on that function's log group ARN suffix. Verify log-group creation stays in Terraform, not runtime.
 
 ## 3A. Verified handler call-site review — 14 Nov 2026
 
-The data handler review confirms these concrete SDK operations in the current solo branch:
+The data handler review confirms these concrete SDK operations in the solo implementation baseline:
 
 | Handler | Verified operations | Policy reconciliation |
 |---|---|---|
@@ -74,11 +74,7 @@ The data handler review confirms these concrete SDK operations in the current so
 | override | GetItem employee/attendance; PutItem attendance/audit | Existing policy covers the observed calls |
 | settings | PutItem config/audit | Existing policy covers the observed calls |
 
-Important corrections to the initial inventory:
-- The `override` handler uses DynamoDB `PutItem`, not `UpdateItem`; the current role policy is consistent with the observed call sites.
-- The broad KMS statement currently appended to every data Lambda role is not least privilege. DynamoDB's table encryption is performed by DynamoDB; it does not justify granting each Lambda direct KMS access. The data handlers that directly read/write SSE-KMS S3 objects are daily_job, weekly_job and reports. Candidate direct KMS actions are GenerateDataKey for report writes and Decrypt for report reads. These must be checked against the bucket's KMS key policy and S3 SSE-KMS authorization behaviour before implementation.
-- The raw S3 bucket and recognition SQS queues use the shared customer-managed KMS key. Recognition roles that upload/read raw objects and send/consume encrypted SQS messages may require scoped GenerateDataKey/Decrypt permissions. Split the requirement by handler and exact bucket/queue resources; do not copy the current broad KMS statement to every role.
-- The foundation KMS key policy grants SNS service access to the encrypted alerts topic and CloudFront access to read encrypted objects. Verify the CloudFront statement is scoped to the actual distribution ARN rather than a distribution wildcard before bootstrap.
+Data-role KMS correction: DynamoDB encryption is service-managed. Only daily_job/weekly_job report writers and the reports reader receive direct KMS actions. Recognition raw-image and encrypted-SQS KMS actions are separately documented in section 3B. The foundation key's SNS and CloudFront service statements still require provider/resource-scope review in the foundation-module task.
 
 The runtime policy code has now been changed to remove the blanket KMS grant from every Lambda role and instead add per-handler KMS statements:
 
@@ -181,3 +177,34 @@ KMS split:
 - result/faces_delete: no direct KMS operations identified.
 
 This is a static call-site/policy reconciliation, not a deployed AWS authorization test. Exact AWS account policies, permissions boundaries and live service delivery remain unverified.
+
+
+## 3C. Data runtime IAM reconciliation — 14 Nov 2026
+
+The seven data handlers were reviewed against their actual boto3 call sites and the per-function policy map in `infra/modules/data/main.tf`:
+
+| Function | SDK operations | Required policy scope | Finding |
+|---|---|---|---|
+| employees | DynamoDB GetItem, Scan, PutItem, UpdateItem; audit PutItem | employees table Get/Scan/Put/Update; audit table Put | Exact actions/resources present |
+| attendance_query | DynamoDB Scan employees; Query attendance table and date-index GSI | employees table Scan; attendance table and `/index/date-index` Query | Exact actions/resources present |
+| daily_job | Scan employees; Query attendance date-index; GetItem config; PutItem/UpdateItem attendance; S3 PutObject reports/daily/*; SNS Publish on failure | Exact DynamoDB table/index ARNs; daily report object prefix; alert topic ARN | Exact actions/resources present |
+| weekly_job | Scan employees; Query attendance by employee key; GetItem config; S3 PutObject reports/weekly/*; SNS Publish on failure | Exact DynamoDB table/index ARNs; weekly report object prefix; alert topic ARN | Exact actions/resources present |
+| reports | S3 GetObject JSON; HeadObject CSV; presigned GetObject URL | S3 GetObject on reports/* | Exact action; HeadObject is authorized by GetObject |
+| override | GetItem employees/attendance; PutItem attendance/audit | Exact employee, attendance and audit table ARNs | Exact actions/resources present; no UpdateItem required |
+| settings | Config GetItem via get_settings; PutItem config; PutItem audit | Exact config and audit table ARNs | Exact actions/resources present; no UpdateItem required |
+
+KMS review:
+- daily_job and weekly_job each write report JSON and CSV objects through single-part `PutObject`; the role's `kms:GenerateDataKey` grant is scoped to the project CMK.
+- reports reads the generated report JSON using `GetObject`; its `kms:Decrypt` grant is scoped to the same CMK.
+- No data handler requires direct KMS access for DynamoDB table encryption; DynamoDB performs encryption/decryption on behalf of the caller.
+- The report bucket policy and CMK resource policy still need validation in the foundation policy task. This static call-site audit does not prove live authorization.
+
+Logging:
+- Each data Lambda receives `logs:CreateLogStream` and `logs:PutLogEvents` scoped to its Terraform-managed log group ARN suffix.
+- Log-group creation is provisioned by Terraform, so runtime roles do not need `logs:CreateLogGroup`.
+
+Scheduler:
+- Each Scheduler execution role has `lambda:InvokeFunction` on only its matching daily or weekly Lambda ARN.
+- The Scheduler trust policy currently trusts `scheduler.amazonaws.com` without source-account/source-schedule conditions. This is a confused-deputy hardening item tracked separately as T32; do not consider the trust policy finalized.
+
+Conclusion: no missing data-handler API actions or unjustified data-handler KMS grants were found in the current policy map. This is static code/policy reconciliation; AWS live authorization remains unverified.
