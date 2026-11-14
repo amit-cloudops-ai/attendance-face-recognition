@@ -74,7 +74,7 @@ def _alert_failure(exc):
             Subject="Attendance daily job failed",
             Message=f"Daily attendance job failed ({type(exc).__name__}). Check CloudWatch logs.",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - failure alerts must never mask the original job error
         LOGGER.exception("Unable to publish daily job failure alert")
 
 
