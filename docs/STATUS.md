@@ -85,7 +85,7 @@ PR #29 now also:
 - Makes enrollment photo selection respect configured maximum/remaining slots.
 - Tracks exact E2E raw-image keys and attempts test-only cleanup if application cleanup fails.
 
-This is CI evidence for the code commit, not local WSL evidence or a live AWS test. The latest documentation-only commit will receive its own CI run. The SNS/KMS static policy correction, local Terraform account/input guards, config.json exclusion and quota checks are now in PR #29; latest CI and local WSL checks remain pending. Live encrypted SNS delivery and the expanded AWS inventory remain unverified.
+This is CI evidence for the code commit, not local WSL evidence or a live AWS test. The latest audit-document updates are documentation-only and have their own CI run in progress. The SNS/KMS static policy correction, local Terraform account/input guards, config.json exclusion and quota checks are now in PR #29; latest CI and local WSL checks remain pending. Live encrypted SNS delivery and the expanded AWS inventory remain unverified.
 
 ### Part 2 — Terraform/IAM static corrections
 
