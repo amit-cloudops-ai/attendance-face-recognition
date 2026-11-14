@@ -85,7 +85,20 @@ PR #29 now also:
 - Makes enrollment photo selection respect configured maximum/remaining slots.
 - Tracks exact E2E raw-image keys and attempts test-only cleanup if application cleanup fails.
 
-This is CI evidence for the code commit, not local WSL evidence or a live AWS test. The latest documentation-only commit will receive its own CI run. The SNS/KMS notification defect, local Terraform input/account guard, config.json collision, and other items in the phased audit remain open.
+This is CI evidence for the code commit, not local WSL evidence or a live AWS test. The latest documentation-only commit will receive its own CI run. The SNS/KMS static policy correction, local Terraform account/input guards, config.json exclusion and quota checks are now in PR #29; latest CI and local WSL checks remain pending. Live encrypted SNS delivery and the expanded AWS inventory remain unverified.
+
+### Part 2 — Terraform/IAM static corrections
+
+The current PR #29 branch now includes:
+- CloudWatch alarm access to the encrypted SNS topic in both the KMS key policy and SNS topic policy, scoped by account and project alarm ARN.
+- Daily/weekly publisher KMS permissions and SNS in the runtime boundary ViaService allowlist.
+- Dev/prod callback and boundary ARN example corrections, account-bound boundary validation, and provider allowed-account restrictions for dev/prod/billing.
+- STS account guard for local Terraform remote init/plan/apply/state-changing operations.
+- Exclusion of generated `web/config.json` from the generic S3 frontend fileset.
+- Terraform CI pinned to 1.10.5, matching deployment.
+- Expanded read-only preflight for Lambda concurrency and Rekognition quotas, plus billing backend/tfvars examples.
+
+These are source/CI corrections only. No live IAM policy, SNS topic policy, GitHub setting or AWS resource has been applied. Latest CI on the current head must pass, and local WSL checks remain outstanding.
 
 ## Region-consistency implementation
 
