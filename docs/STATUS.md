@@ -60,7 +60,7 @@ The exact 12-digit account ID and globally unique state bucket suffix remain unk
 
 ### T37 — dedicated billing deployment roles
 
-The billing root now has separate plan/apply budget and state policies plus exact billing-plan/billing-apply OIDC trust templates. The deployment workflow supports infra/billing on main and requires separate billing environments. CI validation is pending. Normal dev/prod roles continue to exclude budgets:* and aws-portal:* permissions.
+The billing root now has separate plan/apply budget and state policies plus exact billing-plan/billing-apply OIDC trust templates. The deployment workflow supports infra/billing on main, selects the billing root, requires the committed provider lockfile and uses separate billing environments. CI validation is pending. Normal dev/prod roles continue to exclude budgets:* and aws-portal:* permissions.
 
 ## Deployment policy notes and residual scope
 
