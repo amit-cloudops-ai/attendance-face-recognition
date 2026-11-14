@@ -563,6 +563,31 @@ data "aws_iam_policy_document" "attendance_kms_key" {
   }
 
   statement {
+    sid    = "AllowCloudWatchAlarmsToPublishToEncryptedAlertsTopic"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:cloudwatch:${local.region}:${var.account_id}:alarm:attendance-${var.env}-*"]
+    }
+  }
+
+  statement {
     sid    = "AllowLambdaFailureDestinationsToUseSQSKey"
     effect = "Allow"
 
@@ -643,7 +668,7 @@ locals {
   }
   frontend_files = {
     for path in fileset(local.frontend_root, "**") : path => path
-    if !endswith(path, ".gitkeep")
+    if !endswith(path, ".gitkeep") && path != "config.json"
   }
 }
 
