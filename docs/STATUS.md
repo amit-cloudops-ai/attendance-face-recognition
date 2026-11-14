@@ -244,7 +244,11 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T15 — encrypted Terraform plan artifact lifecycle
 
-- **Status:** workflow hardening drafted; CI validation pending.
+- **Status:** complete on `ai/T15-plan-artifact-security`.
+- Plan artifacts are age-encrypted, one-day retention, and only the encrypted file is uploaded. Plaintext plan cleanup is guarded by an EXIT trap.
+- Apply verifies the successful workflow run path, event, branch, exact commit SHA and run attempt; artifact name includes the verified run attempt and download is pinned to the exact run ID.
+- Apply uses a protected environment age identity secret, ephemeral mode-0600 identity file (`umask 077`), removes the encrypted file after decryption and removes the decrypted plan in an always()-guarded cleanup step.
+- CI run [43618692691](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43618692691), commit `e191ce6c06`: Python and Terraform jobs passed, including OIDC trust, artifact provenance/cleanup, state bucket spec, formatting, lockfiles, all modules and environment roots.
 - Plan artifact names now include environment, workflow run ID and run attempt. Apply verifies successful manual workflow_dispatch run, exact workflow path, expected release branch, exact same commit SHA and numeric run attempt before download.
 - Apply downloads only from the referenced run ID and artifact name including the verified attempt. This closes the prior gap where another workflow_dispatch run on the same branch/commit could potentially satisfy the SHA/branch/event checks.
 - Added EXIT cleanup for plaintext plan after encryption; artifact upload includes only tfplan.age and retention-days=1. Apply uses a protected age identity secret, umask 077, ephemeral identity file cleanup, removes encrypted artifact after decryption and removes decrypted plan in an always()-guarded cleanup step.
