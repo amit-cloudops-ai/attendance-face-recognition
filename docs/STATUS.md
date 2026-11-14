@@ -42,15 +42,15 @@ The policy templates are not attached to AWS roles. IAM Access Analyzer and live
 
 **Status: BLOCKED**
 
-PR #24 contains the four-environment setup guide. The required names are dev-plan, dev-apply, prod-plan and prod-apply, with environment-scoped AWS_ROLE_ARN values, plan-only age recipients, apply-only private age identity secrets, branch restrictions and independent apply reviewers.
+PR #24 contains the environment setup guide, and T37 extends it to six environments. The required names are dev-plan, dev-apply, prod-plan, prod-apply, billing-plan and billing-apply, with environment-scoped AWS_ROLE_ARN values, plan-only age recipients, apply-only private age identity secrets, branch restrictions and independent apply reviewers.
 
 The GitHub connector cannot inspect or configure repository Actions environments. Branch protection API reads returned 403 Resource not accessible by integration. Actual environment existence, variable values, secret presence, reviewer assignments and branch restrictions remain unverified.
 
-**Owner action:** configure the four environments and protection settings using docs/GITHUB-ENVIRONMENT-SETUP.md, then confirm or provide an authorized read-only verification path.
+**Owner action:** configure the six environments and protection settings using docs/GITHUB-ENVIRONMENT-SETUP.md, then confirm or provide an authorized read-only verification path.
 
 ### T18 — exact manual AWS bootstrap plan
 
-<badge color="warning">Blocked</badge>
+**Status: BLOCKED**
 
 PR #26 contains docs/MANUAL-AWS-BOOTSTRAP-PLAN.md. It enumerates the state bucket, OIDC provider, two runtime boundaries, six GitHub plan/apply roles, policy attachments, manual order, dev-first rollout, prod approval and rollback. CI run [43619095037](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43619095037), commit `f3aa1e85a6`: Python and Terraform jobs passed, including the bootstrap-plan inventory validator, all policy validators, lockfiles and environment roots.
 
@@ -75,13 +75,12 @@ The billing root now has separate plan/apply budget and state policies plus exac
 
 ## Next sequence
 
-1. Finish T17/T18 CI runs and open their PRs.
-2. Obtain repository-admin confirmation for T16.
+1. Finish T37 billing workflow and policy validation; open its PR.
+2. Obtain repository-admin confirmation for T16, including all six environments.
 3. Obtain verified account ID and explicit bootstrap approval for T18.
-4. Complete T37 billing workflow and policy validation; configure billing environments under T16.
-5. Open T19 solo-only readiness PR to develop after all security/CI gates pass.
-6. Only after separate approval, bootstrap state/OIDC/roles, run dev plan, present the exact plan and request apply approval.
-7. Complete dev smoke/integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
+4. Open T19 solo-only readiness PR to develop only after all security/CI gates pass.
+5. Only after separate approval, bootstrap state/OIDC/roles, run dev plan, present the exact plan and request apply approval.
+6. Complete dev smoke/integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
 
 T20–T24 remain release approval gates, not completed deployment tasks. Phase B is not yet fully closed because T16/T18/T37 and the later deployment acceptance tasks remain outstanding.
 
