@@ -1,127 +1,112 @@
-# IAM least-privilege inventory — deployment roles
+# IAM least-privilege inventory — deployment and runtime roles
 
 **Repository branch:** `solo/amit-monday`  
-**Target account:** existing AWS account (account ID is intentionally not recorded here)  
 **Target region:** `us-east-1`  
-**Status:** action inventory draft; no IAM policy has been attached and no AWS role has been created.
-
-This document derives the initial IAM inventory from the Terraform resource types in the four modules. It is a review baseline, not a final attachable policy. Exact AWS API-to-IAM action mappings, provider read paths, condition-key support, and resource-level authorization must be validated against the pinned AWS provider version and AWS service authorization references before role creation.
+**Status:** candidate inventory only. This document is not an attachable policy and does not authorize AWS changes.
 
 ## 1. Role separation
 
-| Role | Scope | Permission model |
+| Role | Purpose | Required boundary |
 |---|---|---|
-| `attendance-github-plan-dev` | Dev root and dev state | Read/describe/list permissions plus dev state and lock-file access only |
-| `attendance-github-apply-dev` | Dev root and dev state | Dev read permissions plus narrowly scoped dev resource mutations |
-| `attendance-github-plan-prod` | Prod root and prod state | Read/describe/list permissions plus prod state and lock-file access only |
-| `attendance-github-apply-prod` | Prod root and prod state | Prod read permissions plus narrowly scoped prod resource mutations |
+| `attendance-github-plan-dev` | Refresh and plan dev root; access dev state/lock only | No application role permissions |
+| `attendance-github-apply-dev` | Apply reviewed dev plan | Must attach only dev execution boundary |
+| `attendance-github-plan-prod` | Refresh and plan prod root; access prod state/lock only | No application role permissions |
+| `attendance-github-apply-prod` | Apply reviewed prod plan | Must attach only prod execution boundary |
+| Lambda and Scheduler roles | Runtime access per handler | Pre-created environment boundary is mandatory |
 
-Plan and apply roles must be separate for each environment. A plan role must not receive create, update, delete, publish, subscribe, tag, or IAM mutation permissions. Apply roles must not be granted account-wide administrator policies.
-
-The GitHub OIDC trust relationship must require:
+OIDC requirements:
 - Audience: `sts.amazonaws.com`
-- Exact subject for dev: `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev`
-- Exact subject for prod: `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`
+- Dev subject: `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev`
+- Prod subject: `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`
+- Dev GitHub Environment is restricted to `develop`; prod is restricted to `main` with a required reviewer.
 
-The GitHub Environment branch restrictions remain mandatory: dev only from `develop`, prod only from `main`; prod requires reviewer approval.
+Plan roles must not have infrastructure mutation permissions. Prod plan/apply permissions must be separate from dev. Do not use static AWS credentials or wildcard OIDC subjects.
 
-## 2. Terraform-managed resource inventory
+## 2. Terraform resource inventory
 
-The current module source declares these resource families:
-
-| Module | Terraform resource types |
+| Module | Resource families |
 |---|---|
-| foundation | KMS key and alias; S3 buckets, public-access blocks, encryption, CORS, versioning, lifecycle, bucket policies; SNS topic and subscription; Lambda layer; AWS Budget |
-| data | DynamoDB tables; CloudWatch log groups and metric alarms; IAM Lambda/scheduler roles and inline policies; Lambda functions; EventBridge Scheduler schedules |
-| recognition | Rekognition collection; SQS queues and redrive policy; CloudWatch log groups and alarms; IAM Lambda roles and inline policies; Lambda functions, async invoke config, event source mapping and permission; S3 bucket notification |
-| access | Cognito user pool, groups, domain and app client; API Gateway v2 API, authorizer, integrations, routes and stage; Lambda permissions; CloudFront OAC, cache/origin-request/response-header policies, function and distribution; S3 bucket policy and frontend objects |
+| Foundation | KMS keys/aliases; S3 buckets, access blocks, encryption, CORS, versioning, lifecycle, bucket policy; SNS topic/subscription; Lambda layer; AWS Budget |
+| Data | DynamoDB tables/items; CloudWatch log groups/alarms; Lambda functions; IAM roles/inline policies; Scheduler schedules |
+| Recognition | Rekognition collection; SQS queues/redrive; CloudWatch logs/alarms; Lambda functions; IAM roles/inline policies; async invoke config; event source mapping; Lambda permissions; S3 bucket notification |
+| Access | Cognito pools/groups/domain/client; API Gateway v2 API/authorizer/integrations/routes/stage; Lambda permissions; CloudFront OAC/policies/function/distribution; web bucket policies and objects |
 
-## 3. Candidate read permissions for plan roles
+## 3. Runtime policy reconciliation
 
-The following are the service action families that must be evaluated for Terraform refresh and plan. Keep `List*` and account/global discovery calls on `Resource: "*"` only where AWS does not support resource-level scoping; constrain all other reads to the exact dev or prod resource ARNs.
+The following is a reconciliation checklist based on the current Terraform policies. Each action needs confirmation against actual handler code and service authorization before boundary policies are finalized.
 
-- **S3:** `s3:GetBucketLocation`, `s3:GetBucketTagging`, `s3:GetBucketPolicy`, `s3:GetBucketPublicAccessBlock`, `s3:GetEncryptionConfiguration`, `s3:GetLifecycleConfiguration`, `s3:GetBucketVersioning`, `s3:GetBucketCORS`, `s3:GetBucketNotification`, `s3:GetBucketOwnershipControls`, `s3:ListBucket`, `s3:GetObject`, and required bucket/object tagging reads.
-- **KMS:** `kms:DescribeKey`, `kms:GetKeyPolicy`, `kms:ListResourceTags`, `kms:ListAliases`.
-- **SNS:** `sns:GetTopicAttributes`, `sns:GetSubscriptionAttributes`, `sns:ListSubscriptionsByTopic`, `sns:ListTagsForResource`.
-- **Lambda and layers:** `lambda:GetFunction`, `lambda:GetFunctionConfiguration`, `lambda:GetPolicy`, `lambda:GetLayerVersion`, `lambda:ListLayerVersions`, `lambda:ListTags`, and event-source / async-invoke configuration reads.
-- **DynamoDB:** `dynamodb:DescribeTable`, `dynamodb:DescribeContinuousBackups`, `dynamodb:DescribeTimeToLive`, `dynamodb:ListTagsOfResource`.
-- **IAM:** `iam:GetRole`, `iam:GetRolePolicy`, `iam:ListRolePolicies`, `iam:ListAttachedRolePolicies`, `iam:ListRoleTags`, and boundary/policy metadata reads needed by the provider.
-- **CloudWatch Logs and alarms:** `logs:DescribeLogGroups`, `logs:ListTagsForResource`, `cloudwatch:DescribeAlarms`.
-- **EventBridge Scheduler:** `scheduler:GetSchedule`, `scheduler:ListTagsForResource`.
-- **Rekognition:** `rekognition:DescribeCollection`, `rekognition:ListCollections`, `rekognition:ListTagsForResource`.
-- **SQS:** `sqs:GetQueueAttributes`, `sqs:GetQueueUrl`, `sqs:ListQueueTags`.
-- **Cognito:** `cognito-idp:DescribeUserPool`, `cognito-idp:DescribeUserPoolClient`, `cognito-idp:DescribeUserPoolDomain`, `cognito-idp:ListTagsForResource`, `cognito-idp:ListUserPoolClients`, `cognito-idp:ListGroups`.
-- **API Gateway v2:** `apigateway:GET` for the specific API, authorizer, integration, route and stage paths.
-- **CloudFront:** `cloudfront:GetDistribution`, `cloudfront:GetDistributionConfig`, `cloudfront:ListDistributions`, `cloudfront:GetOriginAccessControl`, cache/origin-request/response-header policy reads, function reads and `cloudfront:ListTagsForResource`.
-- **Budgets:** `budgets:ViewBudget`, `budgets:DescribeBudget`, `budgets:DescribeNotificationsForBudget`, `budgets:DescribeSubscribersForNotification`.
+| Runtime function group | Resource scope | Actions currently required or to verify |
+|---|---|---|
+| presign / enroll_url | Raw bucket `captures/*` or `enroll/*`; scan-results table | `s3:PutObject`, `dynamodb:PutItem` or `GetItem` |
+| result | Scan-results table | `dynamodb:GetItem` |
+| recognize | Rekognition collection; raw `captures/*`; employees, attendance, config, scan-results; recognize DLQ | `rekognition:DetectFaces` (resource wildcard may be required), `rekognition:SearchFacesByImage`, S3 get/delete, DynamoDB get/put/update, `sqs:SendMessage` |
+| enroll | Rekognition collection; raw `enroll/*`; employees, config, scan-results; enroll DLQ | DetectFaces, SearchFacesByImage, IndexFaces, DeleteFaces; S3 get/delete; DynamoDB get/update; SQS send |
+| faces_delete | Rekognition collection; employees and audit tables | Rekognition DeleteFaces; DynamoDB get/update/put |
+| failure | Recognition DLQs; scan-results, employees, attendance/date index; Rekognition collection; raw captures/enroll prefixes | SQS receive/delete/get-attributes/change-visibility; DynamoDB get/update/query; Rekognition search/delete; S3 get/delete |
+| employees | Employees and audit tables | DynamoDB get/put/update/scan; audit put |
+| attendance_query | Attendance table/date index and employees table | DynamoDB query and employee scan |
+| daily_job | Employees, attendance/date index, config, reports/daily prefix, alerts topic | DynamoDB scan/query/put/update/get; S3 put; SNS publish |
+| weekly_job | Employees, attendance/date index, config, reports/weekly prefix, alerts topic | DynamoDB scan/query/get; S3 put; SNS publish |
+| reports | Reports object prefix | S3 get |
+| override | Employees, attendance and audit | DynamoDB get/put (verify actual update calls in handler) |
+| settings | Config and audit | DynamoDB get/put/update as required by handler |
+| Scheduler roles | Matching daily or weekly Lambda only | `lambda:InvokeFunction` on the exact target Lambda ARN |
 
-This is a candidate inventory. Some AWS provider resources use additional describe/list calls or require `Resource: "*"`; confirm these through provider documentation and a non-mutating plan before finalizing.
+Important runtime review points:
+- The foundation module creates the KMS key and uses it for DynamoDB tables, raw/report/web buckets and SQS encryption. Verify whether application roles need `kms:Decrypt` and `kms:GenerateDataKey` for each resource's actual encryption context and the chosen AWS service integration. Do not assume a broad KMS grant is necessary.
+- The current Terraform adds KMS decrypt/data-key actions to every Lambda execution role. This is a candidate overgrant until the data paths and KMS key policy are validated. Narrow the grants to only handlers that actually call KMS or need direct KMS access.
+- Verify DynamoDB update actions for override/settings and every handler; compare code call-sites with Terraform statements.
+- Verify SQS permissions for Lambda asynchronous destinations versus the explicit failure consumer queues; keep each role scoped to its actual queue set.
+- Verify the `rekognition:DetectFaces` action's resource-level support. Retain `Resource: "*"` only if AWS documents that resource scope is unsupported.
+- Lambda logging requires scoped `logs:CreateLogStream` and `logs:PutLogEvents` on that function's log group ARN suffix. Verify log-group creation stays in Terraform, not runtime.
 
-## 4. Candidate apply permissions
+## 4. Deployment policy construction
 
-Apply roles receive the read set above plus only the mutation families required by the declared Terraform resources:
+Candidate service families to verify against provider read/write requests:
+- S3 bucket configuration, policy, notification and object operations.
+- KMS describe/key policy/tag/key/alias lifecycle actions.
+- SNS topic/subscription operations.
+- Lambda function/layer/invoke permission/event-source mapping/async invoke configuration.
+- DynamoDB table, item, TTL, PITR and tag operations.
+- IAM role, inline policy, permissions boundary and pass-role operations.
+- CloudWatch log groups/alarms and EventBridge Scheduler schedule operations.
+- Rekognition collection, SQS queue/redrive policies.
+- Cognito, API Gateway v2 and CloudFront resources/policies/functions/distribution.
+- AWS Budgets resources and notifications.
+- S3 remote state and native lock object operations.
 
-- **S3:** `s3:CreateBucket`, `s3:DeleteBucket`, `s3:PutBucket*`, `s3:DeleteBucketPolicy`, `s3:PutBucketPolicy`, `s3:PutObject`, `s3:DeleteObject`, and the required object tagging operations. Scope bucket actions to the exact environment buckets and object actions to their object ARNs.
-- **KMS:** `kms:CreateKey`, `kms:PutKeyPolicy`, `kms:EnableKeyRotation`, `kms:CreateAlias`, `kms:UpdateAlias`, `kms:DeleteAlias`, `kms:TagResource`, `kms:UntagResource`, plus deletion-scheduling actions only if destroy is deliberately supported.
-- **SNS:** `sns:CreateTopic`, `sns:DeleteTopic`, `sns:SetTopicAttributes`, `sns:Subscribe`, `sns:Unsubscribe`, subscription attribute changes and topic tagging.
-- **Lambda:** `lambda:CreateFunction`, `lambda:UpdateFunctionCode`, `lambda:UpdateFunctionConfiguration`, `lambda:DeleteFunction`, layer publish/delete, permission add/remove, event-source mapping create/update/delete, and async-invoke configuration put/delete.
-- **DynamoDB:** `dynamodb:CreateTable`, `dynamodb:UpdateTable`, `dynamodb:DeleteTable`, `dynamodb:UpdateTimeToLive`, `dynamodb:UpdateContinuousBackups`, `dynamodb:TagResource`, `dynamodb:UntagResource`.
-- **IAM:** role create/delete, trust-policy update, inline-policy put/delete, tagging and permissions-boundary attachment. Every role mutation must be constrained to the environment's exact role-name prefix and mandatory permissions boundary.
-- **Logs / CloudWatch:** log group create/delete, retention updates and tagging; `cloudwatch:PutMetricAlarm`, `cloudwatch:DeleteAlarms`.
-- **Scheduler:** schedule create/update/delete and tagging.
-- **Rekognition:** collection create/delete and resource tagging.
-- **SQS:** queue create/delete, attribute updates and queue tagging.
-- **Cognito:** user pool/client/domain/group create/update/delete and tagging.
-- **API Gateway v2:** API, authorizer, integration, route and stage create/update/delete actions through the API Gateway v2 IAM action namespace.
-- **CloudFront:** distribution, OAC, cache policy, origin-request policy, response-header policy and function create/update/publish/delete actions, plus tagging.
-- **Budgets:** budget create/modify/delete and the notification/subscriber create/delete operations managed by the budget resource.
-- **PassRole:** `iam:PassRole` only for the exact environment Lambda execution roles and Scheduler target roles, conditioned on `iam:PassedToService` equal to `lambda.amazonaws.com` or `scheduler.amazonaws.com` as appropriate.
+The earlier candidate action inventory must be expanded to exact IAM action names (not service wildcards), exact ARNs, resource tags and supported condition keys. Use `iam:PassRole` only for exact environment-specific execution role ARNs and condition it by `iam:PassedToService`.
 
-Do not treat wildcard suffixes such as `s3:PutBucket*` above as final policy statements. Expand them to the exact API actions required by each Terraform resource and provider version before attaching the policy.
+## 5. Execution-role permissions boundaries
 
-## 5. Application execution roles are a separate trust boundary
+Create two customer-managed boundary policies during a separately reviewed manual bootstrap:
+- `attendance-dev-execution-boundary`
+- `attendance-prod-execution-boundary`
 
-The application Lambda and Scheduler execution roles are not the GitHub deployment roles. Their inline policies in Terraform must remain narrowly scoped to the runtime operations:
+Each boundary caps the union of the runtime permissions required by the application roles in that environment. A permissions boundary does not grant permissions; each role still needs its own least-privilege inline policy.
 
-- Employee/admin functions: only the employee, audit and required attendance/config table operations.
-- Attendance query: attendance table and date index queries, plus employee lookup.
-- Daily/weekly jobs: employee/attendance/config reads, report-prefix object writes and alert-topic publish.
-- Reports: report-prefix object reads only.
-- Override/settings: narrowly scoped employee, attendance, config and audit table operations.
-- Recognition/enrollment/cleanup functions: exact raw-bucket object operations, Rekognition collection operations, scan/employee/audit table operations, SQS/event destination operations, and KMS use required by the handler.
-- Scheduler roles: invoke only their matching daily or weekly Lambda function.
+The GitHub apply role may attach the expected boundary to approved `attendance-<env>-*` roles, but must not modify, delete or detach the boundary or create an unbounded application role. Apply role policies must constrain role creation and policy attachment by resource ARN/name and supported boundary conditions. Validate provider support before role creation.
 
-The current Terraform declares these execution roles dynamically by environment and function/job name. Confirm each statement against the handler code before deployment; avoid broad DynamoDB, S3, Rekognition, SQS or KMS access.
+## 6. Terraform state isolation
 
-## 6. Permissions boundary decision — required before CI can manage IAM
+- Dev state: `attendance/dev/terraform.tfstate`
+- Dev lock: `attendance/dev/terraform.tfstate.tflock`
+- Prod state: `attendance/prod/terraform.tfstate`
+- Prod lock: `attendance/prod/terraform.tfstate.tflock`
 
-**Recommended design:** create one customer-managed execution-role permissions boundary per environment during a reviewed manual bootstrap, outside the application Terraform root. Require every Terraform-created Lambda and Scheduler role to attach that exact boundary ARN. Do not grant GitHub apply roles permission to edit or delete the boundary policy. The apply role may attach the boundary to approved role names, but must not remove or replace it.
+Scope object read/write to the matching state key. Allow `s3:DeleteObject` only on the matching lock object. Scope `s3:ListBucket` by the corresponding `s3:prefix`. Do not grant one environment access to the other's state.
 
-The boundary must cap the union of the runtime permissions listed in Section 5. It does not grant permissions by itself; the execution role's inline policy must still grant each runtime action. Add a Terraform input for the boundary ARN and attach it to every `aws_iam_role` resource before granting CI role-creation permissions.
+## 7. Remaining validation
 
-Without this control, an apply role with `iam:CreateRole` and `iam:PutRolePolicy` could create an execution role with permissions broader than the intended application policy and then pass it to Lambda or Scheduler. Do not create the GitHub apply roles until this boundary is designed and enforced.
+1. Verify CI after the Terraform formatting correction.
+2. Inspect all application Lambda handlers and compare each AWS SDK operation to its role policy.
+3. Validate all Terraform provider read/write actions and AWS IAM resource/condition support.
+4. Produce two execution boundaries and four GitHub plan/apply policy documents with exact resource scopes.
+5. Validate backend bucket controls and state permissions separately.
+6. Review GitHub Environment branch controls, workflow token scopes, encrypted plan handoff and provenance checks.
+7. Run static tests and Terraform validation without a remote backend.
+8. Submit the solo-only PR to `develop` only after the release candidate is reviewed.
 
-## 7. State access remains separately scoped
+## Safety boundary
 
-For each environment, the deployment role may access only:
-- `attendance/<env>/terraform.tfstate`
-- `attendance/<env>/terraform.tfstate.tflock`
-
-Use `s3:GetObject` and `s3:PutObject` for the state object; add `s3:DeleteObject` only for the lock object. Scope `s3:ListBucket` by `s3:prefix`. Do not allow dev to read or lock prod state, or vice versa.
-
-The backend state bucket is a separate bootstrap resource and is not managed by the application Terraform roots. The backend region must be `us-east-1`.
-
-## 8. Remaining verification gates
-
-1. Confirm all provider and backend region literals use `us-east-1`, including Cognito issuer/domain and browser CSP endpoints.
-2. Enumerate the full resource blocks and provider read paths in each module; validate action names and ARN support against AWS service authorization references.
-3. Add and wire the execution-role boundary input across dev/prod roots and both modules that create IAM roles.
-4. Produce four environment-specific policy documents with exact resource ARNs, tag conditions where supported, and minimal unavoidable wildcard actions.
-5. Validate state bucket TLS/public-access/versioning/encryption policy separately.
-6. Run static validation and CI on the updated branch.
-7. Only then prepare the reviewed solo-only PR to `develop`.
-8. Create AWS bootstrap resources only after presenting the exact resource list and obtaining explicit approval. Run a dev plan first; present the full plan and obtain separate explicit approval before any apply.
-
-## Safety statement
-
-No AWS resource has been provisioned by this work. No Terraform backend has been initialized against the account. No plan or apply has been run. The content above is an inventory and policy-design baseline, not authorization to create or modify AWS resources.
+No AWS resources, IAM roles, OIDC providers, state buckets or permissions boundaries have been created. No backend has been initialized against AWS. No Terraform plan or apply has been run. All policy content remains design material pending review and explicit approval.
