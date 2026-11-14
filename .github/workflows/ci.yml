@@ -326,6 +326,7 @@ jobs:
       - name: Validate foundation dependency ordering
         run: |
           python - <<'PY'
+          import re
           from pathlib import Path
 
           for env in ("dev", "prod"):
@@ -333,7 +334,7 @@ jobs:
               for module in ("data", "recognition"):
                   start = root.index(f'module "{module}"')
                   end = root.find("\n}", start)
-                  if "depends_on = [module.foundation]" not in root[start:end]:
+                  if not re.search(r"depends_on\\s*=\\s*\\[module\\.foundation\\]", root[start:end]):
                       raise SystemExit(f"{env} {module} module must wait for foundation resources and SNS topic policy")
           PY
 
