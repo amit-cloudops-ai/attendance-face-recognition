@@ -11,6 +11,56 @@ data "aws_iam_policy_document" "kms_key" {
     actions   = ["kms:*"]
     resources = ["*"]
   }
+
+  statement {
+    sid    = "AllowEncryptedAlertsTopic"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["sns.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:sns:ap-south-1:${var.account_id}:attendance-${var.env}-alerts"]
+    }
+  }
+
+  statement {
+    sid    = "AllowCloudFrontOACRead"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:cloudfront::${var.account_id}:distribution/*"]
+    }
+  }
 }
 
 data "archive_file" "common_layer" {
