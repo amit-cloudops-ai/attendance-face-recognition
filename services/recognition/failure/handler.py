@@ -163,10 +163,18 @@ def _recover_enrollment(results, employees, rekognition, bucket: str, key: str,
         and (match.get("Face") or {}).get("FaceId")
     ]
     if orphan_ids:
-        rekognition.delete_faces(
+        response = rekognition.delete_faces(
             CollectionId=_required_env("COLLECTION_ID"),
             FaceIds=orphan_ids,
         )
+        confirmed = set(response.get("DeletedFaces", []))
+        for failure in response.get("UnsuccessfulFaceDeletions", []):
+            if failure.get("Reason") in {"FACE_NOT_FOUND", "RESOURCE_NOT_FOUND"}:
+                confirmed.add(failure.get("FaceId"))
+            else:
+                raise RuntimeError("Rekognition could not remove an uncommitted enrollment face")
+        if confirmed != set(orphan_ids):
+            raise RuntimeError("Rekognition did not confirm cleanup of every uncommitted face")
     _set_result(
         results, request_id, "error",
         "Enrollment failed after automatic retries. Please retry the photo.",
