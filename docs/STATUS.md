@@ -36,7 +36,7 @@ Paste links/screenshots per SPEC ID (F01-F13, N01-N11) as they pass.
 - Part B override and settings endpoints are implemented and audit-logged. Part C has not been browser-tested against a deployed stack. Bootstrap state bucket/OIDC role setup and GitHub environment/variable configuration remain; the manual deploy workflow is committed but has not been run.
 - `scripts/e2e_smoke.sh` is committed and syntax-checked, but not executed because no dev stack or consented test photos are available in this work session.
 - After the first approved deployment, add the exact CloudFront site origin to the dev `allowed_origins`, `callback_urls` and `logout_urls` values and apply again; this enables production-domain S3 presigned POST CORS and Cognito redirects without introducing a Terraform dependency cycle.
-- Part B and Part C guides still mention SAM in places, while ARCHITECTURE.md and TEAM_BRIEF specify Terraform modules. Solo implementation follows the architecture/Team Brief; reconcile the stale guide wording before team integration.
+- Part B and Part C contributor guides are aligned to the Terraform modules in ARCHITECTURE.md and TEAM_BRIEF; frozen API/data contracts were not changed.
 
 ## Decisions made after freeze
 (none; contracts are frozen. List approved changes here with date and reason.)
