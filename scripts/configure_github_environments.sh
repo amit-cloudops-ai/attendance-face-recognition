@@ -58,7 +58,7 @@ if [[ "$REVIEWER" == "$OWNER" ]]; then
 fi
 REVIEWER_PERMISSION="$(gh api "repos/$REPO/collaborators/$REVIEWER/permission" --jq '.permission')"
 case "$REVIEWER_PERMISSION" in
-  read|triage|write|maintain|admin) ;;
+  write|maintain|admin) ;;
   *) echo "Reviewer must have repository access; current permission: $REVIEWER_PERMISSION" >&2; exit 2 ;;
 esac
 
