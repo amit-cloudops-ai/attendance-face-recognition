@@ -45,12 +45,13 @@ TF_STATE_BUCKET=<known-candidate-bucket> AWS_PROFILE=<approved-profile> bash scr
 
 ## E2E smoke test
 
-`e2e_smoke.sh` exercises a deployed dev stack without creating infrastructure. It creates one test employee, enrolls three JPEG photos, performs at least 20 kiosk upload/recognition cycles, verifies duplicate-scan debounce and queries the resulting attendance record. Its cleanup trap deactivates the test employee and deletes indexed face templates; the attendance/audit history remains.
+`e2e_smoke.sh` exercises a deployed dev stack without creating infrastructure. It verifies the AWS account identity, creates one consented test employee, enrolls three JPEG photos, performs at least 20 kiosk upload/recognition cycles, verifies duplicate-scan debounce, checks every uploaded raw object is deleted within 10 minutes, confirms both raw prefixes are empty, and queries the resulting attendance record. Its cleanup trap deactivates the test employee and deletes indexed face templates; the attendance/audit history remains.
 
 ## Safety requirements
 
 - Run against **dev only**, never production.
 - Use a consenting test participant and set `CONSENT_CONFIRMED=YES`.
+- Set `AWS_ACCOUNT_ID` to the verified dev account and `RAW_BUCKET` to the dev raw bucket. The AWS CLI profile must have read-only STS, `s3:GetObject` on the test object prefixes and `s3:ListBucket` on the dev raw bucket. The script refuses a mismatched account or noncanonical region.
 - Do not put biometric photos or tokens in Git, screenshots, logs or shared shell history.
 - Photos must be JPEGs between 1 KB and 1 MB. Supply three varied enrollment photos and a scan photo of the same consenting participant.
 - Use an admin token and a kiosk-group token from the dev Cognito user pool.
@@ -60,6 +61,9 @@ TF_STATE_BUCKET=<known-candidate-bucket> AWS_PROFILE=<approved-profile> bash scr
 
 ```bash
 export API_BASE="https://<dev-api-or-cloudfront-origin>/api"
+export AWS_ACCOUNT_ID="924422830139"
+export RAW_BUCKET="<dev-raw-bucket-name>"
+# Optional: export AWS_PROFILE="default"
 export ADMIN_TOKEN="<short-lived admin access token>"
 export KIOSK_TOKEN="<short-lived kiosk access token>"
 export EMPLOYEE_ID="E2E20261114"
