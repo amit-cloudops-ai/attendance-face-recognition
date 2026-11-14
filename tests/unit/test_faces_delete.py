@@ -1,5 +1,4 @@
 import boto3
-import pytest
 from moto import mock_aws
 
 from services.recognition.faces_delete import handler as faces_delete
