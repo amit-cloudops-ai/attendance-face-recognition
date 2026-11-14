@@ -502,8 +502,8 @@ resource "aws_s3_object" "frontend" {
 }
 
 resource "aws_s3_object" "frontend_config" {
-  bucket  = var.web_bucket_name
-  key     = "config.json"
+  bucket = var.web_bucket_name
+  key    = "config.json"
   content = jsonencode({
     region        = local.region
     userPoolId    = aws_cognito_user_pool.main.id
