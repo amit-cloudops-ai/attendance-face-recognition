@@ -22,4 +22,6 @@ jobs:
     steps:
       - uses: hashicorp/setup-terraform@v3
       - uses: actions/checkout@v4
-      - run: terraform fmt -check -recursive infra
+      - run: terraform fmt -check -diff -recursive infra
+      - run: terraform -chdir=infra/modules/recognition init -backend=false -input=false
+      - run: terraform -chdir=infra/modules/recognition validate
