@@ -84,21 +84,7 @@ def validate() -> None:
             errors.append(f"{relative} must resolve SDK region from AWS_REGION")
 
     ignored_parts = {".git", ".terraform", "__pycache__", ".venv", "node_modules"}
-    scan_roots = (
-        ROOT / "README.md",
-        ROOT / "config",
-        ROOT / "docs",
-        ROOT / "infra",
-        ROOT / "services",
-        ROOT / "shared",
-        ROOT / "web",
-        ROOT / "scripts",
-        ROOT / "tests",
-        ROOT / ".github",
-    )
-    for scan_root in scan_roots:
-        candidates = [scan_root] if scan_root.is_file() else scan_root.rglob("*")
-        for path in candidates:
+    for path in ROOT.rglob("*"):
             if not path.is_file() or ignored_parts.intersection(path.parts):
                 continue
             try:
