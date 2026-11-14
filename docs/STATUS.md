@@ -251,3 +251,12 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - Added `docs/TERRAFORM-PLAN-ARTIFACT.md` with lifecycle, access, retention, provenance, rotation and residual trust requirements.
 - CI validates workflow path/run-attempt binding, encrypted-only upload path, one-day retention, age identity cleanup and no static AWS credentials.
 - No plan artifact generated; no AWS role assumption, remote backend init, plan or apply.
+
+
+### T16 — GitHub environment variables, secrets and protection rules
+
+- **Status:** documentation and CI validation complete; external GitHub settings verification blocked.
+- Added `docs/GITHUB-ENVIRONMENT-SETUP.md` with exact four environment names, branch restrictions, reviewer/self-review requirements, variables, JSON array formats and separate dev/prod age identities.
+- CI run [43618843607](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43618843607), commit `3a1af215f5`: Python policy/workflow/documentation validation passed; Terraform job is pending.
+- The GitHub connector cannot inspect or configure repository Actions environments. Branch protection API reads returned 403 Resource not accessible by integration. Therefore actual environment existence, variable values, secret presence, reviewer assignments and branch restrictions cannot be verified or changed in this session.
+- **Owner action required:** configure the four environments and protection settings from the setup guide, then provide confirmation or an authorized read-only verification path. No secrets or GitHub settings were changed.
