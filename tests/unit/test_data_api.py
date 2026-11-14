@@ -120,6 +120,7 @@ def test_employee_public_response_hides_internal_enrollment_metadata(data_tables
         "enrollment_lock_request": "request-secret",
         "enrollment_lock_until": 9999999999,
         "enrollment_" + "12345678-1234-4234-8234-123456789012": "face-secret",
+        "last_faces_delete_audit_id": "faces-delete#EMP002#fingerprint",
     })
     detail = employees_handler.lambda_handler(
         admin_event("GET", employee_id="EMP002"), None
@@ -128,6 +129,7 @@ def test_employee_public_response_hides_internal_enrollment_metadata(data_tables
     assert "face_ids" not in item
     assert "enrollment_lock_request" not in item
     assert "enrollment_lock_until" not in item
+    assert "last_faces_delete_audit_id" not in item
     assert not any(key.startswith("enrollment_") for key in item)
 
 
