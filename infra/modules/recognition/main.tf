@@ -70,8 +70,8 @@ locals {
     ]
     result = [
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
         Resource = [var.tables.scan_results.arn]
       }
     ]
@@ -331,14 +331,14 @@ resource "aws_s3_bucket_notification" "raw" {
 
   lambda_function {
     lambda_function_arn = aws_lambda_function.lambda["recognize"].arn
-    events               = ["s3:ObjectCreated:*"]
-    filter_prefix        = "captures/"
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "captures/"
   }
 
   lambda_function {
     lambda_function_arn = aws_lambda_function.lambda["enroll"].arn
     events               = ["s3:ObjectCreated:*"]
-    filter_prefix        = "enroll/"
+    filter_prefix       = "enroll/"
   }
 
   depends_on = [aws_lambda_permission.s3]
