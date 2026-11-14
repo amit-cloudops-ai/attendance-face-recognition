@@ -15,8 +15,8 @@ bash scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-confi
 \`configure_github_environments.sh\` creates/updates the six exact deployment environments, enforces their single allowed branch and configures independent reviewers. It is dry-run by default and requires GitHub CLI authenticated as a repository administrator plus an independent reviewer with repository access.
 
 \`\`\`bash
-bash scripts/configure_github_environments.sh --reviewer <independent-github-username>
-bash scripts/configure_github_environments.sh --reviewer <independent-github-username> --apply
+bash scripts/configure_github_environments.sh
+bash scripts/configure_github_environments.sh --apply
 \`\`\`
 
 The apply mode changes GitHub environment protection and deployment-branch settings. Review the dry-run output first. It does not populate AWS role/account/bucket variables, age recipients or private age identity secrets; those values must be added only after the approved AWS bootstrap creates the corresponding resources.
@@ -34,7 +34,7 @@ Run the dry-run first and inspect the exact changes. Apply mode requires GitHub 
 
 ## Read-only AWS bootstrap inventory
 
-`scripts/aws_preflight_readonly.sh` verifies the authenticated STS identity and inspects the GitHub OIDC provider, runtime boundaries, six deployment roles and (when `TF_STATE_BUCKET` is supplied) state-bucket controls. It contains no create/update/delete/attach operations. Access-denied results are reported as unknown, not as proof that a resource is absent. The script was run read-only on 14 November 2026 with profile `default`; STS verified account `924422830139` in `us-east-1`. No matching project state bucket was found, and expected OIDC/role lookups returned `NoSuchEntity`. Treat other unconfirmed results as unknown; no AWS resources or policies were changed.
+`scripts/aws_preflight_readonly.sh` verifies the authenticated STS identity and inspects the GitHub OIDC provider, runtime boundaries, six deployment roles and (when `TF_STATE_BUCKET` is supplied) state-bucket controls. It contains no create/update/delete/attach operations. Access-denied results are reported as unknown, not as proof that a resource is absent. The script was run read-only on 14 November 2026 with profile `default`; STS verified account `924422830139` in `us-east-1`. The expected OIDC provider and six roles returned `NoSuchEntity`; neither runtime boundary policy was returned; no matching project state bucket was found. Treat unconfirmed results as unknown where read permissions may be incomplete. No AWS resources or policies were changed.
 
 Run it only with an intentionally selected AWS profile and read-only permissions:
 
