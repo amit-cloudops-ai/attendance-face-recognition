@@ -227,8 +227,9 @@ jobs:
 
           access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
           required_service_actions = {
-              "kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*",
-              "kms:CreateGrant", "kms:DescribeKey",
+              "kms:Encrypt", "kms:Decrypt", "kms:ReEncryptFrom", "kms:ReEncryptTo",
+              "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext", "kms:CreateGrant",
+              "kms:DescribeKey",
           }
           if "AllowDynamoDBUseOfKeyThroughService" not in access:
               raise SystemExit("Missing DynamoDB KMS ViaService statement")
@@ -252,7 +253,7 @@ jobs:
                   raise SystemExit(f"Unexpected DynamoDB crypto action set: {path}")
               if crypto["Condition"]["StringEquals"]["kms:ViaService"] != "dynamodb.us-east-1.amazonaws.com":
                   raise SystemExit(f"Wrong DynamoDB ViaService condition: {path}")
-              if crypto["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != [f"alias/attendance-{env}"]:
+              if crypto["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != f"alias/attendance-{env}":
                   raise SystemExit(f"Wrong environment KMS alias scope: {path}")
               if grant["Action"] != "kms:CreateGrant" or grant["Condition"]["Bool"]["kms:GrantIsForAWSResource"] != "true":
                   raise SystemExit(f"CreateGrant must be AWS-resource constrained: {path}")
