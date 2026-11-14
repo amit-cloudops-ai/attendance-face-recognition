@@ -7,7 +7,7 @@ This directory contains environment-specific AWS IAM permissions-boundary templa
 - `execution-role-boundary-dev.json.tftpl` — dev-only resource ARNs and KMS alias.
 - `execution-role-boundary-prod.json.tftpl` — prod-only resource ARNs and KMS alias.
 
-The templates use Terraform template interpolation for `${account_id}`. They are not attachable until rendered with the verified 12-digit AWS account ID. The target region is fixed to `us-east-1`.
+The templates use Terraform template interpolation for `${account_id}`. They are not attachable until rendered with the verified 12-digit AWS account ID. All regional ARNs must match the canonical region in `config/deployment.json` (`us-east-1`); CI checks regional ARNs and service endpoints for drift.
 
 ## Security model
 
@@ -53,7 +53,7 @@ The current repository does not create or attach these managed policies. Bootstr
 
 The dev plan role uses three separate customer-managed policy templates so each remains below the IAM managed-policy size limit:
 
-- `github-plan-dev-core.json.tftpl` — read-only DynamoDB, IAM role/inline-policy, Lambda, Scheduler, SQS, Rekognition, CloudWatch, SNS and Budget reads.
+- `github-plan-dev-core.json.tftpl` — read-only DynamoDB, IAM role/inline-policy, Lambda, Scheduler, SQS, Rekognition, CloudWatch and SNS reads. Billing reads are isolated to the dedicated billing plan role.
 - `github-plan-dev-edge.json.tftpl` — read-only KMS, S3 bucket/object metadata, Cognito, API Gateway v2 and CloudFront reads.
 - `github-plan-dev-state.json.tftpl` — dev state object read and S3 native lockfile lifecycle.
 
