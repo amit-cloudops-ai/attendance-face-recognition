@@ -55,9 +55,9 @@ No system can guarantee that a future contributor never writes an incorrect regi
 
 The required environments are `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan` and `billing-apply`. Each must have the correct environment-scoped `AWS_ROLE_ARN`, account/bucket values, plan-only age recipient, apply-only private age identity secret, branch restriction and independent apply reviewer.
 
-The GitHub connector cannot inspect or configure Actions environment secrets/protection settings, and branch-protection reads returned 403. Their actual existence and values remain unverified.
+The GitHub connector cannot inspect or configure Actions environment secrets/protection settings, and branch-protection reads returned 403. Their actual existence and values remain unverified. I added two guarded GitHub CLI helpers: `scripts/configure_github_environments.sh` (six exact environments, allowed branches and independent reviewers) and `scripts/configure_branch_protection.sh` (PR reviews, CI checks and protected branches). Both default to dry-run and require an explicit `--apply`; neither has been executed. Environment AWS variables/secrets remain intentionally unset until the AWS account inventory and bootstrap create the roles, bucket and boundaries.
 
-**Owner action:** configure the six environments using `docs/GITHUB-ENVIRONMENT-SETUP.md` and provide confirmation or an authorized read-only verification path.
+**Owner action:** provide the GitHub username of an independent reviewer, run both helpers' dry-runs, inspect the output, then run their `--apply` modes from an authenticated repository-admin GitHub CLI session. Populate AWS role/account/bucket variables and age keys only after approved bootstrap. Provide confirmation or an authorized read-only verification path.
 
 ### T18 — exact manual AWS bootstrap plan
 
