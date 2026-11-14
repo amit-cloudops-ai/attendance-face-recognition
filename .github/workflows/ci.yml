@@ -135,7 +135,7 @@ jobs:
               "scheduler:Create", "scheduler:Update", "scheduler:Delete", "scheduler:TagResource", "scheduler:UntagResource",
               "rekognition:Create", "rekognition:Index", "rekognition:Delete",
               "cloudwatch:Put", "cloudwatch:Delete", "logs:Create", "logs:Put",
-              "logs:Delete", "budgets:Modify"
+              "logs:Delete", "budgets:", "aws-portal:"
           )
           for statement in core_edge:
               actions = statement.get("Action", [])
@@ -513,7 +513,7 @@ jobs:
 
           repo = "amit-cloudops-ai/attendance-face-recognition"
           provider = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
-          for env in ("dev", "prod"):
+          for env in ("dev", "prod", "billing"):
               for operation in ("plan", "apply"):
                   path = Path(f"infra/policies/github-oidc-trust-{env}-{operation}.json.tftpl")
                   rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
@@ -555,7 +555,7 @@ jobs:
               raise SystemExit("Static AWS credentials are not permitted in deployment workflow")
 
           docs = Path("docs/GITHUB-OIDC-DEPLOYMENT.md").read_text(encoding="utf-8")
-          for required in ("dev-plan", "dev-apply", "prod-plan", "prod-apply",
+          for required in ("dev-plan", "dev-apply", "prod-plan", "prod-apply", "billing-plan", "billing-apply",
                            "prevent self-review", "TF_PLAN_AGE_RECIPIENT",
                            "TF_PLAN_AGE_IDENTITY", "CODEOWNERS"):
               if required not in docs:
@@ -571,6 +571,7 @@ jobs:
           required = (
               "age --recipient",
               "TF_PLAN_AGE_RECIPIENT",
+              "-lockfile=readonly",
               "retention-days: 1",
               "if-no-files-found: error",
               "github.run_attempt",
@@ -588,11 +589,11 @@ jobs:
           for item in required:
               if item not in workflow:
                   raise SystemExit(f"Encrypted plan lifecycle missing: {item}")
-          if "path: infra/envs/" + "$" + "{{ inputs.environment }}/tfplan.age" not in workflow:
+          if "path: " + "$" + "{{ env.TF_ROOT }}/tfplan.age" not in workflow:
               raise SystemExit("Only the encrypted plan may be uploaded")
           if "tfplan" in workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]:
               upload = workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]
-              if ("path: infra/envs/" + "$" + "{{ inputs.environment }}/tfplan.age") not in upload:
+              if ("path: " + "$" + "{{ env.TF_ROOT }}/tfplan.age") not in upload:
                   raise SystemExit("Plan upload path must be encrypted age artifact")
           if "AWS_ACCESS_KEY_ID" in workflow or "AWS_SECRET_ACCESS_KEY" in workflow:
               raise SystemExit("Static AWS credentials are prohibited")
@@ -677,23 +678,94 @@ jobs:
               "token.actions.githubusercontent.com", "sts.amazonaws.com",
               "attendance-github-dev-plan", "attendance-github-dev-apply",
               "attendance-github-prod-plan", "attendance-github-prod-apply",
+              "attendance-github-billing-plan", "attendance-github-billing-apply",
               "attendance-dev-execution-boundary", "attendance-prod-execution-boundary",
               "docs/STATE-BUCKET-BOOTSTRAP.md", "docs/GITHUB-ENVIRONMENT-SETUP.md",
               "explicitly approves", "No action may proceed",
-              "Billing deployment is a separate follow-up",
+              "billing-plan", "billing-apply", "26 managed policies",
           ):
               if required not in plan:
                   raise SystemExit(f"Manual bootstrap plan missing: {required}")
           if "aws s3api create-bucket" in plan or "terraform apply -auto-approve" in plan:
               raise SystemExit("Bootstrap plan must not contain executable auto-approval commands")
           policy_dir = Path("infra/policies")
-          for env in ("dev", "prod"):
+          for env in ("dev", "prod", "billing"):
               for operation in ("plan", "apply"):
                   if not list(policy_dir.glob(f"github-{operation}-{env}-*.json.tftpl")):
                       raise SystemExit(f"Missing {env} {operation} role policy templates")
                   trust = policy_dir / f"github-oidc-trust-{env}-{operation}.json.tftpl"
                   if not trust.exists():
                       raise SystemExit(f"Missing OIDC trust template: {trust}")
+          PY
+
+      - name: Validate isolated billing policies and workflow
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("infra/policies")
+          expected = {
+              "github-plan-billing-core.json.tftpl",
+              "github-plan-billing-state.json.tftpl",
+              "github-apply-billing-core.json.tftpl",
+              "github-apply-billing-state.json.tftpl",
+          }
+          for name in expected:
+              path = root / name
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              policy = json.loads(rendered)
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"Billing managed policy too large: {path}")
+              for statement in policy["Statement"]:
+                  resources = statement.get("Resource", [])
+                  resources = [resources] if isinstance(resources, str) else resources
+                  if any("attendance/dev/" in r or "attendance/prod/" in r for r in resources):
+                      raise SystemExit(f"Environment state path in billing policy: {path}")
+
+          plan = json.loads((root / "github-plan-billing-core.json.tftpl").read_text().replace("${account_id}", "123456789012"))
+          plan_actions = [a for s in plan["Statement"] for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])]
+          if set(plan_actions) != {"budgets:ViewBudget", "aws-portal:ViewBilling"}:
+              raise SystemExit("Billing plan policy must be read-only")
+
+          apply = json.loads((root / "github-apply-billing-core.json.tftpl").read_text().replace("${account_id}", "123456789012"))
+          apply_actions = [a for s in apply["Statement"] for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])]
+          if set(apply_actions) != {"budgets:ModifyBudget", "budgets:ViewBudget", "aws-portal:ModifyBilling", "aws-portal:ViewBilling"}:
+              raise SystemExit("Billing apply policy must contain only the documented budget/account billing actions")
+
+          state = json.loads((root / "github-apply-billing-state.json.tftpl").read_text().replace("${state_bucket}", "attendance-tf-state-123456789012"))
+          state_statements = state["Statement"]
+          billing_state = next(s for s in state_statements if s["Sid"] == "BillingStateObjectReadWrite")
+          if billing_state["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012/attendance/billing/terraform.tfstate":
+              raise SystemExit("Billing apply state path must be exact")
+          lock = next(s for s in state_statements if s["Sid"] == "BillingLockfileLifecycle")
+          if lock["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012/attendance/billing/terraform.tfstate.tflock":
+              raise SystemExit("Billing lock lifecycle must be exact")
+
+          for operation in ("plan", "apply"):
+              trust_path = root / f"github-oidc-trust-billing-{operation}.json.tftpl"
+              trust = json.loads(trust_path.read_text().replace("${account_id}", "123456789012"))
+              conditions = trust["Statement"][0]["Condition"]["StringEquals"]
+              if conditions.get("token.actions.githubusercontent.com:sub") != (
+                  f"repo:amit-cloudops-ai/attendance-face-recognition:environment:billing-{operation}"
+              ):
+                  raise SystemExit(f"Wrong billing OIDC subject: {trust_path}")
+
+          workflow = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          if "- billing" not in workflow or "infra/billing" not in workflow:
+              raise SystemExit("Deployment workflow must support the separate billing root")
+          if "inputs.environment == 'billing'" not in workflow or "github.ref == 'refs/heads/main'" not in workflow:
+              raise SystemExit("Billing deployment must be gated to main")
+          if '!= "billing"' not in workflow:
+              raise SystemExit("Billing root must not require Cognito/runtime boundary variables")
+          billing_docs = Path("docs/BILLING-DEPLOYMENT.md").read_text(encoding="utf-8")
+          for required in ("attendance-dev-monthly-cost", "attendance-prod-monthly-cost",
+                           "budgets:ViewBudget", "budgets:ModifyBudget",
+                           "aws-portal:ViewBilling", "aws-portal:ModifyBilling",
+                           "attendance/billing/terraform.tfstate", "billing-plan", "billing-apply"):
+              if required not in billing_docs:
+                  raise SystemExit(f"Billing deployment guide missing: {required}")
           PY
 
   terraform-fmt:

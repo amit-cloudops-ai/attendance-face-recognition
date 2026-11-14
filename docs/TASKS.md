@@ -48,7 +48,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T34 | Isolate AWS Budgets from normal deployment roles | DONE | Budgets moved to separate billing root/state; dev/prod roles have no billing permissions; dedicated billing roles tracked separately in T37 |
 | T35 | Scope CloudFront KMS key policy to exact distribution | DONE | CloudFront decrypt grant uses exact distribution ARN and source account; no distribution wildcard |
 | T36 | Add DynamoDB customer-managed KMS authorization | DONE | Customer-managed key policy and dev/prod apply fragments use exact DynamoDB ViaService and environment alias; CreateGrant is AWS-resource constrained |
-| T37 | Build dedicated billing plan/apply policies and OIDC roles | TODO | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
+| T37 | Build dedicated billing plan/apply policies and OIDC roles | DONE | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
 
 ## Phase C — release and operations
 
@@ -73,6 +73,6 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T16 GitHub environment setup: PR #24; documentation is ready, but actual GitHub environment settings cannot be inspected or configured by the current connector. Repository-admin action is required.
 - T17 template linting: PR #25; CI run 43619026006 passed. No CloudFormation/SAM templates exist; Terraform and JSON policy templates are validated in CI.
 - T18 manual bootstrap plan: PR #26; plan is documented and CI run 43619095037 passed. Exact account ID, globally unique bucket suffix and owner approval remain required.
-- T37 is a separate follow-up because the billing Terraform root is isolated but dedicated billing plan/apply roles are not yet built.
-- All task PRs remain unmerged pending owner review. Do not merge teammate PRs or promote to main/develop without explicit direction.
+- T37 is complete: billing plan/apply policy and OIDC trust templates, isolated billing workflow path and six-environment documentation are validated by CI run 43620012088. PR #27.
+- All task PRs remain unmerged pending owner review. PR #27 contains the dedicated billing roles/workflow. Do not merge teammate PRs or promote to main/develop without explicit direction.
 - No AWS resources, OIDC provider, IAM roles, boundaries, state bucket or KMS keys have been created. No remote backend init, Terraform plan or apply has been run.

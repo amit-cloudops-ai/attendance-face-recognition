@@ -4,7 +4,7 @@
 
 ## OIDC role model
 
-Use four separate IAM roles and four GitHub deployment environments:
+Use six separate IAM roles and six GitHub deployment environments:
 
 | Environment | Branch | IAM role | OIDC subject |
 |---|---|---|---|
@@ -12,10 +12,12 @@ Use four separate IAM roles and four GitHub deployment environments:
 | dev-apply | develop | attendance-github-dev-apply | repo:amit-cloudops-ai/attendance-face-recognition:environment:dev-apply |
 | prod-plan | main | attendance-github-prod-plan | repo:amit-cloudops-ai/attendance-face-recognition:environment:prod-plan |
 | prod-apply | main | attendance-github-prod-apply | repo:amit-cloudops-ai/attendance-face-recognition:environment:prod-apply |
+| billing-plan | main | attendance-github-billing-plan | repo:amit-cloudops-ai/attendance-face-recognition:environment:billing-plan |
+| billing-apply | main | attendance-github-billing-apply | repo:amit-cloudops-ai/attendance-face-recognition:environment:billing-apply |
 
-The trust policy templates are in infra/policies/github-oidc-trust-{dev|prod}-{plan|apply}.json.tftpl. Each policy uses the account's exact token.actions.githubusercontent.com OIDC provider ARN, sts:AssumeRoleWithWebIdentity, aud=sts.amazonaws.com, and one exact environment subject. No wildcard subject is permitted.
+The trust policy templates are in infra/policies/github-oidc-trust-{dev|prod|billing}-{plan|apply}.json.tftpl. Each policy uses the account's exact token.actions.githubusercontent.com OIDC provider ARN, sts:AssumeRoleWithWebIdentity, aud=sts.amazonaws.com, and one exact environment subject. No wildcard subject is permitted.
 
-The OIDC provider must use issuer https://token.actions.githubusercontent.com and client ID/audience sts.amazonaws.com. The provider and four roles are bootstrap resources and are not created by this change.
+The OIDC provider must use issuer https://token.actions.githubusercontent.com and client ID/audience sts.amazonaws.com. The provider and six roles are bootstrap resources and are not created by this change.
 
 ## Workflow controls
 
@@ -23,7 +25,7 @@ The manual Terraform deployment workflow now sets the GitHub environment to envi
 
 The workflow branch gate remains:
 - dev: only refs/heads/develop
-- prod: only refs/heads/main
+- prod and billing: only refs/heads/main
 
 The workflow permissions remain least-privilege:
 - actions: read — verify and download the successful encrypted plan artifact
@@ -50,7 +52,7 @@ The AWS trust policy only distinguishes repository and environment. GitHub envir
 
 ## Required environment variables
 
-Each of the four GitHub environments must define:
+Each of the six GitHub environments must define:
 
 - AWS_ROLE_ARN — only that environment's plan or apply role ARN.
 - AWS_ACCOUNT_ID — verified 12-digit account ID.
@@ -69,7 +71,7 @@ The production callback/logout URLs and allowed origins must be the final HTTPS 
 
 ## Approval boundary
 
-The four trust policies are templates only. OIDC provider creation, role creation, role permission attachments, GitHub environment creation/configuration, reviewer selection and branch protection changes remain manual, explicit approval gates. No AWS or GitHub environment configuration was changed by this task.
+The six trust policies are templates only. OIDC provider creation, role creation, role permission attachments, GitHub environment creation/configuration, reviewer selection and branch protection changes remain manual, explicit approval gates. No AWS or GitHub environment configuration was changed by this task.
 
 
-See `docs/GITHUB-ENVIRONMENT-SETUP.md` for the exact four environment names, variables, secrets, deployment branch restrictions, reviewer requirements and the verification limitation for repository settings.
+See `docs/GITHUB-ENVIRONMENT-SETUP.md` for the exact six environment names, variables, secrets, deployment branch restrictions, reviewer requirements and the verification limitation for repository settings.

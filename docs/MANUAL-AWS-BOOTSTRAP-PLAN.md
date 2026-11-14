@@ -24,15 +24,20 @@ Do not assume an account ID, bucket suffix, existing OIDC provider state, or res
 | IAM role | attendance-github-dev-apply | Dev Terraform apply | Create after approval |
 | IAM role | attendance-github-prod-plan | Read-only prod Terraform plan | Create after approval |
 | IAM role | attendance-github-prod-apply | Prod Terraform apply | Create after approval |
+| IAM role | attendance-github-billing-plan | Billing plan only | Create after approval |
+| IAM role | attendance-github-billing-apply | Billing apply only | Create after approval |
 | Customer-managed IAM policies | Dev/prod plan and apply policy sets | Attach split least-privilege permissions | 22 environment policy templates validated |
-| GitHub environments | dev-plan, dev-apply, prod-plan, prod-apply | Bind OIDC subjects and approvals | Owner configuration required |
+| GitHub environments | dev-plan, dev-apply, prod-plan, prod-apply, billing-plan, billing-apply | Bind OIDC subjects and approvals | Owner configuration required |
 
 The policy set counts are:
 - Dev plan: core, edge, state (3 managed policies).
 - Dev apply: core, data, Lambda, IAM, foundation, access, state, DynamoDB KMS (8 managed policies).
 - Prod plan: core, edge, state (3 managed policies).
 - Prod apply: core, data, Lambda, IAM, foundation, access, state, DynamoDB KMS (8 managed policies).
+- Billing plan/apply: one budget policy and one state policy each (4 managed policies total).
 - Runtime boundaries: one dev and one prod managed policy.
+
+Total: 26 managed policies across dev, prod and billing, plus the two runtime permissions-boundary policies.
 
 Each policy template has CI checks for JSON validity, 6,144-character size, environment isolation and the service-specific constraints documented in infra/policies/README.md.
 
@@ -40,7 +45,7 @@ Each policy template has CI checks for JSON validity, 6,144-character size, envi
 
 T34 moved AWS Budgets to infra/billing with its own Terraform state key. Normal dev/prod plan/apply roles do not receive budgets:* or aws-portal:* permissions.
 
-A dedicated billing plan/apply policy and role pair is not yet built. Do not attach account-level billing permissions to any of the four environment roles. Billing deployment remains blocked until its separate role policies and OIDC subjects are prepared and reviewed.
+Billing has dedicated plan/apply policy templates and OIDC trust templates in T37. Do not attach account-level billing permissions to any dev/prod environment role. Billing role creation and the billing GitHub environments remain approval-gated.
 
 ## Bootstrap order
 
@@ -62,11 +67,13 @@ Render the dev/prod boundary templates with the verified account ID. Validate JS
 
 ### 5. GitHub deployment roles
 
-Create the four roles with trust policies:
+Create the six roles with trust policies:
 - attendance-github-dev-plan trusts only repo:amit-cloudops-ai/attendance-face-recognition:environment:dev-plan.
 - attendance-github-dev-apply trusts only ...:environment:dev-apply.
 - attendance-github-prod-plan trusts only ...:environment:prod-plan.
 - attendance-github-prod-apply trusts only ...:environment:prod-apply.
+- attendance-github-billing-plan trusts only ...:environment:billing-plan.
+- attendance-github-billing-apply trusts only ...:environment:billing-apply.
 
 Every trust policy requires aud=sts.amazonaws.com and exact sub equality. Attach only the matching plan/apply managed policies. Do not allow these deployment roles to manage themselves, the OIDC provider, their own trust policies or the deployment policy attachments.
 
@@ -90,7 +97,7 @@ Do not deploy prod until dev acceptance criteria pass and the owner explicitly a
 
 ### 9. Billing root
 
-Billing deployment is a separate follow-up after dedicated billing plan/apply policies and roles are added. It must not share the dev/prod deployment role permissions.
+Billing has a dedicated plan/apply policy and OIDC role pair. It must not share the dev/prod deployment role permissions.
 
 ## IAM security checks before approval
 
