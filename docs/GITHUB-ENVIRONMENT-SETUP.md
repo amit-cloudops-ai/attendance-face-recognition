@@ -12,6 +12,8 @@ Create these exact repository environments:
 | dev-apply | develop only | At least one independent reviewer; prevent self-review |
 | prod-plan | main only | At least one reviewer recommended |
 | prod-apply | main only | At least one independent reviewer; prevent self-review |
+| billing-plan | main only | At least one reviewer recommended |
+| billing-apply | main only | At least one independent reviewer; prevent self-review |
 
 Use deployment branch restrictions, not only the workflow's if-condition. The workflow's OIDC subject is bound to the exact environment name, so the environment names must match exactly. Do not create generic dev/prod environments for this workflow.
 
@@ -28,6 +30,8 @@ Use deployment branch restrictions, not only the workflow's if-condition. The wo
 | COGNITO_LOGOUT_URLS | non-empty JSON array | same | production HTTPS logout array | same |
 | ALLOWED_ORIGINS | non-empty JSON array | same | production HTTPS origin array | same |
 | TF_PLAN_AGE_RECIPIENT | dev public age recipient | not required | prod public age recipient | not required |
+
+For billing-plan and billing-apply, define only AWS_ROLE_ARN, AWS_ACCOUNT_ID, TF_STATE_BUCKET and ALERT_EMAIL; the billing root does not consume runtime boundary or Cognito callback/origin variables. Billing plan additionally defines TF_PLAN_AGE_RECIPIENT; billing apply defines the TF_PLAN_AGE_IDENTITY secret.
 
 The role ARNs are non-secret configuration values. The account ID, bucket name and boundary ARN are also configuration values, not credentials. Do not place access keys or private key material in variables.
 
@@ -54,7 +58,7 @@ Require reviews for changes to .github/workflows/**, infra/**, infra/policies/**
 
 ## Preflight checklist before any AWS bootstrap
 
-- All four environments exist with exact names.
+- All six environments exist with exact names.
 - Allowed deployment branches match the table above.
 - Apply environments have independent reviewers and prevent self-review.
 - AWS_ROLE_ARN points to the matching role only.
