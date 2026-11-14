@@ -1,6 +1,6 @@
 # IAM least-privilege inventory — deployment and runtime roles
 
-**Repository branch:** `solo/amit-monday`  
+**Implementation baseline:** `solo/amit-monday`; task work is isolated on `ai/T02-lambda-dlq-kms-policy`  
 **Target region:** `us-east-1`  
 **Status:** candidate inventory only. This document is not an attachable policy and does not authorize AWS changes.
 
@@ -94,13 +94,13 @@ The runtime policy code has now been changed to remove the blanket KMS grant fro
 | Recognition | failure | Decrypt | Reads raw objects and consumes encrypted SQS DLQs |
 | Other handlers | result, faces_delete, employees, attendance_query, override, settings | None | No direct S3/SQS KMS data operation identified |
 
-The foundation KMS key policy also now includes a service-principal statement for Lambda failure destinations to use the encrypted SQS DLQs, conditioned by source account and the environment queue ARN pattern. This is necessary because Lambda's asynchronous failure destination is sent by the Lambda service, not by the function execution role.
+The foundation KMS key policy includes a Lambda service-principal statement for the two asynchronous failure destination queues only (`recognize-dlq` and `enroll-dlq`). It is constrained by `aws:SourceAccount` and exact `aws:SourceArn` values (`ArnEquals`). The separate failure-processor DLQ is not an asynchronous destination and is excluded from this statement. The corresponding function execution roles retain the SQS producer KMS permissions and `sqs:SendMessage` permissions required by Lambda asynchronous destinations.
 
 AWS authorization references reviewed:
 - S3 SSE-KMS requires `kms:GenerateDataKey` for PutObject and `kms:Decrypt` for GetObject: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html
 - SQS SSE-KMS producers require `kms:GenerateDataKey` and `kms:Decrypt`; consumers require `kms:Decrypt`: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-key-management.html
 
-This is a code-call-site review, not a complete AWS authorization verification. Exact KMS condition keys, S3 encryption context, SQS permissions, Rekognition resource-level support and provider API actions remain open gates.
+This is a code-call-site review, not a complete AWS authorization verification. The Lambda destination key-policy statement is scoped to the exact two destination queue ARNs and source account. No SQS encryption-context condition is added because the reviewed AWS SQS key-management guidance specifies source ARN/account confused-deputy controls but does not establish an encryption-context condition for this use case. S3 encryption-context details, Rekognition resource-level support and provider API actions remain open gates.
 
 ## 4. Deployment policy construction
 
