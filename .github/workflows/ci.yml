@@ -261,6 +261,89 @@ jobs:
                   raise SystemExit(f"CreateGrant must be ViaService constrained: {path}")
           PY
 
+      - name: Validate dev apply-role IAM policy templates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("infra/policies")
+          names = (
+              "github-apply-dev-core.json.tftpl",
+              "github-apply-dev-data.json.tftpl",
+              "github-apply-dev-lambda.json.tftpl",
+              "github-apply-dev-iam.json.tftpl",
+              "github-apply-dev-foundation.json.tftpl",
+              "github-apply-dev-access.json.tftpl",
+              "github-apply-dev-state.json.tftpl",
+              "github-apply-dev-dynamodb-kms.json.tftpl",
+          )
+          policies = {}
+          for name in names:
+              path = root / name
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              if "${account_id}" in rendered or "${state_bucket}" in rendered:
+                  raise SystemExit(f"Unresolved template variable: {path}")
+              policy = json.loads(rendered)
+              if policy.get("Version") != "2012-10-17" or not policy.get("Statement"):
+                  raise SystemExit(f"Invalid policy envelope: {path}")
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy exceeds 6,144 characters: {path}")
+              for statement in policy["Statement"]:
+                  actions = statement.get("Action", [])
+                  actions = [actions] if isinstance(actions, str) else actions
+                  resources = statement.get("Resource", [])
+                  resources = [resources] if isinstance(resources, str) else resources
+                  if any(action.startswith(("budgets:", "aws-portal:")) for action in actions):
+                      raise SystemExit(f"Billing permissions must stay in separate billing root: {path}")
+                  if any("attendance/prod/" in resource or "attendance-prod-" in resource for resource in resources):
+                      raise SystemExit(f"Production resource in dev apply policy: {path}")
+              policies[name] = policy
+
+          iam = policies["github-apply-dev-iam.json.tftpl"]["Statement"]
+          for sid in ("PassRoleToLambda", "PassRoleToScheduler"):
+              statement = next(s for s in iam if s["Sid"] == sid)
+              if any("*" in resource for resource in statement["Resource"]):
+                  raise SystemExit(f"{sid} must use exact role ARNs")
+              if "iam:PassRole" not in statement["Action"]:
+                  raise SystemExit(f"{sid} missing iam:PassRole")
+              if "iam:PassedToService" not in statement.get("Condition", {}).get("StringEquals", {}):
+                  raise SystemExit(f"{sid} must constrain PassedToService")
+          create_role = next(s for s in iam if s["Sid"] == "IamRoleCreate")
+          if create_role.get("Condition", {}).get("StringEquals", {}).get("iam:PermissionsBoundary") != (
+              "arn:aws:iam::123456789012:policy/attendance-dev-execution-boundary"
+          ):
+              raise SystemExit("CreateRole must require the exact dev permissions boundary")
+
+          state = policies["github-apply-dev-state.json.tftpl"]["Statement"]
+          state_object = next(s for s in state if s["Sid"] == "DevStateObject")
+          if set(state_object["Action"]) != {"s3:GetObject", "s3:PutObject"}:
+              raise SystemExit("Dev apply state object permissions must be read/write only")
+          if state_object["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012/attendance/dev/terraform.tfstate":
+              raise SystemExit("Dev apply state object must be exact")
+          lock = next(s for s in state if s["Sid"] == "DevLockfileLifecycle")
+          if not all(resource.endswith(".tflock") for resource in lock["Resource"]):
+              raise SystemExit("State lock mutations must be limited to the dev .tflock object")
+
+          data = policies["github-apply-dev-data.json.tftpl"]["Statement"]
+          tables = next(s for s in data if s["Sid"] == "DynamoDBTableLifecycle")
+          if len(tables["Resource"]) != 5 or any("attendance-prod-" in r for r in tables["Resource"]):
+              raise SystemExit("DynamoDB apply policy must use the five dev table ARNs only")
+
+          lambda_policy = policies["github-apply-dev-lambda.json.tftpl"]["Statement"]
+          mapping = next(s for s in lambda_policy if s["Sid"] == "LambdaEventSourceMappingCreate")
+          if mapping["Resource"] != "*" or mapping["Condition"]["StringEquals"]["lambda:FunctionArn"] != (
+              "arn:aws:lambda:us-east-1:123456789012:function:attendance-dev-failure"
+          ):
+              raise SystemExit("Event source mapping create must be function-conditioned")
+
+          access = policies["github-apply-dev-access.json.tftpl"]["Statement"]
+          api = next(s for s in access if s["Sid"] == "ApiGatewayManageApi")
+          if api["Resource"] != "arn:aws:apigateway:us-east-1::/apis/*":
+              raise SystemExit("API Gateway permissions must be restricted to API resource paths")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
