@@ -31,11 +31,11 @@ variable "raw_bucket_arn" {
 variable "tables" {
   description = "Names and ARNs of the DynamoDB tables consumed by Part A."
   type = object({
-    employees = object({ name = string, arn = string })
-    attendance = object({ name = string, arn = string })
+    employees    = object({ name = string, arn = string })
+    attendance   = object({ name = string, arn = string })
     scan_results = object({ name = string, arn = string })
-    config = object({ name = string, arn = string })
-    audit = object({ name = string, arn = string })
+    config       = object({ name = string, arn = string })
+    audit        = object({ name = string, arn = string })
   })
 }
 
