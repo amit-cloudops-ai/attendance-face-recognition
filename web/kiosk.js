@@ -11,6 +11,7 @@ const title = document.querySelector("#result-title");
 const detail = document.querySelector("#result-detail");
 const signIn = document.querySelector("#sign-in");
 let stream;
+let cameraReady = false;
 
 function status(text, kind = "") {
   message.textContent = text;
@@ -39,6 +40,7 @@ async function startCamera() {
   video.srcObject = stream;
   await video.play();
   button.disabled = false;
+  cameraReady = true;
   button.textContent = "Capture attendance";
   status("Camera ready. Position your face in the frame.");
 }
@@ -87,7 +89,14 @@ async function capture() {
 }
 
 signIn.addEventListener("click", () => accessToken() ? logout() : login());
-button.addEventListener("click", capture);
+button.addEventListener("click", async () => {
+  if (!accessToken()) return login();
+  if (!cameraReady) {
+    try { await startCamera(); } catch (error) { status(error.message || "Camera unavailable.", "error"); }
+    return;
+  }
+  await capture();
+});
 
 try {
   await getConfig();
@@ -100,8 +109,11 @@ try {
     status("Sign in with your kiosk account to begin.");
     button.textContent = "Sign in to continue";
     button.disabled = false;
-    button.onclick = login;
   }
 } catch (error) {
   status(error.message || "Unable to start the kiosk.", "error");
+  if (accessToken()) {
+    button.disabled = false;
+    button.textContent = "Retry camera";
+  }
 }
