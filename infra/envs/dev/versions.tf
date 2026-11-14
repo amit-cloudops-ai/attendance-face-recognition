@@ -24,5 +24,6 @@ locals {
 }
 
 provider "aws" {
-  region = local.deployment_region
+  region              = local.deployment_region
+  allowed_account_ids = [var.account_id]
 }
