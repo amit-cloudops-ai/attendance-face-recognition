@@ -1,96 +1,3 @@
-data "aws_iam_policy_document" "kms_key" {
-  statement {
-    sid    = "EnableAccountRootPermissions"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::${var.account_id}:root"]
-    }
-
-    actions   = ["kms:*"]
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "AllowEncryptedAlertsTopic"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["sns.amazonaws.com"]
-    }
-
-    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
-    resources = ["*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [var.account_id]
-    }
-
-    condition {
-      test     = "ArnLike"
-      variable = "aws:SourceArn"
-      values   = ["arn:aws:sns:us-east-1:${var.account_id}:attendance-${var.env}-alerts"]
-    }
-  }
-
-  statement {
-    sid    = "AllowLambdaFailureDestinationsToUseSQSKey"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-
-    actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
-    resources = ["*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [var.account_id]
-    }
-
-    condition {
-      test     = "ArnEquals"
-      variable = "aws:SourceArn"
-      values = [
-        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-recognize-dlq",
-        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-enroll-dlq"
-      ]
-    }
-  }
-
-  statement {
-    sid    = "AllowCloudFrontOACRead"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["cloudfront.amazonaws.com"]
-    }
-
-    actions   = ["kms:Decrypt"]
-    resources = ["*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [var.account_id]
-    }
-
-    condition {
-      test     = "ArnLike"
-      variable = "aws:SourceArn"
-      values   = ["arn:aws:cloudfront::${var.account_id}:distribution/*"]
-    }
-  }
-}
-
 data "archive_file" "common_layer" {
   type        = "zip"
   source_dir  = "${path.module}/../../../shared"
@@ -101,7 +8,6 @@ resource "aws_kms_key" "attendance" {
   description             = "Attendance ${var.env} data encryption key"
   deletion_window_in_days = 30
   enable_key_rotation     = true
-  policy                  = data.aws_iam_policy_document.kms_key.json
 
   tags = {
     Project     = "attendance"
