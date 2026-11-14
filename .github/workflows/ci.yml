@@ -158,6 +158,50 @@ jobs:
                       raise SystemExit("Dev plan may mutate only its Terraform lockfile")
               if any("attendance/prod/" in resource for resource in resources):
                   raise SystemExit("Dev state policy references production state")
+          prod_names = (
+              "github-plan-prod-core.json.tftpl",
+              "github-plan-prod-edge.json.tftpl",
+              "github-plan-prod-state.json.tftpl",
+          )
+          prod_policies = {}
+          for name in prod_names:
+              path = root / name
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012")
+              if "${account_id}" in rendered or "${state_bucket}" in rendered:
+                  raise SystemExit(f"Unresolved template variable in {path}")
+              policy = json.loads(rendered)
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy size exceeded: {path}")
+              prod_policies[name] = policy
+
+          prod_core_edge = prod_policies[prod_names[0]]["Statement"] + prod_policies[prod_names[1]]["Statement"]
+          prod_scheduler = next(s for s in prod_policies[prod_names[0]]["Statement"] if s["Sid"] == "SchedulerRead")
+          prod_group = next(s for s in prod_policies[prod_names[0]]["Statement"] if s["Sid"] == "SchedulerGroupRead")
+          if prod_scheduler["Resource"] != "arn:aws:scheduler:us-east-1:123456789012:schedule/attendance-prod/attendance-prod-*":
+              raise SystemExit("Prod plan schedule read must use the dedicated prod schedule group")
+          if prod_group["Resource"] != "arn:aws:scheduler:us-east-1:123456789012:schedule-group/attendance-prod":
+              raise SystemExit("Prod plan schedule-group read must be environment-scoped")
+          for statement in prod_core_edge:
+              actions = statement.get("Action", [])
+              actions = [actions] if isinstance(actions, str) else actions
+              if any(action.startswith(forbidden_prefixes) for action in actions):
+                  raise SystemExit(f"Mutation action in prod read-only plan policy: {statement['Sid']}")
+              resources = statement.get("Resource", [])
+              resources = [resources] if isinstance(resources, str) else resources
+              if any("attendance/dev/" in resource or "attendance-dev-" in resource for resource in resources):
+                  raise SystemExit(f"Dev resource in prod plan policy: {statement['Sid']}")
+          prod_state = prod_policies[prod_names[2]]["Statement"]
+          for statement in prod_state:
+              actions = statement.get("Action", [])
+              actions = [actions] if isinstance(actions, str) else actions
+              resources = statement.get("Resource", [])
+              resources = [resources] if isinstance(resources, str) else resources
+              if any(action in ("s3:PutObject", "s3:DeleteObject") for action in actions):
+                  if not all(resource.endswith(".tflock") for resource in resources):
+                      raise SystemExit("Prod plan may mutate only its Terraform lockfile")
+              if any("attendance/dev/" in resource for resource in resources):
+                  raise SystemExit("Prod state policy references dev state")
           PY
 
       - name: Validate environment-specific Scheduler trust
