@@ -45,6 +45,8 @@ jobs:
       AWS_ROLE_ARN: ${{ inputs.environment == 'prod' && vars.AWS_ROLE_ARN_PROD || vars.AWS_ROLE_ARN_DEV }}
       TF_ROOT: infra/envs/${{ inputs.environment }}
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_PLAN_AGE_RECIPIENT: ${{ vars.TF_PLAN_AGE_RECIPIENT }}
+      TF_PLAN_AGE_IDENTITY: ${{ secrets.TF_PLAN_AGE_IDENTITY }}
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
       TF_VAR_account_id: ${{ vars.AWS_ACCOUNT_ID }}
@@ -68,6 +70,14 @@ jobs:
               exit 1
             fi
           done
+          if [[ "${{ inputs.operation }}" == "plan" && -z "$TF_PLAN_AGE_RECIPIENT" ]]; then
+            echo "Missing TF_PLAN_AGE_RECIPIENT environment/repository variable."
+            exit 1
+          fi
+          if [[ "${{ inputs.operation }}" == "apply" && -z "$TF_PLAN_AGE_IDENTITY" ]]; then
+            echo "Missing TF_PLAN_AGE_IDENTITY environment secret."
+            exit 1
+          fi
           if [[ "${{ inputs.operation }}" == "apply" && ! "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]; then
             echo "Apply requires the numeric run ID of a successful plan workflow."
             exit 1
@@ -105,16 +115,26 @@ jobs:
       - name: Validate Terraform root
         run: terraform -chdir="$TF_ROOT" validate
 
-      - name: Create plan
-        if: ${{ inputs.operation == 'plan' }}
-        run: terraform -chdir="$TF_ROOT" plan -input=false -out=tfplan
+      - name: Install age for encrypted plan hand-off
+        if: ${{ inputs.operation == 'plan' || inputs.operation == 'apply' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes age
 
-      - name: Upload plan for review
+      - name: Create and encrypt plan
+        if: ${{ inputs.operation == 'plan' }}
+        run: |
+          set -euo pipefail
+          terraform -chdir="$TF_ROOT" plan -input=false -out=tfplan
+          age --recipient "$TF_PLAN_AGE_RECIPIENT" --output "$TF_ROOT/tfplan.age" "$TF_ROOT/tfplan"
+          rm -f "$TF_ROOT/tfplan"
+
+      - name: Upload encrypted plan for review
         if: ${{ inputs.operation == 'plan' }}
         uses: actions/upload-artifact@v4
         with:
           name: attendance-${{ inputs.environment }}-terraform-plan-${{ github.run_id }}
-          path: infra/envs/${{ inputs.environment }}/tfplan
+          path: infra/envs/${{ inputs.environment }}/tfplan.age
           retention-days: 1
           if-no-files-found: error
 
@@ -144,6 +164,17 @@ jobs:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.plan_run_id }}
+
+      - name: Decrypt the exact reviewed plan
+        if: ${{ inputs.operation == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          identity_file="$RUNNER_TEMP/attendance-plan-identity.txt"
+          umask 077
+          printf '%s' "$TF_PLAN_AGE_IDENTITY" > "$identity_file"
+          age --decrypt --identity "$identity_file" --output "$TF_ROOT/tfplan" "$TF_ROOT/tfplan.age"
+          rm -f "$identity_file" "$TF_ROOT/tfplan.age"
 
       - name: Apply the exact reviewed plan
         if: ${{ inputs.operation == 'apply' }}
