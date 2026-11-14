@@ -231,14 +231,16 @@ def record_scan(
             condition += " AND attribute_not_exists(#events.#request)"
             update += ", #events.#request=:outcome"
         try:
-            updated = attendance.update_item(
-                Key={"employee_id": employee_id, "date": business_date},
-                UpdateExpression=update,
-                ConditionExpression=condition,
-                ExpressionAttributeNames=names if names else {},
-                ExpressionAttributeValues=values,
-                ReturnValues="ALL_NEW",
-            )
+            update_args = {
+                "Key": {"employee_id": employee_id, "date": business_date},
+                "UpdateExpression": update,
+                "ConditionExpression": condition,
+                "ExpressionAttributeValues": values,
+                "ReturnValues": "ALL_NEW",
+            }
+            if names:
+                update_args["ExpressionAttributeNames"] = names
+            updated = attendance.update_item(**update_args)
             return _result("clock_out", updated["Attributes"])
         except ClientError as exc:
             if _conditional_failure(exc):
