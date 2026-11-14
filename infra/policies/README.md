@@ -115,3 +115,19 @@ The prod plan role mirrors the dev plan role with production-only resource tags,
 - `github-plan-prod-state.json.tftpl`
 
 The production state object is read-only. Only `attendance/prod/terraform.tfstate.tflock` receives Get/Put/Delete for native S3 backend locking. The prod plan policy contains no dev resource ARNs or dev state path, and contains no infrastructure mutation actions. As with dev, API Gateway v2 GET permissions remain at the API path family because child API resources are not independently tagged in this configuration. CI checks the prod action set, policy size, exact Scheduler group, and dev/prod state/resource separation.
+
+
+## Production Terraform apply-role policy set (T12)
+
+The production apply role mirrors the dev split with production-only role ARNs, service resource ARNs, environment tags, KMS alias and state key:
+
+- `github-apply-prod-core.json.tftpl`
+- `github-apply-prod-data.json.tftpl`
+- `github-apply-prod-lambda.json.tftpl`
+- `github-apply-prod-iam.json.tftpl`
+- `github-apply-prod-foundation.json.tftpl`
+- `github-apply-prod-access.json.tftpl`
+- `github-apply-prod-state.json.tftpl`
+- `github-apply-prod-dynamodb-kms.json.tftpl`
+
+The prod role requires the exact prod execution boundary; PassRole is limited to the exact prod Lambda and Scheduler roles and service principals. The prod state object is Get/Put only; the prod lockfile is the only state path that receives Get/Put/Delete. The policy set contains no dev resource/state paths and no AWS Budgets or account billing actions. CI renders and validates each policy, checks managed-policy size, exact role/boundary/KMS conditions, state isolation and service-specific function constraints.
