@@ -100,6 +100,8 @@ jobs:
                   raise SystemExit(f"IAM managed policy size exceeded: {path}")
               policies[name] = policy
 
+          if any(statement["Sid"] in ("BudgetRead", "BillingRead") for statement in policies[names[0]]["Statement"]):
+              raise SystemExit("Environment plan role must not receive account-level billing permissions")
           core_edge = policies[names[0]]["Statement"] + policies[names[1]]["Statement"]
           scheduler_read = next(
               statement for statement in policies[names[0]]["Statement"]
@@ -217,3 +219,5 @@ jobs:
       - run: terraform -chdir=infra/envs/dev validate
       - run: terraform -chdir=infra/envs/prod init -backend=false -input=false
       - run: terraform -chdir=infra/envs/prod validate
+      - run: terraform -chdir=infra/billing init -backend=false -input=false
+      - run: terraform -chdir=infra/billing validate

@@ -31,7 +31,7 @@ Provider source inspected at tag `v6.73.0`:
 | `aws_sns_topic.alerts` | CreateTopic; GetTopicAttributes; SetTopicAttributes; DeleteTopic; tag/list-tag operations | `sns:CreateTopic`, `sns:GetTopicAttributes`, `sns:SetTopicAttributes`, `sns:DeleteTopic`, `sns:TagResource`, `sns:UntagResource`, `sns:ListTagsForResource` |
 | `aws_sns_topic_subscription.email` | Subscribe; GetSubscriptionAttributes; SetSubscriptionAttributes; Unsubscribe | `sns:Subscribe`, `sns:GetSubscriptionAttributes`, `sns:SetSubscriptionAttributes`, `sns:Unsubscribe` |
 | `aws_lambda_layer_version.common` | PublishLayerVersion; GetLayerVersion; DeleteLayerVersion | `lambda:PublishLayerVersion`, `lambda:GetLayerVersion`, `lambda:DeleteLayerVersion` |
-| `aws_budgets_budget.monthly` | CreateBudget; DescribeBudget; UpdateBudget; DeleteBudget; CreateNotification; DeleteNotification; DescribeSubscribersForNotification | `budgets:ModifyBudget`, `budgets:ViewBudget`, `aws-portal:ModifyBilling`, `aws-portal:ViewBilling` |
+| AWS Budgets | Moved to the isolated `infra/billing` root; excluded from foundation and environment apply roles | Dedicated billing plan/apply role only; requires `budgets:ModifyBudget`, `budgets:ViewBudget`, `aws-portal:ModifyBilling`, `aws-portal:ViewBilling` |
 | `data.archive_file.common_layer`; `data.aws_iam_policy_document.*` | Local archive/policy-document generation only | No AWS IAM actions |
 
 ## Important provider behavior and least-privilege scope
@@ -59,7 +59,7 @@ The configured endpoint protocol is `email`. In provider v6.73.0, `waitForConfir
 
 The AWS Service Authorization Reference maps budget creation/update/deletion and notification create/delete operations to `budgets:ModifyBudget` plus `aws-portal:ModifyBilling`; describe operations map to `budgets:ViewBudget` plus `aws-portal:ViewBilling`. The `budgets:*` actions can be scoped to the exact budget ARN, but the `aws-portal` actions have no resource-level scope and require `Resource: "*"`.
 
-This is materially broader than the rest of the foundation module. The standard dev/prod apply roles should not silently inherit account-wide billing modification. T34 tracks isolating the budget into a separate root and dedicated, separately approved role. Until then, do not claim the foundation deployment policy is fully least-privilege.
+This is materially broader than the rest of the foundation module. The budget resources are isolated in `infra/billing`, a separate Terraform root with its own `attendance/billing/terraform.tfstate` state key. The standard dev/prod environment roots no longer manage budgets and their deployment policies must not receive `aws-portal:ModifyBilling` or `aws-portal:ViewBilling`. Only a dedicated billing role should manage this root.
 
 ## Resource and condition scoping requirements
 
@@ -73,7 +73,7 @@ This is materially broader than the rest of the foundation module. The standard 
 ## Additional blockers discovered
 
 - **T33 — Provider reproducibility:** root constraints allow AWS provider `>=5,<7` and no lockfile is committed. Pin the reviewed provider version and commit dev/prod lockfiles before finalizing IAM policies.
-- **T34 — Budget isolation:** move the Budget resource into a separate root/role so normal plan/apply roles do not receive account-wide `aws-portal:ModifyBilling`.
+- **T34 — Budget isolation:** implemented in `infra/billing`; CI validates the root. Dedicated billing plan/apply policy and role wiring remain a separate deployment gate.
 - **T35 — CloudFront KMS scope:** foundation key policy currently permits CloudFront OAC decrypt for any distribution in the account. Move the grant to a point where the exact distribution ARN is available, or otherwise constrain it to the single project distribution before bootstrap.
 
 ## AWS authorization references
