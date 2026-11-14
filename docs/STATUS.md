@@ -1,3 +1,11 @@
+## Current deployment preparation update (2026-11-14)
+
+- Target account: existing AWS account; target region: `us-east-1`.
+- Updated workflow, Terraform provider/backend regions, bootstrap docs, Cognito issuer/domain, CSP endpoints and generated frontend region config for `us-east-1`.
+- Added `docs/IAM-LEAST-PRIVILEGE-INVENTORY.md` with Terraform resource families, candidate plan/apply action sets, state isolation, `iam:PassRole` constraints and execution-role boundary design.
+- Terraform now requires `EXECUTION_ROLE_BOUNDARY_ARN` and attaches the environment-specific boundary to Lambda and Scheduler execution roles.
+- CI for latest commit is pending at time of this update. No AWS resources, IAM roles, OIDC provider or state bucket have been created; no backend init, plan or apply has been run.
+
 # Project Status (source of truth for "what is built")
 
 **Update this file at the end of every work session (human or AI).** Newest entries at the top of the log.
