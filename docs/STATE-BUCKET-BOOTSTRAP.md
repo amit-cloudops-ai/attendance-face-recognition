@@ -4,7 +4,7 @@
 
 ## Purpose and naming
 
-Create one dedicated S3 bucket for Terraform state in the existing AWS account and us-east-1 region. The proposed name is:
+Create one dedicated S3 bucket for Terraform state in the existing AWS account and the canonical region declared in `config/deployment.json` (`us-east-1`). The proposed name is:
 
 attendance-tf-state-<12-digit-account-id>-<approved-unique-suffix>
 
@@ -18,11 +18,11 @@ S3 bucket names are globally unique, so the suffix must be selected and checked 
 | Prod | attendance/prod/terraform.tfstate | attendance/prod/terraform.tfstate.tflock |
 | Billing | attendance/billing/terraform.tfstate | attendance/billing/terraform.tfstate.tflock |
 
-All roots target us-east-1, set encrypt = true, and use native S3 lockfiles with use_lockfile = true. The environment lockfiles are committed and CI uses terraform init -lockfile=readonly; remote backend init remains disabled in CI.
+All roots use the canonical region from `config/deployment.json`, set `encrypt = true`, and use native S3 lockfiles with `use_lockfile = true`. Local commands must use `bash scripts/terraform.sh`; GitHub Actions loads the same manifest value before backend initialization. The environment lockfiles are committed and CI uses terraform init -lockfile=readonly; remote backend init remains disabled in CI.
 
 ## Required bucket configuration
 
-1. **Region:** us-east-1.
+1. **Region:** the canonical `us-east-1` value in `config/deployment.json`.
 2. **Versioning:** Enabled. Preserve previous state versions for recovery; do not configure automatic noncurrent-version expiration in the initial bootstrap.
 3. **Default encryption:** SSE-S3 (AES256). Terraform's encrypt = true enables server-side encryption; no separate KMS key is required for backend state.
 4. **Block Public Access:** all four settings enabled: BlockPublicAcls, IgnorePublicAcls, BlockPublicPolicy and RestrictPublicBuckets.
