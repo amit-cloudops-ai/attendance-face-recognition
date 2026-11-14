@@ -30,14 +30,14 @@ Code must read names/ARNs only from these variables. Never hard-code a resource 
 | Lambda layer | `attendance-{env}-common` (import path `attendance_common`) |
 | SNS alerts topic | `attendance-{env}-alerts` |
 | Cognito | pool `attendance-{env}-users`, app client `attendance-{env}-web` (public SPA, PKCE, no secret), groups `admin` and `kiosk` |
-| Lambdas | `attendance-{env}-<name>` where name is one of: `presign`, `result`, `recognize`, `enroll`, `enroll-url`, `faces-delete`, `employees`, `attendance-query`, `reports`, `override`, `settings`, `daily-job`, `weekly-job` |
+| Lambdas | `attendance-{env}-<name>` where name is one of: `presign`, `result`, `recognize`, `enroll`, `enroll-url`, `faces-delete`, `failure` (internal async failure recovery), `employees`, `attendance-query`, `reports`, `override`, `settings`, `daily-job`, `weekly-job` |
 
 ## 3. DynamoDB schemas (all on-demand, KMS-encrypted, PITR on)
 **employees**: PK `employee_id` (S)
-`name` S, `email` S, `department` S, `shift_start` S "HH:MM", `shift_end` S "HH:MM", `active` BOOL, `face_ids` L of S, `photo_count` N, `consent_at` S (ISO), `created_at` S, `updated_at` S.
+`name` S, `email` S, `department` S, `shift_start` S "HH:MM", `shift_end` S "HH:MM", `active` BOOL, `face_ids` L of S, `photo_count` N, `consent_at` S (ISO), `created_at` S, `updated_at` S. Internal retry metadata: `enrollment_{request_id}` S (FaceId committed for that request), `enrollment_lock_request` S and `enrollment_lock_until` N (short per-employee lease).
 
 **attendance**: PK `employee_id` (S), SK `date` (S)
-`clock_in` S (ISO, absent for `absent` rows), `clock_out` S (ISO, optional), `status` S one of `present` | `late` | `absent`, `flags` SS (optional, value `missing_clock_out`), `confidence` N (optional), `source` S one of `face` | `admin` | `system`, `updated_at` S, `updated_by` S (optional).
+`clock_in` S (ISO, absent for `absent` rows), `clock_out` S (ISO, optional), `status` S one of `present` | `late` | `absent`, `flags` SS (optional, value `missing_clock_out`), `confidence` N (optional), `source` S one of `face` | `admin` | `system`, `updated_at` S, `updated_by` S (optional). Internal retry metadata: `scan_events` M keyed by `request_id`, storing the exact outcome of each accepted scan request so retries cannot create a second attendance transition.
 GSI **`date-index`**: PK `date`, SK `employee_id`, projection ALL.
 
 **scan-results**: PK `request_id` (S)
@@ -73,6 +73,8 @@ Only the recognition module defines `aws_s3_bucket_notification` for the raw buc
 ## 6. Result codes
 **Scan** (`kind=scan`): `pending`, `matched` (with `action`), `no_match`, `no_face`, `multiple_faces`, `low_quality`, `inactive`, `error`.
 **Enroll** (`kind=enroll`): `pending`, `enrolled`, `no_face`, `multiple_faces`, `low_quality`, `unknown_employee`, `limit_reached`, `duplicate_face`, `error`.
+
+Unexpected infrastructure failures remain `pending` while Lambda's configured automatic retries run. Only the failure-destination consumer sets `error` after retries are exhausted, then removes the retained raw image. The failure consumer's own poison messages are moved to `attendance-{env}-failure-processor-dlq` after five receives and trigger an alarm.
 
 ## 7. HTTP API
 Base path `/api` on the same CloudFront domain as the web apps (no CORS needed for the API). Auth: `Authorization: Bearer <Cognito access token>`. Group `kiosk` or `admin` as noted. Pre-signed POST to S3 is the only cross-origin call.
@@ -112,3 +114,11 @@ Scan: `DetectFaces` (must find exactly 1 face; Brightness and Sharpness at or ab
 
 ## 11. Frontend runtime config (Part C)
 Terraform uploads `/config.json` to the web bucket: `{"region":"ap-south-1","userPoolId","clientId","cognitoDomain","apiBase":"/api","rawBucketUrl":"https://<raw bucket>.s3.ap-south-1.amazonaws.com"}`. Kiosk lives at `/`, admin at `/admin/`, shared OAuth callback at `/callback.html`. `config.json` and `*.html` are served with `Cache-Control: no-cache`.
+
+
+## 12. Internal retry metadata (additive implementation detail)
+The frozen API response shapes and result-code vocabulary are unchanged. The following additive DynamoDB attributes support exactly-once attendance effects and recoverable enrollment:
+- Attendance `scan_events` stores the outcome for each request ID atomically with its clock-in/clock-out transition. A repeated request ID returns the stored outcome.
+- Employee `enrollment_{request_id}` stores the FaceId committed for that enrollment request. It prevents a retry after employee persistence from incrementing `photo_count` or appending the same FaceId again.
+- Employee `enrollment_lock_request` and `enrollment_lock_until` serialize concurrent enrollment attempts for one employee. The 90-second lease is reclaimed by the same request or after expiry.
+- Recognition and enrollment workers preserve pending results and raw images on retryable exceptions. Lambda asynchronous failure destinations feed the per-worker SQS queues; the internal `failure` Lambda converts exhausted failures to `error` and deletes the image. Its own unprocessable messages go to the processor DLQ and raise a separate alarm.
