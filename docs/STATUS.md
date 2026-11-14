@@ -4,7 +4,7 @@
 - Region migration is present in the solo workflow, dev/prod Terraform provider and backend settings, bootstrap guide, Cognito issuer/domain, CSP endpoints and frontend config. The older `main` branch has not been promoted and still contains the original `ap-south-1` README description; do not deploy from `main`.
 - Added the IAM action inventory and required pre-created permissions-boundary input. The inventory remains a draft: action/resource mapping and runtime boundary statements require verification before any policy is attached.
 - Fixed the Terraform formatting reported by CI on the previous latest commit. Formatting-only commits were applied to the dev/prod root files and data/recognition module files.
-- The Python job passed on the previous failing run; Terraform validation was skipped because formatting stopped the Terraform job. New CI runs for the formatting corrections were queued/in progress at this update. Confirm their final results before declaring CI green.
+- The Python job passes. The latest Terraform job still fails at `terraform fmt -check`: `infra/modules/data/main.tf` and `infra/modules/recognition/main.tf` remain unformatted. Terraform init/validate steps are skipped after the formatter exits non-zero. Terraform CLI 1.10.5 was unavailable in the local validation container and downloading it failed due to DNS, so the actual formatter has not yet been run locally. Do not call this branch CI-green.
 - No AWS resources, IAM roles, OIDC provider or state bucket have been created; no backend init, Terraform plan or apply has been run.
 
 # Project Status (source of truth for "what is built")
