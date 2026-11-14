@@ -37,7 +37,7 @@ def _body(event: dict) -> dict:
 
 def _date(value) -> str:
     if not isinstance(value, str):
-        raise ValueError("date must use YYYY-MM-DD")
+        raise TypeError("date must use YYYY-MM-DD")
     parsed = date.fromisoformat(value)
     if parsed.isoformat() != value:
         raise ValueError("date must use YYYY-MM-DD")
@@ -48,7 +48,7 @@ def _timestamp(value, label: str, business_date: str) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        raise ValueError(f"{label} must be an ISO 8601 timestamp")
+        raise TypeError(f"{label} must be an ISO 8601 timestamp")
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError(f"{label} must include a timezone offset")
