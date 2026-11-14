@@ -207,3 +207,6 @@ Scheduler:
 - The Scheduler trust policy currently trusts `scheduler.amazonaws.com` without source-account/source-schedule conditions. This is a confused-deputy hardening item tracked separately as T32; do not consider the trust policy finalized.
 
 Conclusion: no missing data-handler API actions or unjustified data-handler KMS grants were found in the current policy map. This is static code/policy reconciliation; AWS live authorization remains unverified.
+
+
+- DynamoDB CMK provisioning permissions are isolated in `infra/policies/github-apply-dev-dynamodb-kms.json.tftpl` and `github-apply-prod-dynamodb-kms.json.tftpl`. They grant the AWS-documented KMS operations only via DynamoDB and the matching environment alias; CreateGrant is separately conditioned on `kms:GrantIsForAWSResource=true`. These fragments must be attached only to the matching environment apply role.
