@@ -206,7 +206,10 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T11 — production Terraform plan-role policy
 
-- **Status:** policy templates drafted; CI validation pending.
+- **Status:** complete on `ai/T12-prod-apply-policy`.
+- Added the production counterpart to the split dev apply set: core, data, Lambda, IAM, foundation, access, state and DynamoDB KMS templates. Each rendered policy is below the 6,144-character limit.
+- Production policies use exact prod table/function/queue/role ARNs, `attendance-prod` KMS alias, prod tags, prod Scheduler group, and prod execution-role boundary. The prod state object is Get/Put only; the prod lockfile is the only state path with Get/Put/Delete.
+- CI run [43618294918](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43618294918), commit `29a9195eb4`: Python and Terraform jobs passed. Python validated all prod apply policy templates, size, no dev references, no billing permissions, exact PassRole roles/service conditions, required boundary, state isolation, exact DynamoDB tables, failure processor mapping, and prod KMS alias/ViaService/CreateGrant conditions. Terraform formatting, lockfile verification and all module/environment/billing validations passed.
 - Cloned the dev read-only plan policy into three production-specific policy templates (core, edge, state), changing environment tags, S3/DynamoDB/Lambda/KMS/Scheduler resource names and state key to prod.
 - The production state object is read-only; only the production `.tflock` object can be Get/Put/Deleted for native S3 locking.
 - CI checks read-only action sets, 6,144-character policy size, exact `attendance-prod` Scheduler group/schedule ARNs, and rejects dev resources/state paths from prod policies.
