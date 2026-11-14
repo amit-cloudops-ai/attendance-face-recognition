@@ -49,7 +49,6 @@ DEPARTMENT="${DEPARTMENT:-SmokeTest}"
 TMP_DIR="$(mktemp -d)"
 CREATED=0
 LATENCIES=()
-RAW_KEYS=()
 
 cleanup() {
   if [[ "$CREATED" == "1" ]]; then
@@ -97,12 +96,10 @@ api_post() {
 
 upload_presigned() {
   local token="$1" request_path="$2" photo="$3"
-  local request upload_url request_id fields_file raw_key
+  local request upload_url request_id fields_file
   request="$(api_post "$token" "$request_path" '{}')"
   upload_url="$(jq -er '.upload.url' <<<"$request")"
   request_id="$(jq -er '.request_id' <<<"$request")"
-  raw_key="$(jq -er '.upload.fields.key' <<<"$request")"
-  RAW_KEYS+=("$raw_key")
   fields_file="$TMP_DIR/fields-$request_id.tsv"
   jq -r '.upload.fields | to_entries[] | [.key, .value] | @tsv' <<<"$request" > "$fields_file"
 
