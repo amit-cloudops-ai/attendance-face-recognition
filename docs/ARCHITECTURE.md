@@ -81,7 +81,7 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 |---|---|---|
 | Photo/video of an employee shown to the camera | Strict threshold, supervised kiosk, audit trail | Real in v1; fix is Face Liveness (LATER) |
 | Someone abuses upload endpoint | Auth required, pre-signed POST limits, throttling, concurrency cap, budget alarm | Low |
-| Stolen kiosk token | Dedicated `kiosk` user with kiosk-only routes, 60 min access tokens, disable the user to revoke | Medium (device theft) |
+| Stolen kiosk token | Dedicated `kiosk` user with kiosk-only routes and 60 min access tokens; disabling blocks new auth/refresh but already-issued JWTs remain valid until expiry (up to 60 min) | Medium (device theft) |
 | Biometric data leak | Raw images are retained only for the bounded retry/recovery window, then deleted; only Rekognition feature vectors remain for enrolled employees; KMS, least privilege and offboarding deletion | Low |
 | Admin misuse | Cognito admin group, override requires reason and is audited | Low |
 | Cost attack | Throttling, reserved concurrency, AWS Budget alarm | Low |
@@ -103,7 +103,7 @@ Biometric data is personal data (India DPDP Act 2023 applies). Controls: explici
 | Bad deploy | `git revert` on `main`, pipeline redeploys; DynamoDB PITR for data mistakes |
 
 ## 8. Observability
-Structured JSON logs (30-day retention); alarms to SNS `attendance-{env}-alerts` (email lead): Lambda `Errors` > 0 on any function, `Throttles` > 0, DLQ `ApproximateNumberOfMessagesVisible` > 0, `recognize` p95 `Duration` > 2500 ms, job failures; AWS Budget 15 USD (80% and 100%). CloudWatch dashboard: scans per hour, p95 latency, error counts, Rekognition calls.
+Structured JSON logs (30-day retention); alarms to SNS `attendance-{env}-alerts` (email lead): Lambda `Errors` > 0 on any function, `Throttles` > 0, DLQ `ApproximateNumberOfMessagesVisible` > 0, `recognize` p95 `Duration` > 2500 ms, job failures; AWS Budget 15 USD (80% and 100%). CloudWatch metrics and alarms are provisioned; a custom dashboard (scans per hour, p95 latency, error counts, Rekognition calls) is deferred and is not part of the current Terraform build.
 
 ## 9. Cost
 See [COST.md](COST.md). About 10 to 14 USD per month at 100 employees x 2 scans/day.
@@ -146,7 +146,7 @@ The deployment is approval-gated and is not yet executed. The target is AWS acco
 | Offboard | Admin app, Deactivate (sets inactive and deletes faces) |
 | Tune accuracy | Admin app Settings (or config table item `SETTINGS`): `face_match_threshold` |
 | Re-run daily/weekly job | Console, Lambda, Test with `{"date": "YYYY-MM-DD"}` / `{"week": "YYYY-Www"}` |
-| Revoke a kiosk | Cognito, disable user `kiosk-01` |
+| Disable a kiosk | Cognito, disable user `kiosk-01`; already-issued access JWTs may remain valid for up to 60 minutes |
 | Roll back | Revert commit on `main`, run a new manual plan, review it, then apply through the protected `prod` environment |
 | Restore data | DynamoDB point-in-time restore to a new table, then swap |
 
