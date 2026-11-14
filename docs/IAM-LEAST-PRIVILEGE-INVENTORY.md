@@ -103,8 +103,9 @@ This is a code-call-site review, not a complete AWS authorization verification. 
 Foundation module provider actions have been mapped against the exact AWS provider v6.73.0 source and AWS Service Authorization References in `docs/security/FOUNDATION-PROVIDER-IAM.md`. This mapping includes the S3 bucket read actions that the monolithic `aws_s3_bucket` provider resource calls even when split resources own configuration. It also identifies the account-wide `aws-portal:ModifyBilling` dependency introduced by the Budget resource.
 
 Remaining provider-action tasks:
-- Data and recognition module: T07 (in progress).
-- Access module: T08 (in progress).
+- Data and recognition module: T07 complete.
+- Access module: T08 complete.
+- Dev plan role: T09 in progress; templates are being split into service-read and backend-state policy documents.
 
 Access module provider-source mapping is drafted in `docs/security/ACCESS-PROVIDER-IAM.md`, including Cognito pool-level IAM granularity, API Gateway v2 HTTP-verb action model, CloudFront global resource ARNs, web S3 object/bucket-policy operations, and API Gateway Lambda permission actions.
 

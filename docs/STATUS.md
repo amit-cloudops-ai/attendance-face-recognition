@@ -105,6 +105,19 @@
 - API Gateway v2 uses `apigateway:GET/POST/PATCH/PUT/DELETE`; CloudFront is global and uses resource-specific action names; Cognito IAM granularity is user-pool level. Exact provider source/API matrix: `docs/security/ACCESS-PROVIDER-IAM.md`.
 - CI run [43615508377](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43615508377), commit `59ad7e0c1ccd`: Python and Terraform jobs passed, including access module and dev/prod root validation.
 
+### T09 — dev plan-role policy
+
+- **Status:** complete on `ai/T09-dev-plan-policy`.
+- Three managed-policy templates: `github-plan-dev-core.json.tftpl`, `github-plan-dev-edge.json.tftpl`, and `github-plan-dev-state.json.tftpl`. The split keeps each under the 6,144-character IAM managed-policy limit.
+- Core/edge policies contain read-only service actions. State policy reads only `attendance/dev/terraform.tfstate` and permits Get/Put/Delete only on `attendance/dev/terraform.tfstate.tflock`; the state object cannot be written. No prod state path is present.
+- Documented read-only residual scope: API Gateway v2 GET permissions span the `/apis` family because IDs are generated and child resources are not independently tagged by this configuration. CloudFront read actions use per-resource-family wildcards where IDs are opaque; no CloudFront mutation actions are granted.
+- First CI attempt exposed an overbroad validator prefix that rejected `iam:GetRole` and other read-only IAM calls. Root cause was isolated; the policy was not changed. Fix attempt 1 narrowed the validator to explicit write/admin action prefixes.
+- Final CI run [43615873597](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43615873597), commit `dcde60d5e339`: Python and Terraform jobs passed, including policy template rendering, JSON parsing, size checks, read-only action checks and dev-only state path checks.
+- Added three read-only policy templates: `github-plan-dev-core.json.tftpl` (DynamoDB/IAM/Lambda/Scheduler/SQS/Rekognition/CloudWatch/SNS/Budgets reads), `github-plan-dev-edge.json.tftpl` (KMS/S3/Cognito/API Gateway v2/CloudFront reads), and `github-plan-dev-state.json.tftpl` (dev state read plus dev lockfile lifecycle only).
+- The three rendered managed policies are each below 6,144 characters with dummy values. The state object is read-only; PutObject/DeleteObject are restricted to the dev `.tflock` object. No production state path is included.
+- The plan role has no infrastructure create/update/delete actions. `s3:ListBucket` on the three app buckets is retained because the reviewed AWS provider v6.73.0 bucket refresh path calls HeadBucket, which requires ListBucket; no raw-object read permission is granted.
+- CI now validates rendered JSON, template substitution, policy size, absence of infrastructure mutation actions, and dev-only state paths.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
@@ -126,3 +139,5 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 ## Session log
 
 - 14 Nov 2026: Audited repository governance and found the three expected governance files absent from the solo implementation branch. Created `ai/T01-repository-governance` from the verified solo baseline, restored the governance files, created the task board, and added AI task-branch push CI coverage. T01 closed after both CI jobs passed. The next task is T02; no AWS changes. No AWS changes.
+
+- First CI attempt [43615741764](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43615741764) failed in the new policy validator, not in pytest or Terraform. Root cause: the validator treated every `iam:` action as a mutation, incorrectly rejecting required read-only `iam:GetRole`, `iam:GetRolePolicy` and `iam:ListRoleTags`. The policy itself was not changed. Fix attempt 1 narrows the validator to explicit IAM write/administrative prefixes and also checks API Gateway, DynamoDB, Lambda, SQS, Scheduler and other service mutation verbs. Revalidation is pending.
