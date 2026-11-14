@@ -104,7 +104,7 @@ Example state permissions for the dev role (the prod role gets only the prod key
 
 The plan role needs these state permissions because Terraform acquires/releases the native S3 lock while planning. This policy does not grant access to the prod state. Confirm the exact S3 backend calls against the pinned Terraform version before attaching it.
 
-### 3. Public-repository plan artifact protection
+### 4. Public-repository plan artifact protection
 
 The repository is public. GitHub Actions artifacts are available to repository readers, while Terraform saved plan files may contain sensitive values in clear text. The deployment workflow was updated to encrypt the plan with `age` before artifact upload and decrypt it only in the matching apply run.
 
@@ -115,7 +115,7 @@ Each GitHub Environment needs its own key pair:
 
 The encrypted artifact is retained for one day. The apply job still verifies that the plan came from a successful manual plan run for the same environment branch and exact commit SHA.
 
-### 4. Deployment IAM policy — not yet approved or created
+### 5. Deployment IAM policy — not yet approved or created
 
 Do not attach `AdministratorAccess`. A safe policy must be derived from the full Terraform resource/action inventory and must separate the GitHub deployment role from the application execution roles.
 
