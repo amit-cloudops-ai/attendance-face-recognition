@@ -173,3 +173,13 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - CloudFront's `kms:Decrypt` grant uses `aws:SourceAccount` plus `ArnEquals aws:SourceArn = aws_cloudfront_distribution.site.arn`; the former `distribution/*` wildcard is removed. SNS alert and Lambda async DLQ service statements and account-root administration remain in the final policy.
 - Added the `kms:GetKeyPolicy`/`kms:PutKeyPolicy` provider action mapping for the access-module policy resource.
 - Also corrected a latent T31 omission: `user_pool_issuer` output was still hard-coded to `ap-south-1`; it now emits the `us-east-1` issuer used by the deployed Cognito pool.
+
+
+### T36 — DynamoDB customer-managed KMS authorization
+
+- **Status:** implementation drafted; CI validation pending.
+- The final key policy in the access module now has a DynamoDB customer-managed-key statement for account principals using the key only through `dynamodb.us-east-1.amazonaws.com`, with `kms:CallerAccount` constrained to this account. This allows only `Encrypt`, `Decrypt`, `ReEncrypt*`, `GenerateDataKey*`, `CreateGrant` and `DescribeKey` through DynamoDB.
+- Added a separate direct `dynamodb.amazonaws.com` service-principal statement for `Describe*`, `Get*` and `List*` key metadata operations, matching the AWS customer-managed-key guidance.
+- Added environment-specific dev/prod apply-policy fragments for the exact `alias/attendance-dev` or `alias/attendance-prod` key. The crypto actions and `kms:CreateGrant` are separate statements; CreateGrant alone requires `kms:GrantIsForAWSResource=true`. Both are constrained to the DynamoDB ViaService and environment alias.
+- CI validates exact service principal statements, action sets, account/region conditions, environment aliases, CreateGrant condition and policy size.
+- AWS reference: [DynamoDB encryption at rest usage notes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/encryption.usagenotes.html) explains the minimum customer-managed-key actions, the `kms:ViaService` model, direct service key-metadata access and grants.
