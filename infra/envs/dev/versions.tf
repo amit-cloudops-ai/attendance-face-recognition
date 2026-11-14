@@ -13,9 +13,9 @@ terraform {
   }
 
   backend "s3" {
-    key         = "attendance/dev/terraform.tfstate"
-    region      = "ap-south-1"
-    encrypt     = true
+    key          = "attendance/dev/terraform.tfstate"
+    region       = "ap-south-1"
+    encrypt      = true
     use_lockfile = true
   }
 }
