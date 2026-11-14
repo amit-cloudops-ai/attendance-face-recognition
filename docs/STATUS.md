@@ -27,7 +27,8 @@
 
 ### T03 — recognition runtime IAM reconciliation
 
-- **Status:** code and static review complete; CI validation pending.
+- **Status:** complete on `ai/T03-recognition-runtime-iam`.
+- CI run [43612245039](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43612245039), commit `aad1fb68f4045e84aa3c418cf24794af45edb1c8`: Python and Terraform jobs passed, including `terraform fmt`, all four module validations and both environment-root validations.
 - Audited all seven recognition handlers and shared `record_scan`/`get_settings` SDK call sites against the role-specific policies.
 - Removed unused `sqs:ChangeMessageVisibility` from the failure processor role; retained ReceiveMessage, DeleteMessage and GetQueueAttributes on the two event-source queues.
 - Verified `rekognition:DetectFaces` requires `Resource: "*"`; collection-bound actions remain on the collection ARN. AWS docs: [Rekognition IAM guide](https://docs.aws.amazon.com/rekognition/latest/dg/security_iam_service-with-iam.html).
@@ -35,7 +36,7 @@
 
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
-- T04 is next: reconcile data Lambda SDK call sites against handler-specific IAM statements.
+- T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
 - Region migration and separate dev/prod Terraform state keys are present on the solo implementation branch. The state bucket remains a manual prerequisite.
 - The manual deployment workflow uses GitHub OIDC, separate plan/apply role variables, encrypted saved plans using age, commit/branch checks, and GitHub Environment gates. Its workflow logic still requires a dedicated least-privilege and protection review.
 - The IAM inventory is a candidate review document, not an attachable policy. Runtime KMS grants have been narrowed by handler in the data and recognition modules; exact key-policy conditions and remaining runtime IAM mappings are not yet fully verified.
