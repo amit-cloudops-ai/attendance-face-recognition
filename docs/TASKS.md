@@ -16,7 +16,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 |---|---|---|---|
 | T02 | Validate KMS key policy for Lambda asynchronous failure destinations | DONE | Confirm AWS service-principal model, source ARN/account conditions, encryption context and exact DLQ ARNs against AWS docs; update policy only with evidence |
 | T03 | Reconcile recognition Lambda runtime IAM permissions | DONE | Every SDK call mapped to exact action/resource; Rekognition, S3, DynamoDB, SQS, KMS and logs checked |
-| T04 | Reconcile data Lambda runtime IAM permissions | TODO | Every SDK call mapped to exact action/resource; no unused permissions or unjustified KMS grants |
+| T04 | Reconcile data Lambda runtime IAM permissions | DONE | Every SDK call mapped to exact action/resource; no unused permissions or unjustified KMS grants |
 | T05 | Finalize dev/prod execution-role permissions boundaries | TODO | Two environment-specific boundary documents, least-privilege union, explicit deny/guardrails, no self-management path |
 | T06 | Verify Terraform provider IAM actions for foundation module | TODO | Create/read/update/delete/tag operations mapped to exact IAM actions and resource scopes |
 | T07 | Verify Terraform provider IAM actions for data and recognition modules | TODO | All provider operations mapped, including Lambda, IAM, DynamoDB, Scheduler, SQS, Rekognition and CloudWatch |
@@ -43,6 +43,12 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | ID | Task | Status | Acceptance criteria |
 |---|---|---|---|
 | T31 | Align all Lambda runtime AWS SDK clients with the us-east-1 deployment region | DONE | Every explicit region override/default is aligned to the deployed region; no runtime client targets ap-south-1; CI and unit tests pass |
+
+## Phase B cross-cutting hardening
+
+| ID | Task | Status | Acceptance criteria |
+|---|---|---|---|
+| T32 | Constrain EventBridge Scheduler execution-role trust policy to source account and schedule ARN | TODO | Trust policy is scoped to the owning account and exact schedule ARN; no wildcard service trust beyond required schedule group |
 
 ## Phase C — release and operations
 

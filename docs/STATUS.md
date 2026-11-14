@@ -45,6 +45,16 @@
 - Fix: all 14 Lambda handlers now derive their region from Lambda's reserved `AWS_REGION` environment variable with `us-east-1` as the local/test fallback. Shared `get_settings` and `record_scan` helpers use the same environment variable and fallback.
 - No AWS resources or live AWS calls were used. Python and Terraform CI are the validation gates.
 
+### T04 — data runtime IAM reconciliation
+
+- **Status:** complete on `ai/T04-data-runtime-iam`.
+- CI run [43612832683](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43612832683), commit `6c1946a4d2391eeabf0a0323fae19669259722dc`: Python and Terraform jobs passed, including pytest, Ruff, formatting, all four module validations and both environment-root validations.
+- Audited all seven data handlers against the role-specific policies in `infra/modules/data/main.tf`.
+- Confirmed the actions and ARNs for employees, attendance query, daily/weekly jobs, reports, override and settings. Override uses GetItem/PutItem, settings uses GetItem/PutItem; no UpdateItem grants are required for either.
+- Confirmed data KMS split: daily_job/weekly_job GenerateDataKey for SSE-KMS report writes; reports Decrypt for report reads; no direct KMS permission for DynamoDB encryption.
+- Confirmed per-function CloudWatch log writes are scoped to Terraform-managed log groups; Scheduler invoke policies target only their matching Lambda functions.
+- Found the Scheduler trust policy lacks source account/schedule ARN conditions. Added T32 to harden it separately.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
