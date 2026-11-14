@@ -1,6 +1,6 @@
 # SPEC: Scope and Finish Line
 
-**Version 1.1, FROZEN on 14 Nov 2026.** This amendment changes only the deployment region to `us-east-1`; functional scope and acceptance criteria are unchanged. Any further change needs lead approval and an update to this file in the same PR.
+**Version 1.2, FROZEN on 14 Nov 2026.** Version 1.1 established `us-east-1` as the deployment region. Version 1.2 clarifies the solo-owner release governance; functional scope and acceptance criteria are unchanged. Any further change needs owner approval and an update to this file in the same PR.
 **Target:** production-ready and live by **15 Nov 2026**. Submission 16 Nov (buffer day).
 
 ## 1. Purpose
@@ -39,7 +39,7 @@ Contactless attendance for ~100 employees: face capture in browser, recognition 
 | N04 | One IAM role per Lambda; no `*` resources except where AWS requires it (logs) | IAM matrix in ARCHITECTURE section 6 matches Terraform |
 | N05 | No public bucket; only CloudFront reads the web bucket | Block Public Access screenshot |
 | N06 | `terraform apply` from a clean checkout builds a working environment | Rebuild dev from scratch once before freeze |
-| N07 | CI green on `main`; no direct pushes; at least 1 review on every PR | Branch protection screenshot |
+| N07 | CI green on `main`; no direct pushes; every change goes through a PR whose diff and CI are inspected by the repository owner before merge (solo-owner model; no independent reviewer) | Branch protection screenshot and owner PR checklist |
 | N08 | Alarms email the lead: any Lambda errors, DLQ depth above 0, daily/weekly job failure, monthly budget over 15 USD | Trigger one alarm deliberately |
 | N09 | Monthly cost at 100 employees x 2 scans/day is 15 USD or less | docs/COST.md |
 | N10 | Logs retained 30 days, JSON structured, never contain images, tokens or full face data | Code review + sample log |
