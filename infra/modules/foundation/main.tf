@@ -156,6 +156,18 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "buckets" {
   }
 }
 
+resource "aws_s3_bucket_cors_configuration" "raw" {
+  bucket = aws_s3_bucket.raw.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["POST"]
+    allowed_origins = var.raw_upload_origins
+    expose_headers  = ["ETag"]
+    max_age_seconds = 300
+  }
+}
+
 resource "aws_s3_bucket_versioning" "reports" {
   bucket = aws_s3_bucket.reports.id
 
