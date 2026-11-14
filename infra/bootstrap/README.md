@@ -2,93 +2,91 @@
 
 This folder documents manual prerequisites only. No bootstrap resources are provisioned by application Terraform modules.
 
+## Canonical region
+
+The only canonical deployment-region setting is `config/deployment.json` (`aws_region: us-east-1`). Terraform provider roots read that file. The S3 backend receives the same region through `scripts/terraform.sh` locally or the deployment workflow in GitHub Actions. Do not add a separate backend/provider region literal.
+
+Use the wrapper for every local Terraform command. It rejects conflicting `AWS_REGION` or `AWS_DEFAULT_REGION` values:
+
+```bash
+scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-config=backend.hcl
+scripts/terraform.sh -chdir=infra/envs/dev validate
+scripts/terraform.sh -chdir=infra/envs/dev plan -input=false
+```
+
+The backend examples intentionally omit `region`; the wrapper exports it from the canonical manifest. Never run `terraform init` against the remote backend until the owner has separately approved it.
+
 ## 1. Terraform state bucket
 
-In the target AWS account, create `attendance-tfstate-<account_id>` in `us-east-1` with:
+The proposed bucket name is:
 
-- S3 Block Public Access fully enabled
+`attendance-tf-state-<12-digit-account-id>-<approved-unique-suffix>`
+
+The name must be globally unique and must be confirmed available before bootstrap. Create it in `us-east-1` only after approval, with:
+
+- S3 Block Public Access fully enabled (all four settings)
 - Versioning enabled
-- Default SSE-S3 (AES256) encryption enabled. If choosing SSE-KMS instead, configure the matching backend `kms_key_id` and KMS permissions in both environment roots and deployment roles.
-- TLS-only bucket policy
-- Object ownership set to bucket owner enforced
-- No public access or static website hosting
+- Default SSE-S3 (AES256) encryption
+- BucketOwnerEnforced object ownership
+- TLS-only deny bucket policy
+- No Object Lock and no automatic state expiration
 
-The development root uses the S3 native lock file (`use_lockfile = true`), so a separate DynamoDB lock table is not required. Keep the state bucket separate from application buckets.
+Dev, prod and billing use isolated state keys and native S3 lockfiles:
 
-Copy `infra/envs/dev/backend.hcl.example` to `infra/envs/dev/backend.hcl`, replace the account ID, then run `terraform init -backend-config=backend.hcl`.
+- `attendance/dev/terraform.tfstate`
+- `attendance/prod/terraform.tfstate`
+- `attendance/billing/terraform.tfstate`
+
+See `docs/STATE-BUCKET-BOOTSTRAP.md` for the exact specification.
 
 ## 2. GitHub Actions OIDC provider
 
-Create the IAM OIDC identity provider for:
+Use issuer `https://token.actions.githubusercontent.com` and audience `sts.amazonaws.com`. Reuse an existing matching provider. Create it only if read-only inspection proves it is absent and the owner approves.
 
-- URL: `https://token.actions.githubusercontent.com`
-- Audience: `sts.amazonaws.com`
+## 3. Runtime permissions boundaries
 
-Reuse the provider if it already exists in the account.
+Create only after review and approval:
 
-## 3. Deployment roles
+- `attendance-dev-execution-boundary`
+- `attendance-prod-execution-boundary`
 
-Create four roles only after the deployment workflow and its exact permissions policy have been reviewed:
+These boundaries cap Lambda and Scheduler runtime permissions. They do not grant permissions by themselves. GitHub apply roles may attach the exact boundary but must not edit/delete its managed policy or create an unbounded runtime role.
 
-Create separate plan and apply roles for each environment:
+## 4. GitHub deployment roles
 
-- `attendance-github-plan-dev`: read-only infrastructure access plus dev state/lock access.
-- `attendance-github-apply-dev`: dev resource mutation access plus dev state/lock access.
-- `attendance-github-plan-prod`: read-only infrastructure access plus prod state/lock access.
-- `attendance-github-apply-prod`: prod resource mutation access plus prod state/lock access.
+Six separate roles are required:
 
-Each role's trust policy must require audience `sts.amazonaws.com` and the exact matching environment subject: `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev` or `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`. Do not use wildcard repository, branch or environment subjects. The plan role must not have resource mutation permissions. The apply role must not receive broad account administration; scope it to the reviewed Terraform resources, and restrict `iam:PassRole` to the exact environment application execution roles and required service principals.
+- `attendance-github-dev-plan`
+- `attendance-github-dev-apply`
+- `attendance-github-prod-plan`
+- `attendance-github-prod-apply`
+- `attendance-github-billing-plan`
+- `attendance-github-billing-apply`
 
-## 4. GitHub environments and variables
+The plan roles are read-only for infrastructure; the only state writes are lockfile operations. Apply roles are restricted to their environment's resource and state scope. Billing roles are isolated from dev/prod and contain the dedicated budget/billing permissions only.
 
-Create GitHub Environments:
+Every OIDC trust policy must require audience `sts.amazonaws.com` and the exact repository/environment subject. Do not use wildcard repository, branch or environment subjects.
 
-- `dev`: allow deployments from `develop`; no required reviewer is necessary for the dev environment.
-- `prod`: allow deployments from `main`; require at least one designated reviewer.
+## 5. GitHub environments and variables
 
-Configure these repository/environment variables:
+Create these exact environments:
 
-- `AWS_ROLE_ARN_DEV_PLAN`, `AWS_ROLE_ARN_DEV_APPLY`, `AWS_ROLE_ARN_PROD_PLAN`, `AWS_ROLE_ARN_PROD_APPLY`
-- `TF_PLAN_AGE_RECIPIENT` (environment variable; age public recipient for the matching environment)
-- `TF_STATE_BUCKET`, `AWS_ACCOUNT_ID`, `ALERT_EMAIL`, `EXECUTION_ROLE_BOUNDARY_ARN` (environment-specific pre-created permissions boundary ARN)
-- `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS`, `ALLOWED_ORIGINS` (each a non-empty JSON array of strings)
+- `dev-plan` and `dev-apply` — branch `develop`
+- `prod-plan` and `prod-apply` — branch `main`
+- `billing-plan` and `billing-apply` — branch `main`
 
-The manual workflow is `.github/workflows/deploy.yml`. Trigger it from `develop` for dev or `main` for prod, choose `plan` first, review the uploaded plan artifact, then trigger `apply` and supply the successful plan run ID. Apply downloads and uses that exact saved plan. It verifies the plan run succeeded on the same environment branch and exact commit SHA; stale or mismatched plans fail safely. Production runs are gated by the `prod` environment reviewer. The workflow uses GitHub OIDC and short-lived credentials; never store AWS access keys.
+Apply environments require an independent reviewer and self-review prevention. Each environment defines its own `AWS_ROLE_ARN`. Configure account/state bucket and environment-specific values as described in `docs/GITHUB-ENVIRONMENT-SETUP.md`.
 
-### Encrypt saved Terraform plans
+Plan environments receive only their public `TF_PLAN_AGE_RECIPIENT`. Apply environments receive the matching private `TF_PLAN_AGE_IDENTITY` secret. Never store private age identities in repository variables, source control, artifacts or logs. Dev, prod and billing use separate age key pairs.
 
-This repository is public. GitHub Actions artifacts are readable by anyone with repository read access, and Terraform plan files can contain sensitive values in clear text. The workflow therefore encrypts the binary plan with `age` before upload and decrypts it only in the matching apply run.
+## 6. Manual deployment workflow
 
-Create a separate age key pair for each GitHub Environment (`dev` and `prod`) on a trusted local machine:
+The workflow is `.github/workflows/deploy.yml`. It is manual-only and uses GitHub OIDC with short-lived credentials. It loads the region from `config/deployment.json`, initializes the selected remote state root, and supports plan then apply of the exact encrypted plan artifact. Apply verifies the successful plan run, workflow path, branch, commit and attempt before decrypting and applying.
 
-```bash
-age-keygen -o attendance-dev-plan-identity.txt
-age-keygen -o attendance-prod-plan-identity.txt
-```
-
-For each key pair:
-- Copy the `# public key:` recipient from the generated file into that environment's `TF_PLAN_AGE_RECIPIENT` variable.
-- Store the complete private identity file contents as that environment's `TF_PLAN_AGE_IDENTITY` secret.
-- Keep the identity files outside the repository and store a protected offline backup. Never paste the private identity into a workflow variable, commit, issue, or chat.
-- Use the dev recipient/identity only in the `dev` environment and the prod pair only in `prod`.
-
-The plan artifact remains encrypted in GitHub Actions and expires after one day. Only the matching environment's apply job receives the private identity secret, and only in the decryption step. To review the full plan locally, download the encrypted artifact from the successful plan run, then decrypt it using the matching private identity file:
-
-```bash
-PLAN_RUN_ID=123456789
-gh run download "$PLAN_RUN_ID" \
-  --repo amit-cloudops-ai/attendance-face-recognition \
-  --name "attendance-dev-terraform-plan-$PLAN_RUN_ID" \
-  --dir ./attendance-dev-plan
-age --decrypt \
-  --identity attendance-dev-plan-identity.txt \
-  --output tfplan \
-  ./attendance-dev-plan/tfplan.age
-terraform show -no-color tfplan
-```
-
-Use the prod identity and artifact for production. Keep the decrypted `tfplan` file private and delete it after review; it can contain sensitive infrastructure values. The GitHub environment branch restrictions and production reviewer remain mandatory controls.
+The deployment workflow has not been run. GitHub environment variables, secrets, reviewer settings and branch restrictions have not been verified by the current repository connection.
 
 ## Safety gate
 
-The bootstrap steps above are intentionally manual. Normal CI runs Python tests, Ruff, browser syntax/CSP checks, Terraform formatting and static validation. The deployment workflow is manual-only and has not been run. No AWS resources have been provisioned from this repository work. Any `apply` must follow an explicitly approved plan.
+The first AWS interaction must be read-only: verify the active STS account, inspect existing OIDC provider, bucket, boundaries, roles, trust policies and policy attachments. Distinguish missing resources from access-denied responses. Do not create duplicates.
+
+The exact account ID and final bucket suffix remain unverified. The bootstrap inventory and rendered policies must be presented to the owner for explicit approval before any AWS write. State-bucket creation, IAM/OIDC bootstrap, remote backend initialization, Terraform plan and Terraform apply are separate approval-gated actions.
