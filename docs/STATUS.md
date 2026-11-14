@@ -185,7 +185,11 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T36 — DynamoDB customer-managed KMS authorization
 
-- **Status:** implementation drafted; CI validation pending.
+- **Status:** complete on `ai/T14-github-oidc`.
+- Four OIDC trust templates bind the exact repo, audience `sts.amazonaws.com` and one of `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`; no wildcard subjects.
+- Deployment workflow uses operation-specific GitHub environments and one environment-scoped `AWS_ROLE_ARN`, retains dev/develop and prod/main branch gates, and uses only `actions:read`, `contents:read`, `id-token:write`. No static AWS credentials.
+- Added environment variable/secret and reviewer/branch restriction setup docs. Actual GitHub environment protection configuration remains T16 because the connector cannot inspect or configure those settings.
+- CI run [43618685801](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43618685801), commit `b6293325ef`: Python and Terraform jobs passed, including trust-policy validation, workflow YAML, formatting, module validation and environment-root validation.
 - The final key policy in the access module now has a DynamoDB customer-managed-key statement for account principals using the key only through `dynamodb.us-east-1.amazonaws.com`, with `kms:CallerAccount` constrained to this account. This allows only `Encrypt`, `Decrypt`, `ReEncrypt*`, `GenerateDataKey*`, `CreateGrant` and `DescribeKey` through DynamoDB. The separate DynamoDB service-principal metadata statement was removed after reviewing AWS documentation: that direct metadata statement appears in the AWS-managed-key example, while the customer-managed-key example authorizes the table-creating principal through `kms:ViaService`.
 - Added environment-specific dev/prod apply-policy fragments for the exact `alias/attendance-dev` or `alias/attendance-prod` key. The crypto actions and `kms:CreateGrant` are separate statements; CreateGrant alone requires `kms:GrantIsForAWSResource=true`. Both are constrained to the DynamoDB ViaService and environment alias.
 - CI validates exact service principal statements, action sets, account/region conditions, environment aliases, CreateGrant condition and policy size.
