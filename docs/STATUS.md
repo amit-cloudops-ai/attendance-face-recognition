@@ -40,7 +40,7 @@ The policy templates are not attached to AWS roles. IAM Access Analyzer and live
 
 ### T16 — GitHub environment variables, secrets and protections
 
-<badge color="warning">Blocked</badge>
+**Status: BLOCKED**
 
 PR #24 contains the four-environment setup guide. The required names are dev-plan, dev-apply, prod-plan and prod-apply, with environment-scoped AWS_ROLE_ARN values, plan-only age recipients, apply-only private age identity secrets, branch restrictions and independent apply reviewers.
 
