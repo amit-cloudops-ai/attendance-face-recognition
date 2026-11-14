@@ -56,6 +56,11 @@ if [[ "$REVIEWER" == "$OWNER" ]]; then
   echo "The repository owner cannot be the independent reviewer." >&2
   exit 2
 fi
+REVIEWER_PERMISSION="$(gh api "repos/$REPO/collaborators/$REVIEWER/permission" --jq '.permission')"
+case "$REVIEWER_PERMISSION" in
+  read|triage|write|maintain|admin) ;;
+  *) echo "Reviewer must have repository access; current permission: $REVIEWER_PERMISSION" >&2; exit 2 ;;
+esac
 
 # environment|branch|require independent reviewer
 ENVIRONMENTS=(
