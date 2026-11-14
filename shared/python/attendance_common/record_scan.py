@@ -75,9 +75,9 @@ def record_scan(employee_id: str, scanned_at: datetime, confidence: float) -> di
             try:
                 attendance.update_item(
                     Key={"employee_id": employee_id, "date": business_date},
-                    UpdateExpression="SET clock_in=:ci, #st=:st, confidence=:cf, source=:src, updated_at=:ua REMOVE flags",
+                    UpdateExpression="SET clock_in=:ci, #st=:st, confidence=:cf, #source=:src, updated_at=:ua REMOVE flags",
                     ConditionExpression="#st=:absent AND attribute_not_exists(clock_in)",
-                    ExpressionAttributeNames={"#st": "status"},
+                    ExpressionAttributeNames={"#st": "status", "#source": "source"},
                     ExpressionAttributeValues={":ci": scanned_iso, ":st": status,
                         ":cf": Decimal(str(confidence_value)), ":src": "face", ":ua": scanned_iso, ":absent": "absent"},
                 )
