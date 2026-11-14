@@ -113,6 +113,8 @@
 
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
+- T34 is complete: AWS Budgets moved to the dedicated `infra/billing` root, with CI run [43616787686](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43616787686) passing both jobs. The environment deployment policies no longer need account-level billing access.
+
 - Complete: T01–T09 and T31. PRs #3–#12 are open in a task-by-task stack and remain unmerged.
 - Active: T32. It adds separate `attendance-dev` and `attendance-prod` Scheduler schedule groups and scopes each Scheduler execution-role trust policy to the matching schedule-group ARN plus the owning account. AWS requires the group ARN, not an individual schedule ARN.
 - Remaining cross-cutting blockers: T33 provider pin/lockfiles; T34 isolate AWS Budgets from normal apply roles; T35 restrict CloudFront KMS access to the exact distribution; T36 add DynamoDB CMK service access and exact deployment-role KMS permissions.
@@ -158,7 +160,11 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T34 — AWS Budget isolation
 
-- **Status:** implementation drafted; CI validation pending.
+- **Status:** complete on `ai/T34-budget-isolation`.
+- Removed `aws_budgets_budget.monthly` from the foundation module and added a dedicated `infra/billing` root with its own state key `attendance/billing/terraform.tfstate`.
+- The isolated root manages the dev and prod USD 15/month cost budgets and 80%/100% actual-cost email notifications. Normal environment plan policy no longer contains `budgets:ViewBudget` or `aws-portal:ViewBilling`; no account-level billing permissions are assigned to normal environment roles.
+- The billing root is structurally separate and ready for a separately permissioned billing role. Dedicated billing plan/apply policies and OIDC role provisioning remain future gated work.
+- CI run [43616787686](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43616787686), commit `98de6b2aeb21`: Python and Terraform jobs passed, including formatting, all module validations, both environment roots, and the isolated billing root.
 - Removed `aws_budgets_budget.monthly` from the shared foundation module. Normal dev/prod Terraform roots no longer create or update account-level budgets.
 - Added independent `infra/billing` Terraform root with its own backend state key `attendance/billing/terraform.tfstate`; it manages the dev and prod USD 15 monthly budgets and their 80%/100% actual-cost notifications.
 - Removed `budgets:ViewBudget` and `aws-portal:ViewBilling` from the dev environment plan-role core policy. Billing access belongs only to a dedicated billing plan/apply role; no such role or policy is attached/created here.
