@@ -4,7 +4,7 @@
 **Target integration branch:** `solo/amit-monday`  
 **Code audit baseline:** `31bb951c9c6dcffe3ddd95e9aa9b2d9df4808d75`  
 **Follow-up fixes:** Part 2 static corrections are now added to PR #29; their latest CI result is pending.  
-**CI:** [Run 43628880020 — passed](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43628880020)  
+**CI:** [Run 43630911862 — passed](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43630911862)  
 **AWS target:** account `924422830139`, region `us-east-1`  
 **Deployment status:** NOT READY — no AWS resources have been provisioned by this deployment work.
 
