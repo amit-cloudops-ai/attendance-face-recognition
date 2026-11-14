@@ -94,8 +94,8 @@ locals {
     ]
     attendance_query = [
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Query"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
         Resource = [
           aws_dynamodb_table.attendance.arn,
           "${aws_dynamodb_table.attendance.arn}/index/date-index"
@@ -114,8 +114,8 @@ locals {
         Resource = [aws_dynamodb_table.employees.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Query"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
         Resource = [
           aws_dynamodb_table.attendance.arn,
           "${aws_dynamodb_table.attendance.arn}/index/date-index"
@@ -149,8 +149,8 @@ locals {
         Resource = [aws_dynamodb_table.employees.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Query"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
         Resource = [
           aws_dynamodb_table.attendance.arn,
           "${aws_dynamodb_table.attendance.arn}/index/date-index"
@@ -387,8 +387,8 @@ resource "aws_cloudwatch_log_group" "lambda" {
 resource "aws_iam_role" "lambda" {
   for_each = local.function_specs
 
-  name               = "attendance-${var.env}-${replace(each.key, "_", "-")}"
-  assume_role_policy  = data.aws_iam_policy_document.lambda_assume_role.json
+  name                 = "attendance-${var.env}-${replace(each.key, "_", "-")}"
+  assume_role_policy   = data.aws_iam_policy_document.lambda_assume_role.json
   permissions_boundary = var.execution_role_boundary_arn
 
   tags = {
@@ -405,7 +405,7 @@ resource "aws_iam_role_policy" "lambda" {
   role = aws_iam_role.lambda[each.key].id
 
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = concat(local.lambda_permissions[each.key], [
       {
         Effect   = "Allow"
@@ -453,8 +453,8 @@ resource "aws_lambda_function" "lambda" {
 resource "aws_iam_role" "scheduler" {
   for_each = toset(["daily_job", "weekly_job"])
 
-  name               = "attendance-${var.env}-${replace(each.key, "_", "-")}-scheduler"
-  assume_role_policy  = data.aws_iam_policy_document.scheduler_assume_role.json
+  name                 = "attendance-${var.env}-${replace(each.key, "_", "-")}-scheduler"
+  assume_role_policy   = data.aws_iam_policy_document.scheduler_assume_role.json
   permissions_boundary = var.execution_role_boundary_arn
 }
 
