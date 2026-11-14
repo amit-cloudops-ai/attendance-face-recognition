@@ -109,9 +109,29 @@ done
 BUCKET="${TF_STATE_BUCKET:-}"
 if [[ -z "$BUCKET" ]]; then
   echo
-  echo "=== Terraform state bucket ==="
-  echo "Skipped: set TF_STATE_BUCKET to the candidate bucket name after choosing the approved suffix."
-else
+  echo "=== Discover existing project state bucket names (read-only) ==="
+  if bucket_names="$(aws s3api list-buckets --query 'Buckets[].Name' --output text)"; then
+    matches=()
+    for candidate in $bucket_names; do
+      if [[ "$candidate" == "attendance-tf-state-$ACCOUNT_ID-"* ]]; then
+        matches+=("$candidate")
+      fi
+    done
+    if [[ "${#matches[@]}" -eq 1 ]]; then
+      BUCKET="${matches[0]}"
+      echo "Found one account-prefixed candidate: $BUCKET"
+    elif [[ "${#matches[@]}" -gt 1 ]]; then
+      echo "Multiple account-prefixed candidates found; set TF_STATE_BUCKET explicitly:"
+      printf ' - %s\n' "${matches[@]}"
+    else
+      echo "No existing bucket matched attendance-tf-state-$ACCOUNT_ID-*."
+    fi
+  else
+    echo "NOT CONFIRMED: unable to list bucket names; caller may lack s3:ListAllMyBuckets."
+  fi
+fi
+
+if [[ -n "$BUCKET" ]]; then
   report "State bucket HEAD: $BUCKET" aws s3api head-bucket --bucket "$BUCKET"
   report "State bucket region: $BUCKET" aws s3api get-bucket-location --bucket "$BUCKET" --output json
   report "State bucket ownership: $BUCKET" aws s3api get-bucket-ownership-controls --bucket "$BUCKET" --output json
@@ -119,6 +139,9 @@ else
   report "State bucket versioning: $BUCKET" aws s3api get-bucket-versioning --bucket "$BUCKET" --output json
   report "State bucket encryption: $BUCKET" aws s3api get-bucket-encryption --bucket "$BUCKET" --output json
   report "State bucket policy: $BUCKET" aws s3api get-bucket-policy --bucket "$BUCKET" --output json
+else
+  echo
+  echo "State bucket settings not inspected: no unique existing candidate was identified."
 fi
 
 echo
