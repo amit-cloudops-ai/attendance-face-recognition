@@ -56,9 +56,12 @@ data "aws_iam_policy_document" "kms_key" {
     }
 
     condition {
-      test     = "ArnLike"
+      test     = "ArnEquals"
       variable = "aws:SourceArn"
-      values   = ["arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-*-dlq"]
+      values = [
+        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-recognize-dlq",
+        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-enroll-dlq"
+      ]
     }
   }
 
