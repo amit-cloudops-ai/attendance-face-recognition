@@ -9,6 +9,13 @@ This root wires the shared foundation, data/automation, recognition and access m
 - From the repository root, export `AWS_PROFILE=default` and `EXPECTED_AWS_ACCOUNT_ID=924422830139` before using the local wrapper. The wrapper verifies STS identity; the provider restricts operations to `var.account_id`.
 - The GitHub deployment path uses the `prod-plan` and `prod-apply` environments and the solo-owner approval checkpoint; verify their settings before use.
 
+Before any remote backend initialization or plan, run from the repository root:
+
+```bash
+export AWS_PROFILE=default
+export EXPECTED_AWS_ACCOUNT_ID=924422830139
+```
+
 ## Two-pass first deployment
 
 1. The initial values use localhost for Cognito callback/logout and raw-bucket CORS so the first reviewed plan can create the CloudFront distribution without a dependency cycle.
