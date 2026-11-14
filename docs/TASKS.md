@@ -28,7 +28,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T13 | Review Terraform state bucket bootstrap specification | DONE | Versioning, public access block, SSE-S3, ownership controls, TLS-only policy and state/lock object scope documented |
 | T14 | Audit GitHub OIDC trust and deployment workflow permissions | DONE | Exact audience/subjects, operation-specific environments, branch gates, token permissions and no static credentials |
 | T15 | Audit encrypted Terraform plan artifact lifecycle | DONE | Exact workflow/run/attempt/commit binding, encryption, one-day retention, artifact access and identity cleanup |
-| T16 | Reconcile GitHub environment variables, secrets and protection rules | BLOCKED | Exact names/scopes documented; actual environment secrets, reviewers and branch restrictions must be configured and verified by repository admin |
+| T16 | Reconcile GitHub environment variables, secrets and protection rules | BLOCKED | Solo-owner model documented; owner-only apply checkpoints with self-review allowed; actual environment settings/secrets and branch restrictions still require configuration and verification |
 | T17 | Add or verify infrastructure template linting in CI | DONE | No CloudFormation/SAM source exists; Terraform and JSON policy templates are validated; CI fails if unlinted CloudFormation/SAM is introduced |
 | T18 | Produce exact manual bootstrap change plan | BLOCKED | Bootstrap plan documented; exact AWS account ID, globally unique state bucket suffix and owner approval are required before finalizing mutation inventory |
 | T19 | Open solo-only deployment-readiness PR to develop | TODO | T16/T18 and required security/CI gates resolved; PR contains only approved solo implementation; teammate PRs remain separate |
@@ -72,9 +72,9 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T13 state bucket bootstrap specification: PR #21; CI run 43618372200 passed.
 - T14 GitHub OIDC hardening: PR #22; CI run 43618685801 passed.
 - T15 encrypted plan artifact lifecycle: PR #23; CI run 43618692691 passed.
-- T16 GitHub environment setup: PR #24; documentation is ready, but actual GitHub environment settings cannot be inspected or configured by the current connector. Repository-admin action is required.
+- T16 GitHub environment setup: PR #24; solo-owner governance documented; actual GitHub environment settings cannot be inspected or configured by the current connector. Repository-admin action is required.
 - T17 template linting: PR #25; CI run 43619026006 passed. No CloudFormation/SAM templates exist; Terraform and JSON policy templates are validated in CI.
-- T18 manual bootstrap plan: PR #26; plan is documented and CI run 43619095037 passed. Exact account ID, globally unique bucket suffix and owner approval remain required.
+- T18 manual bootstrap plan: PR #26; plan is documented and CI run 43619095037 passed. Account 924422830139 verified by read-only STS; globally unique bucket suffix and explicit owner approval remain required.
 - T37 implementation is complete: billing plan/apply policy and OIDC trust templates, isolated billing workflow path and six-environment documentation are validated by CI run 43620012088. PR #27.
 - T38 is complete and merged into `solo/amit-monday`: canonical region manifest, Terraform provider loading, backend wrapper/workflow export, contract/example updates, Moto fixture alignment and repository-wide region drift guard. Consolidated CI run 43622637663 passed all 27 Python/security steps and all 21 Terraform formatting/validation steps on head commit `8bae76d788074e9c0d47d886fe355fddbcff709f`.
 - Consolidation PR #28 was merged into `solo/amit-monday` at merge commit `a43adea001009004597e19e1c04c14079205865a`. It contains the T01–T38 security and region-guard work. The individual task PRs remain historical and may remain open; do not merge teammate PRs or promote to `main`/`develop` without the required T16/T18 gates and owner direction.
