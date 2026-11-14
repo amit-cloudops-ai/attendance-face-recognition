@@ -42,7 +42,7 @@ The following is a reconciliation checklist based on the current Terraform polic
 | recognize | Rekognition collection; raw `captures/*`; employees, attendance, config, scan-results; recognize DLQ | `rekognition:DetectFaces` (resource wildcard may be required), `rekognition:SearchFacesByImage`, S3 get/delete, DynamoDB get/put/update, `sqs:SendMessage` |
 | enroll | Rekognition collection; raw `enroll/*`; employees, config, scan-results; enroll DLQ | DetectFaces, SearchFacesByImage, IndexFaces, DeleteFaces; S3 get/delete; DynamoDB get/update; SQS send |
 | faces_delete | Rekognition collection; employees and audit tables | Rekognition DeleteFaces; DynamoDB get/update/put |
-| failure | Recognition DLQs; scan-results, employees, attendance/date index; Rekognition collection; raw captures/enroll prefixes | SQS receive/delete/get-attributes/change-visibility; DynamoDB get/update/query; Rekognition search/delete; S3 get/delete |
+| failure | Recognition DLQs; scan-results, employees, attendance/date index; Rekognition collection; raw captures/enroll prefixes | SQS receive/delete/get-attributes; DynamoDB get/update/query; Rekognition search/delete; S3 get/delete |
 | employees | Employees and audit tables | DynamoDB get/put/update/scan; audit put |
 | attendance_query | Attendance table/date index and employees table | DynamoDB query and employee scan |
 | daily_job | Employees, attendance/date index, config, reports/daily prefix, alerts topic | DynamoDB scan/query/put/update/get; S3 put; SNS publish |
@@ -152,3 +152,32 @@ Scope object read/write to the matching state key. Allow `s3:DeleteObject` only 
 ## Safety boundary
 
 No AWS resources, IAM roles, OIDC providers, state buckets or permissions boundaries have been created. No backend has been initialized against AWS. No Terraform plan or apply has been run. All policy content remains design material pending review and explicit approval.
+
+
+## 3B. Verified recognition handler call-site review — 14 Nov 2026
+
+The recognition runtime policy was compared against the current handler and shared-library SDK call sites:
+
+| Function | Verified AWS operations | Policy coverage |
+|---|---|---|
+| presign | DynamoDB PutItem (scan request); presigned S3 POST for `captures/*` | `dynamodb:PutItem`, `s3:PutObject`; KMS GenerateDataKey for SSE-KMS POST |
+| result | DynamoDB GetItem (scan result) | `dynamodb:GetItem` on scan-results table |
+| recognize | S3 HeadObject/GetObject and DeleteObject; Rekognition DetectFaces and SearchFacesByImage; DynamoDB GetItem/PutItem/UpdateItem across employees/config/scan-results/attendance; SQS async failure destination | `s3:GetObject`, `s3:DeleteObject`; DetectFaces on `*`; collection search on collection ARN; table actions on exact table ARNs; `sqs:SendMessage`; KMS Decrypt + GenerateDataKey |
+| enroll | S3 HeadObject/GetObject and DeleteObject; Rekognition DetectFaces, SearchFacesByImage, IndexFaces and DeleteFaces; DynamoDB GetItem/UpdateItem for employees/config/scan-results; SQS async failure destination | Exact S3 prefix and table ARNs; DetectFaces on `*`; collection actions on collection ARN; `sqs:SendMessage`; KMS Decrypt + GenerateDataKey |
+| enroll_url | DynamoDB GetItem (employee), PutItem (request); presigned S3 POST for `enroll/*` | `dynamodb:GetItem`, `dynamodb:PutItem`, `s3:PutObject`; KMS GenerateDataKey |
+| faces_delete | DynamoDB GetItem/UpdateItem (employee), PutItem (audit); Rekognition DeleteFaces | Exact employee/audit table ARNs and collection ARN |
+| failure | SQS event-source poller; DynamoDB GetItem/UpdateItem and Query attendance date index; Rekognition SearchFacesByImage/DeleteFaces; S3 GetObject/DeleteObject | SQS ReceiveMessage/DeleteMessage/GetQueueAttributes on the two source DLQs; KMS Decrypt; exact table/index, collection and raw-object prefixes |
+
+Shared-library review confirmed that `record_scan` performs attendance GetItem/PutItem/UpdateItem and employee GetItem, while `get_settings` performs config GetItem. Those actions are included in the recognize role policy.
+
+Least-privilege correction: removed `sqs:ChangeMessageVisibility` from the failure processor role. The Lambda SQS event-source execution-role documentation and AWSLambdaSQSQueueExecutionRole managed policy identify ReceiveMessage, DeleteMessage and GetQueueAttributes as the required queue operations for this integration. The handler itself does not call ChangeMessageVisibility.
+
+Rekognition scope: AWS documents that DetectFaces does not support a collection resource ARN, so its `Resource: "*"` is necessary. Collection-bound SearchFacesByImage, IndexFaces and DeleteFaces remain scoped to the single attendance collection.
+
+KMS split:
+- presign/enroll_url: GenerateDataKey for presigned single-object uploads to SSE-KMS S3.
+- recognize/enroll: Decrypt for raw-image reads and Decrypt + GenerateDataKey for encrypted SQS async-destination producer use.
+- failure: Decrypt for encrypted SQS event-source consumption and raw-image reads.
+- result/faces_delete: no direct KMS operations identified.
+
+This is a static call-site/policy reconciliation, not a deployed AWS authorization test. Exact AWS account policies, permissions boundaries and live service delivery remain unverified.

@@ -25,9 +25,18 @@
 - AWS documentation reviewed: Lambda requires execution-role destination permissions and both the role and key resource policy to permit KMS use for customer-managed encrypted destinations; SQS documents the Lambda service as a supported event source for encrypted queues and supports source-ARN confused-deputy conditions.
 - Validation: run [43612039939](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43612039939), commit `598a6e013ffb1861941ca33c2a9611fae304482b`: Python and Terraform jobs passed, including `terraform fmt`, all four module validations and both environment-root validations.
 
+### T03 — recognition runtime IAM reconciliation
+
+- **Status:** complete on `ai/T03-recognition-runtime-iam`.
+- CI run [43612245039](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43612245039), commit `aad1fb68f4045e84aa3c418cf24794af45edb1c8`: Python and Terraform jobs passed, including `terraform fmt`, all four module validations and both environment-root validations.
+- Audited all seven recognition handlers and shared `record_scan`/`get_settings` SDK call sites against the role-specific policies.
+- Removed unused `sqs:ChangeMessageVisibility` from the failure processor role; retained ReceiveMessage, DeleteMessage and GetQueueAttributes on the two event-source queues.
+- Verified `rekognition:DetectFaces` requires `Resource: "*"`; collection-bound actions remain on the collection ARN. AWS docs: [Rekognition IAM guide](https://docs.aws.amazon.com/rekognition/latest/dg/security_iam_service-with-iam.html).
+- Found a separate deployment blocker: several recognition handlers hard-code `ap-south-1`, while Terraform targets `us-east-1`. Added T31 to correct runtime region selection across all Lambda handlers/shared code before deployment.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
-- T03 is now active: reconcile every recognition Lambda SDK call against the handler-specific IAM statements and KMS/SQS permissions.
+- T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
 - Region migration and separate dev/prod Terraform state keys are present on the solo implementation branch. The state bucket remains a manual prerequisite.
 - The manual deployment workflow uses GitHub OIDC, separate plan/apply role variables, encrypted saved plans using age, commit/branch checks, and GitHub Environment gates. Its workflow logic still requires a dedicated least-privilege and protection review.
 - The IAM inventory is a candidate review document, not an attachable policy. Runtime KMS grants have been narrowed by handler in the data and recognition modules; exact key-policy conditions and remaining runtime IAM mappings are not yet fully verified.

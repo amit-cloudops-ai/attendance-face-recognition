@@ -15,7 +15,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | ID | Task | Status | Acceptance criteria |
 |---|---|---|---|
 | T02 | Validate KMS key policy for Lambda asynchronous failure destinations | DONE | Confirm AWS service-principal model, source ARN/account conditions, encryption context and exact DLQ ARNs against AWS docs; update policy only with evidence |
-| T03 | Reconcile recognition Lambda runtime IAM permissions | IN_PROGRESS | Every SDK call mapped to exact action/resource; Rekognition, S3, DynamoDB, SQS, KMS and logs checked |
+| T03 | Reconcile recognition Lambda runtime IAM permissions | DONE | Every SDK call mapped to exact action/resource; Rekognition, S3, DynamoDB, SQS, KMS and logs checked |
 | T04 | Reconcile data Lambda runtime IAM permissions | TODO | Every SDK call mapped to exact action/resource; no unused permissions or unjustified KMS grants |
 | T05 | Finalize dev/prod execution-role permissions boundaries | TODO | Two environment-specific boundary documents, least-privilege union, explicit deny/guardrails, no self-management path |
 | T06 | Verify Terraform provider IAM actions for foundation module | TODO | Create/read/update/delete/tag operations mapped to exact IAM actions and resource scopes |
@@ -37,6 +37,12 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T22 | Complete privacy, deletion, latency and browser acceptance | TODO | Raw-image deletion evidence, consent checks, 20-scan p95, Chrome/Android and Safari/iOS checks |
 | T23 | Prepare production release review | TODO | Dev acceptance complete, security/cost evidence, rollback plan and separate production approval |
 | T24 | Deploy production after explicit approval | TODO | Exact production plan reviewed and approved; production apply and post-deploy checks evidenced |
+
+## Phase B cross-cutting blocker
+
+| ID | Task | Status | Acceptance criteria |
+|---|---|---|---|
+| T31 | Align all Lambda runtime AWS SDK clients with the us-east-1 deployment region | TODO | Every explicit region override/default is aligned to the deployed region; no runtime client targets ap-south-1; CI and unit tests pass |
 
 ## Phase C — release and operations
 
