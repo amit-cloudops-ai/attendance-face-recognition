@@ -220,3 +220,12 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - Production policies use exact prod table/function/queue/role ARNs, `attendance-prod` KMS alias, prod tags, prod schedule group, and the prod execution-role boundary. The prod state object is Get/Put only; the prod lockfile is the only state path with Get/Put/Delete.
 - CI validates each policy's JSON, size, absence of dev resource/state paths and billing permissions, exact PassRole role/service scope, required prod boundary, five DynamoDB table ARNs, failure processor function condition and prod KMS alias/ViaService/GrantIsForAWSResource conditions.
 - No AWS resources, IAM roles or policies created or attached; no remote backend initialization, Terraform plan or apply.
+
+
+### T13 — Terraform state bucket bootstrap specification
+
+- **Status:** specification drafted; CI validation pending.
+- Added `docs/STATE-BUCKET-BOOTSTRAP.md` with a globally unique account-specific bucket naming convention, us-east-1 region, SSE-S3 default encryption, versioning, all four Block Public Access settings, BucketOwnerEnforced ownership, TLS-only deny policy, no Object Lock, no automatic state expiration, rollback and manual verification sequence.
+- Documented state and lockfile keys for dev, prod and the isolated billing root. Plan/apply state permissions are environment-specific; billing state remains separate and is not included in normal environment roles.
+- CI checks all three Terraform S3 backend blocks for exact state keys, region, encryption and native lockfiles, and checks required bucket security controls in the bootstrap spec.
+- No AWS bucket or resources created; no remote backend init, plan or apply.
