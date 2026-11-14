@@ -42,7 +42,11 @@ def _body(event: dict) -> dict:
 
 
 def _public_employee(item: dict) -> dict:
-    return {key: value for key, value in item.items() if key != "face_ids"}
+    internal = {"face_ids", "enrollment_lock_request", "enrollment_lock_until"}
+    return {
+        key: value for key, value in item.items()
+        if key not in internal and not key.startswith("enrollment_")
+    }
 
 
 def _audit(table, event, action, employee_id, old, new, reason, at):
