@@ -65,7 +65,7 @@ If absent, create the IAM OIDC provider for issuer token.actions.githubuserconte
 
 ### 4. Runtime permissions boundaries
 
-Render the dev/prod boundary templates with the verified account ID. Validate JSON, policy size, allowed runtime services, resource scopes, KMS alias/ViaService conditions and absence of IAM/STS administration or PassRole. Create the two customer-managed boundary policies only after review.
+Render the dev/prod boundary templates with the verified account ID. Validate JSON, policy size, allowed runtime services, resource scopes, KMS alias/ViaService conditions for S3/SQS/SNS and absence of IAM/STS administration or PassRole. Create the two customer-managed boundary policies only after review.
 
 ### 5. GitHub deployment roles
 
