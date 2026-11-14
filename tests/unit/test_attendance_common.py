@@ -148,7 +148,7 @@ def test_same_request_id_returns_original_clock_in_without_clocking_out(aws_tabl
     item = table.get_item(Key={"employee_id": "EMP001", "date": "2026-11-14"})["Item"]
     assert first == retried
     assert first["action"] == "clock_in"
-    assert item["clock_out"] is None
+    assert item.get("clock_out") is None
     assert item["scan_events"][request_id] == first
 
 
