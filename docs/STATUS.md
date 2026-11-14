@@ -189,3 +189,15 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - Added environment-specific dev/prod apply-policy fragments for the exact `alias/attendance-dev` or `alias/attendance-prod` key. The crypto actions and `kms:CreateGrant` are separate statements; CreateGrant alone requires `kms:GrantIsForAWSResource=true`. Both are constrained to the DynamoDB ViaService and environment alias.
 - CI validates exact service principal statements, action sets, account/region conditions, environment aliases, CreateGrant condition and policy size.
 - AWS reference: [DynamoDB encryption at rest usage notes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/encryption.usagenotes.html) explains the minimum customer-managed-key actions, the `kms:ViaService` model, direct service key-metadata access and grants.
+
+
+### T10 — dev Terraform apply-role policy
+
+- **Status:** policy set drafted; CI validation pending.
+- Added split managed-policy templates for core services, DynamoDB, Lambda, IAM, foundation, access, dev state and DynamoDB KMS provisioning. Each rendered policy is below the 6,144-character managed-policy limit.
+- IAM role creation requires the exact dev execution boundary and required Project/Environment tags. `iam:PassRole` is split between the exact 14 Lambda execution-role ARNs and two Scheduler role ARNs, with `iam:PassedToService` constrained separately.
+- DynamoDB table permissions use five exact dev table ARNs and the attendance date GSI. Lambda permissions use 14 exact function ARNs; the event-source-mapping create action is the one documented `Resource: "*"` exception and is constrained by `lambda:FunctionArn` to the failure processor.
+- Foundation permissions exclude AWS Budgets and billing actions; the separate billing root is not in the dev apply role. State writes are limited to the dev state object and dev lockfile.
+- Added CI validation for JSON rendering, size, dev-only ARNs, exact PassRole roles/service conditions, mandatory execution boundary, state/lock isolation, DynamoDB tables, Lambda event source mapping scope and API Gateway path family.
+- Residual service limitations are documented in `infra/policies/README.md`: API Gateway v2 child-resource paths remain scoped at the API path family until generated API ID can be pinned; several create APIs require `Resource: "*"` with tag or function conditions where supported. This is a policy template, not an attached AWS role.
+- No AWS resources, IAM roles or policies created; no remote backend initialization, Terraform plan or apply.
