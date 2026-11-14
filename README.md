@@ -45,13 +45,13 @@ scripts/     seed data, e2e smoke test
 ```
 
 ## Environments and branches
-`develop` auto-deploys to **dev**; `main` deploys to **prod** after manual approval. Feature branches: `a/<topic>`, `b/<topic>`, `c/<topic>`, `lead/<topic>`; open PRs into `develop`.
+`develop` is the **dev** deployment branch; `main` is the **prod** deployment branch. Deployments are manual via `.github/workflows/deploy.yml`: run `plan`, review it, then explicitly select `apply`. Production apply requires a GitHub `prod` environment reviewer. Feature branches: `a/<topic>`, `b/<topic>`, `c/<topic>`, `lead/<topic>`; open PRs into `develop`.
 
 ## Frontend and local verification
 The kiosk is served at `/`, the admin app at `/admin/`, and Cognito returns to `/callback.html`. See [docs/FRONTEND.md](docs/FRONTEND.md) for local run instructions, runtime configuration and the browser verification matrix. The generated `web/config.json` is ignored by Git and uploaded by the access Terraform module.
 
 ## Deploy
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 11 (bootstrap once, then CI deploys).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 11 and [infra/bootstrap/README.md](infra/bootstrap/README.md). CI validates changes; the OIDC deployment workflow is manual-only and has not been run.
 
 ## Documents
 | Doc | Purpose |
