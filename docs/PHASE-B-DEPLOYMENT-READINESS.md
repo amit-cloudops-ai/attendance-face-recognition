@@ -31,9 +31,9 @@ Backend object permissions should be scoped to the exact environment key:
 
 ### 2. GitHub OIDC and deployment workflow
 
-The workflow uses short-lived GitHub OIDC credentials, with one role per environment. The trust policy subject must match the exact GitHub Environment:
-- Dev: `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev`
-- Prod: `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`
+The workflow uses short-lived GitHub OIDC credentials and separate plan/apply roles per environment. Plan roles are read-only apart from state-lock operations; apply roles carry the resource mutation permissions. The trust policy subject must match the exact GitHub Environment:
+- Dev plan/apply: `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev`
+- Prod plan/apply: `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`
 
 Both trust policies must require audience `sts.amazonaws.com`. GitHub Environments must restrict deployment branches: dev to `develop`, prod to `main`; prod must require a reviewer. Do not use static AWS access keys or wildcard OIDC subjects.
 
@@ -60,6 +60,8 @@ The current Terraform roots manage resources across:
 - Rekognition collections, SQS queues/redrive, Lambda async destinations/event mappings, Lambda permissions and CloudWatch alarms (recognition).
 - Cognito, API Gateway v2, CloudFront, CloudFront Functions/cache/origin/response policies, S3 objects/bucket policies and Lambda invoke permissions (access).
 
+The workflow selects four role ARNs through `AWS_ROLE_ARN_DEV_PLAN`, `AWS_ROLE_ARN_DEV_APPLY`, `AWS_ROLE_ARN_PROD_PLAN` and `AWS_ROLE_ARN_PROD_APPLY`. The plan role must not have resource mutation permissions.
+
 The application execution role names follow `attendance-<env>-<function>`; the scheduler roles follow `attendance-<env>-<job>-scheduler`. The deployment policy must scope `iam:PassRole` to only these exact environment role ARNs and the required AWS service principals. Role creation/update permissions need a separate review, including whether a permissions boundary should be added to every application role before allowing CI to create or modify IAM roles.
 
 The exact deployment policy is intentionally not guessed in this phase. It must be checked against the provider's actual create/read/update/delete calls, resource-level IAM support, tagging conditions and any `iam:PassRole` dependencies before an AWS role is created.
@@ -69,6 +71,7 @@ The exact deployment policy is intentionally not guessed in this phase. It must 
 - [x] Inspect current backend configuration and deployment workflow.
 - [x] Identify public plan-artifact exposure.
 - [x] Encrypt saved Terraform plan artifacts before upload.
+- [x] Separate Terraform plan and apply role selection in the deployment workflow.
 - [x] Document age key setup and environment isolation.
 - [ ] Complete deployment-role action inventory and least-privilege policy review.
 - [ ] Decide and document permissions-boundary treatment for application IAM roles.
