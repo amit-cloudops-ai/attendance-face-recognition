@@ -1,7 +1,7 @@
 locals {
-  region            = "ap-south-1"
+  region            = "us-east-1"
   cognito_prefix    = "attendance-${var.account_id}-${var.env}"
-  cognito_base_url  = "${aws_cognito_user_pool_domain.hosted.domain}.auth.ap-south-1.amazoncognito.com"
+  cognito_base_url  = "${aws_cognito_user_pool_domain.hosted.domain}.auth.us-east-1.amazoncognito.com"
   api_origin_domain = replace(aws_apigatewayv2_api.http.api_endpoint, "https://", "")
   api_log_format = jsonencode({
     requestId      = "$context.requestId"
@@ -11,7 +11,7 @@ locals {
     sourceIp       = "$context.identity.sourceIp"
     userAgent      = "$context.identity.userAgent"
   })
-  web_content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://cognito-idp.ap-south-1.amazonaws.com https://${local.cognito_base_url} https://s3.ap-south-1.amazonaws.com https://*.s3.ap-south-1.amazonaws.com; form-action 'self' https://${local.cognito_base_url}; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+  web_content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://cognito-idp.us-east-1.amazonaws.com https://${local.cognito_base_url} https://s3.us-east-1.amazonaws.com https://*.s3.us-east-1.amazonaws.com; form-action 'self' https://${local.cognito_base_url}; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 }
 
 resource "aws_cognito_user_pool" "main" {
@@ -144,7 +144,7 @@ resource "aws_apigatewayv2_authorizer" "jwt" {
 
   jwt_configuration {
     audience = [aws_cognito_user_pool_client.web.id]
-    issuer   = "https://cognito-idp.ap-south-1.amazonaws.com/${aws_cognito_user_pool.main.id}"
+    issuer   = "https://cognito-idp.us-east-1.amazonaws.com/${aws_cognito_user_pool.main.id}"
   }
 }
 
