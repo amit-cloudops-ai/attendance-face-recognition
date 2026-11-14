@@ -48,7 +48,7 @@ scripts/     region guard, Terraform wrapper, read-only AWS preflight, e2e smoke
 ```
 
 ## Environments and branches
-`develop` is the **dev** deployment branch; `main` is the **prod** deployment branch. Deployments are manual via `.github/workflows/deploy.yml`: run `plan`, review it, then explicitly select `apply`. Production apply requires a GitHub `prod` environment reviewer. Feature branches: `a/<topic>`, `b/<topic>`, `c/<topic>`, `lead/<topic>`; open PRs into `develop`.
+`develop` is the **dev** deployment branch; `main` is the **prod** deployment branch. Deployments are manual via `.github/workflows/deploy.yml`: run `plan`, review it, then explicitly select `apply`. Production apply requires the `prod-apply` GitHub environment's independent reviewer. Feature branches: `a/<topic>`, `b/<topic>`, `c/<topic>`, `lead/<topic>`; open PRs into `develop`.
 
 ## Frontend and local verification
 The kiosk is served at `/`, the admin app at `/admin/`, and Cognito returns to `/callback.html`. See [docs/FRONTEND.md](docs/FRONTEND.md) for local run instructions, runtime configuration and the browser verification matrix. The generated `web/config.json` is ignored by Git and uploaded by the access Terraform module.
