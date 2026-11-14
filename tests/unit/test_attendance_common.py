@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import boto3
 import pytest
