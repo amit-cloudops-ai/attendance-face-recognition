@@ -60,6 +60,34 @@ locals {
     COLLECTION_ID      = aws_rekognition_collection.faces.collection_id
   })
 
+  lambda_kms_permissions = {
+    presign = [{
+      Effect   = "Allow"
+      Action   = ["kms:GenerateDataKey"]
+      Resource = [var.kms_key_arn]
+    }]
+    recognize = [{
+      Effect   = "Allow"
+      Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+      Resource = [var.kms_key_arn]
+    }]
+    enroll = [{
+      Effect   = "Allow"
+      Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+      Resource = [var.kms_key_arn]
+    }]
+    enroll_url = [{
+      Effect   = "Allow"
+      Action   = ["kms:GenerateDataKey"]
+      Resource = [var.kms_key_arn]
+    }]
+    failure = [{
+      Effect   = "Allow"
+      Action   = ["kms:Decrypt"]
+      Resource = [var.kms_key_arn]
+    }]
+  }
+
   lambda_permissions = {
     presign = [
       {
@@ -322,17 +350,12 @@ resource "aws_iam_role_policy" "lambda" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = concat(local.lambda_permissions[each.key], [
+    Statement = concat(local.lambda_permissions[each.key], lookup(local.lambda_kms_permissions, each.key, []), [
       {
         Effect   = "Allow"
         Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = ["${aws_cloudwatch_log_group.lambda[each.key].arn}:*"]
       },
-      {
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
-        Resource = [var.kms_key_arn]
-      }
     ])
   })
 }
