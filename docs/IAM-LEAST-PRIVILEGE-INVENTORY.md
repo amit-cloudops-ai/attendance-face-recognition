@@ -60,6 +60,28 @@ Important runtime review points:
 - Verify the `rekognition:DetectFaces` action's resource-level support. Retain `Resource: "*"` only if AWS documents that resource scope is unsupported.
 - Lambda logging requires scoped `logs:CreateLogStream` and `logs:PutLogEvents` on that function's log group ARN suffix. Verify log-group creation stays in Terraform, not runtime.
 
+## 3A. Verified handler call-site review — 14 Nov 2026
+
+The data handler review confirms these concrete SDK operations in the current solo branch:
+
+| Handler | Verified operations | Policy reconciliation |
+|---|---|---|
+| employees | GetItem, Scan, PutItem, UpdateItem | Existing table and audit permissions cover these calls |
+| attendance_query | Scan employees; Query attendance and date index | Existing Scan/Query scope matches |
+| daily_job | Scan employees; Query attendance; GetItem config; PutItem/UpdateItem attendance; PutObject reports; SNS Publish | Existing policy covers these operations |
+| weekly_job | Scan employees; Query attendance; GetItem config; PutObject reports; SNS Publish | Existing policy covers these operations |
+| reports | S3 GetObject from reports prefix | Existing S3 read scope matches |
+| override | GetItem employee/attendance; PutItem attendance/audit | Existing policy covers the observed calls |
+| settings | PutItem config/audit | Existing policy covers the observed calls |
+
+Important corrections to the initial inventory:
+- The `override` handler uses DynamoDB `PutItem`, not `UpdateItem`; the current role policy is consistent with the observed call sites.
+- The broad KMS statement currently appended to every data Lambda role is not least privilege. DynamoDB's table encryption is performed by DynamoDB; it does not justify granting each Lambda direct KMS access. The data handlers that directly read/write SSE-KMS S3 objects are daily_job, weekly_job and reports. Candidate direct KMS actions are GenerateDataKey for report writes and Decrypt for report reads. These must be checked against the bucket's KMS key policy and S3 SSE-KMS authorization behaviour before implementation.
+- The raw S3 bucket and recognition SQS queues use the shared customer-managed KMS key. Recognition roles that upload/read raw objects and send/consume encrypted SQS messages may require scoped GenerateDataKey/Decrypt permissions. Split the requirement by handler and exact bucket/queue resources; do not copy the current broad KMS statement to every role.
+- The foundation KMS key policy grants SNS service access to the encrypted alerts topic and CloudFront access to read encrypted objects. Verify the CloudFront statement is scoped to the actual distribution ARN rather than a distribution wildcard before bootstrap.
+
+This is a code-call-site review, not a complete AWS authorization verification. Exact KMS condition keys, S3 encryption context, SQS permissions, Rekognition resource-level support and provider API actions remain open gates.
+
 ## 4. Deployment policy construction
 
 Candidate service families to verify against provider read/write requests:
