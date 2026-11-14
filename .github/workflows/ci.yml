@@ -38,6 +38,41 @@ jobs:
                   yaml.compose(stream, Loader=yaml.BaseLoader)
           PY
 
+      - name: Validate rendered IAM permissions-boundary templates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          for env in ("dev", "prod"):
+              path = Path(f"infra/policies/execution-role-boundary-{env}.json.tftpl")
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              if "${account_id}" in rendered:
+                  raise SystemExit(f"Unresolved account placeholder in {path}")
+              policy = json.loads(rendered)
+              if policy.get("Version") != "2012-10-17" or not policy.get("Statement"):
+                  raise SystemExit(f"Invalid IAM policy envelope in {path}")
+              expected_alias = f"alias/attendance-{env}"
+              statements = policy["Statement"]
+              for statement in statements:
+                  actions = statement.get("Action", [])
+                  actions = [actions] if isinstance(actions, str) else actions
+                  if any(action.startswith(("iam:", "sts:")) for action in actions):
+                      raise SystemExit(f"Boundary must not manage IAM/STS: {path}")
+                  if statement.get("Resource") == "*" and actions != ["rekognition:DetectFaces"]:
+                      raise SystemExit(f"Unexpected unscoped resource in {path}: {actions}")
+              kms = next(s for s in statements if s["Sid"] == "KmsRuntimeAccessViaS3AndSqs")
+              if kms["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != expected_alias:
+                  raise SystemExit(f"Wrong KMS alias scope in {path}")
+              if set(kms["Condition"]["StringEquals"]["kms:ViaService"]) != {
+                  "s3.us-east-1.amazonaws.com", "sqs.us-east-1.amazonaws.com"
+              }:
+                  raise SystemExit(f"Wrong KMS ViaService scope in {path}")
+              compact = json.dumps(policy, separators=(",", ":"))
+              if len(compact) > 6144:
+                  raise SystemExit(f"IAM managed policy size exceeds 6144 characters: {path}")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
