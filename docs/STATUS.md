@@ -32,7 +32,7 @@ Target region: us-east-1. Target account: the owner's existing AWS account; the 
 | T13 | Manual S3 state bucket bootstrap specification | PR #21; CI run 43618372200 |
 | T14 | Operation-specific GitHub OIDC subjects, role selection and deployment workflow boundaries | PR #22; CI run 43618685801 |
 | T15 | Encrypted plan artifact provenance, run-attempt binding and cleanup | PR #23; CI run 43618692691 |
-| T17 | Infrastructure template lint audit and CI guard for future CloudFormation/SAM templates | PR #25 pending; final CI evidence to be recorded after run completion |
+| T17 | Infrastructure template lint audit and CI guard for future CloudFormation/SAM templates | PR #25; CI run 43619026006 passed |
 
 The policy templates are not attached to AWS roles. IAM Access Analyzer and live AWS authorization tests have not been performed.
 
@@ -52,7 +52,7 @@ The GitHub connector cannot inspect or configure repository Actions environments
 
 <badge color="warning">Blocked</badge>
 
-PR #26 contains docs/MANUAL-AWS-BOOTSTRAP-PLAN.md. It enumerates the state bucket, OIDC provider, two runtime boundaries, four GitHub plan/apply roles, policy attachments, manual order, dev-first rollout, prod approval and rollback.
+PR #26 contains docs/MANUAL-AWS-BOOTSTRAP-PLAN.md. It enumerates the state bucket, OIDC provider, two runtime boundaries, four GitHub plan/apply roles, policy attachments, manual order, dev-first rollout, prod approval and rollback. CI run [43619095037](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43619095037), commit `f3aa1e85a6`: Python and Terraform jobs passed, including the bootstrap-plan inventory validator, all policy validators, lockfiles and environment roots.
 
 The exact 12-digit account ID and globally unique state bucket suffix remain unknown. The bootstrap plan must be rendered with verified account values and presented to the owner before any write operation. T16 must also be resolved before role federation can be enabled.
 
