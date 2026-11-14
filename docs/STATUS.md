@@ -141,3 +141,12 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - 14 Nov 2026: Audited repository governance and found the three expected governance files absent from the solo implementation branch. Created `ai/T01-repository-governance` from the verified solo baseline, restored the governance files, created the task board, and added AI task-branch push CI coverage. T01 closed after both CI jobs passed. The next task is T02; no AWS changes. No AWS changes.
 
 - First CI attempt [43615741764](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43615741764) failed in the new policy validator, not in pytest or Terraform. Root cause: the validator treated every `iam:` action as a mutation, incorrectly rejecting required read-only `iam:GetRole`, `iam:GetRolePolicy` and `iam:ListRoleTags`. The policy itself was not changed. Fix attempt 1 narrows the validator to explicit IAM write/administrative prefixes and also checks API Gateway, DynamoDB, Lambda, SQS, Scheduler and other service mutation verbs. Revalidation is pending.
+
+### T32 — EventBridge Scheduler trust policy hardening
+
+- **Status:** implementation drafted; CI validation pending.
+- Confirmed the current Scheduler execution-role trust policy allowed any `scheduler.amazonaws.com` principal request without source conditions.
+- AWS's current confused-deputy guidance explicitly requires `aws:SourceArn` to identify a **schedule-group ARN**, not an individual schedule ARN. The existing configuration used the shared `default` group, which would not separate dev and prod.
+- Added a dedicated `attendance-<env>` schedule group in the data module, assigned daily/weekly schedules to it, and scoped Scheduler role trust to the exact group ARN plus `aws:SourceAccount=var.account_id` using `StringEquals`.
+- Added `account_id` as an explicit data-module input in both environment roots. Provider IAM follow-up includes Create/Get/DeleteScheduleGroup and tagging actions.
+- AWS evidence: [EventBridge Scheduler confused-deputy prevention](https://docs.aws.amazon.com/scheduler/latest/UserGuide/cross-service-confused-deputy-prevention.html) states the source ARN must be the schedule group ARN and recommends combining it with source account.
