@@ -51,7 +51,7 @@ Billing has dedicated plan/apply policy templates and OIDC trust templates in T3
 
 ### 1. Read-only identity and existence checks
 
-Before any write operation, use an authenticated read-only AWS session to verify the active STS identity and region. Inspect whether the OIDC provider, state bucket, boundary policies, deployment roles and policy names already exist. Record exact ARNs and current trust/permission documents. No writes in this step. Use `bash scripts/aws_preflight_readonly.sh` with an approved read-only AWS profile; set `TF_STATE_BUCKET` only after selecting the candidate suffix. No live inventory has been performed by this repository session.
+Before any write operation, use an authenticated read-only AWS session to verify the active STS identity and region. Inspect whether the OIDC provider, state bucket, boundary policies, deployment roles and policy names already exist. Record exact ARNs and current trust/permission documents. No writes in this step. Use `bash scripts/aws_preflight_readonly.sh` with an approved read-only AWS profile. The script discovers a unique existing bucket matching `attendance-tf-state-<account-id>-*`; if none or multiple are found, set `TF_STATE_BUCKET` explicitly to inspect a known candidate. No live inventory has been performed by this repository session.
 
 ### 2. State bucket
 
