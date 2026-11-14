@@ -136,7 +136,11 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T32 — EventBridge Scheduler trust policy hardening
 
-- **Status:** implementation drafted; CI validation pending.
+- **Status:** complete on `ai/T32-scheduler-trust`.
+- Created `aws_scheduler_schedule_group.attendance` named `attendance-dev` or `attendance-prod` and assigned daily/weekly schedules to the matching group.
+- Scheduler execution-role trust now requires both `aws:SourceAccount=var.account_id` and `aws:SourceArn=aws_scheduler_schedule_group.attendance.arn` using exact `StringEquals` conditions. This follows AWS guidance that the SourceArn must be the schedule-group ARN, not an individual schedule ARN.
+- Added the schedule-group CRUD/tag provider operations to the T07 IAM action inventory. Updated the dev plan role policy to read only the `attendance-dev` schedule group and its schedules.
+- CI run [43616332197](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43616332197), commit `966eda33e8b7`: Python and Terraform jobs passed. Python validation checked environment-specific group names, source account/ARN trust conditions, schedule group assignment in both environment roots, and dev-only plan policy group/schedule ARNs. Terraform formatting, all four module validations and both environment-root validations passed.
 - Confirmed the current Scheduler execution-role trust policy allowed any `scheduler.amazonaws.com` principal request without source conditions.
 - AWS's current confused-deputy guidance explicitly requires `aws:SourceArn` to identify a **schedule-group ARN**, not an individual schedule ARN. The existing configuration used the shared `default` group, which would not separate dev and prod.
 - Added a dedicated `attendance-<env>` schedule group in the data module, assigned daily/weekly schedules to it, and scoped Scheduler role trust to the exact group ARN plus `aws:SourceAccount=var.account_id` using `StringEquals`.
