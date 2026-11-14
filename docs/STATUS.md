@@ -47,7 +47,8 @@
 
 ### T04 — data runtime IAM reconciliation
 
-- **Status:** static review complete; CI validation pending.
+- **Status:** complete on `ai/T04-data-runtime-iam`.
+- CI run [43612832683](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43612832683), commit `6c1946a4d2391eeabf0a0323fae19669259722dc`: Python and Terraform jobs passed, including pytest, Ruff, formatting, all four module validations and both environment-root validations.
 - Audited all seven data handlers against the role-specific policies in `infra/modules/data/main.tf`.
 - Confirmed the actions and ARNs for employees, attendance query, daily/weekly jobs, reports, override and settings. Override uses GetItem/PutItem, settings uses GetItem/PutItem; no UpdateItem grants are required for either.
 - Confirmed data KMS split: daily_job/weekly_job GenerateDataKey for SSE-KMS report writes; reports Decrypt for report reads; no direct KMS permission for DynamoDB encryption.
