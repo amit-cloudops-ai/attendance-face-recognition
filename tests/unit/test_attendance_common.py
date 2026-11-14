@@ -4,12 +4,11 @@ from zoneinfo import ZoneInfo
 
 import boto3
 import pytest
-from moto import mock_aws
-
 from attendance_common import config
 from attendance_common.record_scan import record_scan
 from attendance_common.responses import error, ok
-from attendance_common.tz import IST, now_ist, parse_hhmm, today_ist, to_iso
+from attendance_common.tz import IST, now_ist, parse_hhmm, to_iso, today_ist
+from moto import mock_aws
 
 UTC = ZoneInfo("UTC")
 
