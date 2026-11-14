@@ -80,7 +80,7 @@ The previous recommendation to bypass OIDC and apply locally as the broad `Amit-
 
 ### Part 2 — Terraform, IAM and AWS configuration correctness
 
-- Verify CI for the SNS/KMS static correction, then test encrypted Lambda/CloudWatch alarm delivery in dev.
+- Verify CI for the SNS topic/KMS static corrections, then test encrypted Lambda and CloudWatch alarm email delivery in dev.
 - Run local WSL Terraform formatting/validation and verify the new boundary/account guards.
 - Confirm CI enforces generated `config.json` ownership.
 - Run the local wrapper against the verified profile in read-only/validate mode; do not initialize the remote backend until separately approved.
