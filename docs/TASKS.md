@@ -22,7 +22,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T07 | Verify Terraform provider IAM actions for data and recognition modules | DONE | All provider operations mapped, including Lambda, IAM, DynamoDB, Scheduler, SQS, Rekognition and CloudWatch |
 | T08 | Verify Terraform provider IAM actions for access module | DONE | Cognito, API Gateway v2, CloudFront, S3 and Lambda permission operations mapped |
 | T09 | Build dev plan-role policy | DONE | Read-only planning permissions, dev-only state/lock access, no resource mutation |
-| T10 | Build dev apply-role policy | TODO | Exact dev resource permissions, boundary enforcement and exact iam:PassRole scopes |
+| T10 | Build dev apply-role policy | IN_PROGRESS | Exact dev resource permissions, boundary enforcement and exact iam:PassRole scopes |
 | T11 | Build prod plan-role policy | TODO | Read-only planning permissions, prod-only state/lock access, no resource mutation |
 | T12 | Build prod apply-role policy | TODO | Exact prod resource permissions, boundary enforcement and exact iam:PassRole scopes |
 | T13 | Review Terraform state bucket bootstrap specification | TODO | Versioning, public access block, SSE-S3, ownership controls, TLS-only bucket policy, state/lock object scope documented |
