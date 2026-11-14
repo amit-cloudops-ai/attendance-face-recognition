@@ -123,20 +123,7 @@ def _release_employee_lock(employees, employee_id: str, request_id: str) -> None
 
 
 
-def _delete_request_faces(rekognition, image: dict, external_id: str) -> None:
-    matches = rekognition.search_faces_by_image(
-        CollectionId=_required_env("COLLECTION_ID"),
-        Image=image,
-        FaceMatchThreshold=0.0,
-        MaxFaces=10,
-        QualityFilter="NONE",
-    ).get("FaceMatches", [])
-    face_ids = [
-        (match.get("Face") or {}).get("FaceId")
-        for match in matches
-        if (match.get("Face") or {}).get("ExternalImageId") == external_id
-        and (match.get("Face") or {}).get("FaceId")
-    ]
+def _delete_face_ids(rekognition, face_ids: list[str]) -> None:
     if not face_ids:
         return
     response = rekognition.delete_faces(
@@ -151,6 +138,23 @@ def _delete_request_faces(rekognition, image: dict, external_id: str) -> None:
             raise RuntimeError("Rekognition could not remove an uncommitted enrollment face")
     if confirmed != set(face_ids):
         raise RuntimeError("Rekognition did not confirm cleanup of every uncommitted face")
+
+
+def _delete_request_faces(rekognition, image: dict, external_id: str) -> None:
+    matches = rekognition.search_faces_by_image(
+        CollectionId=_required_env("COLLECTION_ID"),
+        Image=image,
+        FaceMatchThreshold=0.0,
+        MaxFaces=10,
+        QualityFilter="NONE",
+    ).get("FaceMatches", [])
+    face_ids = [
+        (match.get("Face") or {}).get("FaceId")
+        for match in matches
+        if (match.get("Face") or {}).get("ExternalImageId") == external_id
+        and (match.get("Face") or {}).get("FaceId")
+    ]
+    _delete_face_ids(rekognition, face_ids)
 
 
 def _process_record(record: dict) -> None:
@@ -341,7 +345,7 @@ def _process_record(record: dict) -> None:
                 indexed_face_ids = []
             else:
                 if face_id not in set((latest or {}).get("face_ids") or []):
-                    _delete_request_faces(rekognition, image, request_external_id)
+                    _delete_face_ids(rekognition, [face_id])
                     indexed_face_ids = []
                 _release_employee_lock(employees, employee_id, request_id)
                 code = "limit_reached" if latest and latest.get("active", False) else "unknown_employee"
