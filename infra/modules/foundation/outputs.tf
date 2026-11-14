@@ -61,3 +61,8 @@ output "common_env" {
     BUCKET_REPORTS = aws_s3_bucket.reports.bucket
   }
 }
+
+output "kms_key_id" {
+  description = "Shared KMS key ID used by the access module to install the final policy after CloudFront exists."
+  value       = aws_kms_key.attendance.key_id
+}
