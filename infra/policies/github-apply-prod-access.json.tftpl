@@ -1,0 +1,203 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CognitoUserPoolLifecycle",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:CreateUserPool",
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:UpdateUserPool",
+        "cognito-idp:DeleteUserPool",
+        "cognito-idp:SetUserPoolMfaConfig",
+        "cognito-idp:GetUserPoolMfaConfig",
+        "cognito-idp:AddCustomAttributes",
+        "cognito-idp:TagResource",
+        "cognito-idp:UntagResource",
+        "cognito-idp:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-east-1:${account_id}:userpool/*"
+    },
+    {
+      "Sid": "CognitoClientDomainGroups",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:UpdateUserPoolClient",
+        "cognito-idp:DeleteUserPoolClient",
+        "cognito-idp:CreateUserPoolDomain",
+        "cognito-idp:DescribeUserPoolDomain",
+        "cognito-idp:UpdateUserPoolDomain",
+        "cognito-idp:DeleteUserPoolDomain",
+        "cognito-idp:CreateGroup",
+        "cognito-idp:GetGroup",
+        "cognito-idp:UpdateGroup",
+        "cognito-idp:DeleteGroup"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-east-1:${account_id}:userpool/*"
+    },
+    {
+      "Sid": "ApiGatewayCreateApi",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:POST"
+      ],
+      "Resource": [
+        "arn:aws:apigateway:us-east-1::/apis",
+        "arn:aws:apigateway:us-east-1::/apis/*/*"
+      ]
+    },
+    {
+      "Sid": "ApiGatewayManageApi",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET",
+        "apigateway:PATCH",
+        "apigateway:PUT",
+        "apigateway:DELETE"
+      ],
+      "Resource": "arn:aws:apigateway:us-east-1::/apis/*"
+    },
+    {
+      "Sid": "CloudFrontDistributionCreate",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateDistribution"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "attendance",
+          "aws:RequestTag/Environment": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "CloudFrontDistributionManage",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:TagResource",
+        "cloudfront:UntagResource",
+        "cloudfront:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:distribution/*"
+    },
+    {
+      "Sid": "CloudFrontOAC",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:GetOriginAccessControlConfig",
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:origin-access-control/*"
+    },
+    {
+      "Sid": "CloudFrontCachePolicies",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetCachePolicy",
+        "cloudfront:GetCachePolicyConfig",
+        "cloudfront:UpdateCachePolicy",
+        "cloudfront:DeleteCachePolicy"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:cache-policy/*"
+    },
+    {
+      "Sid": "CloudFrontOriginPolicies",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetOriginRequestPolicy",
+        "cloudfront:GetOriginRequestPolicyConfig",
+        "cloudfront:UpdateOriginRequestPolicy",
+        "cloudfront:DeleteOriginRequestPolicy"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:origin-request-policy/*"
+    },
+    {
+      "Sid": "CloudFrontResponsePolicies",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetResponseHeadersPolicy",
+        "cloudfront:GetResponseHeadersPolicyConfig",
+        "cloudfront:UpdateResponseHeadersPolicy",
+        "cloudfront:DeleteResponseHeadersPolicy"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:response-headers-policy/*"
+    },
+    {
+      "Sid": "CloudFrontFunction",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:DescribeFunction",
+        "cloudfront:GetFunction",
+        "cloudfront:UpdateFunction",
+        "cloudfront:DeleteFunction",
+        "cloudfront:PublishFunction"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:function/attendance-prod-directory-index"
+    },
+    {
+      "Sid": "S3WebObjects",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::attendance-prod-${account_id}-web/*"
+    },
+    {
+      "Sid": "S3WebBucketPolicy",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketPolicy",
+        "s3:PutBucketPolicy",
+        "s3:DeleteBucketPolicy"
+      ],
+      "Resource": "arn:aws:s3:::attendance-prod-${account_id}-web"
+    },
+    {
+      "Sid": "CloudFrontFunctionCreate",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateFunction",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "attendance",
+          "aws:RequestTag/Environment": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "CloudFrontOACCreate",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateOriginAccessControl",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFrontCachePoliciesCreate",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateCachePolicy",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFrontOriginPoliciesCreate",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateOriginRequestPolicy",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFrontResponsePoliciesCreate",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateResponseHeadersPolicy",
+      "Resource": "*"
+    }
+  ]
+}
