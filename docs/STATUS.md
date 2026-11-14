@@ -65,6 +65,16 @@
 - Boundaries are allow-list ceilings and include no IAM management, `iam:PassRole`, STS, provisioning or self-management actions. They do not grant permissions; the handler-specific role policies remain the grant layer.
 - Account ID is a template variable because the verified 12-digit account ID is not in the repository. Templates must be rendered and validated before manual bootstrap. No policy has been created or attached.
 
+### T06 — foundation Terraform provider IAM mapping
+
+- **Status:** complete on `ai/T06-foundation-provider-iam`.
+- CI run [43613487881](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43613487881), commit `2a05c4d8248f7164d21f0aa6e1c851dad3b8e94d`: Python and Terraform jobs passed, including the policy-template validator, formatting, all module validations and both environment-root validations.
+- CI resolved AWS provider v6.73.0 and archive provider v2.8.1 in run [43613054015](https://github.com/amit-cloudops-ai/attendance-face-recognition). The root constraint still allows AWS provider >=5,<7 and no lockfile is committed; T33 tracks pinning and reproducibility.
+- Mapped KMS key/alias, all S3 bucket and split configuration resources, SNS topic/subscription, Lambda layer and AWS Budget API operations against provider v6.73.0 source and AWS Service Authorization References. Full matrix: `docs/security/FOUNDATION-PROVIDER-IAM.md`.
+- S3 provider v6.73.0 `aws_s3_bucket` read path requires more bucket-level read actions than the explicitly configured split resources alone suggest; HeadBucket maps to `s3:ListBucket`. S3 Control tagging operations are used for tagged buckets.
+- AWS Budget operations require `budgets:ModifyBudget`/`ViewBudget` plus account-wide `aws-portal:ModifyBilling`/`ViewBilling`. T34 tracks isolating budgets so ordinary deployment roles do not receive account-wide billing modification.
+- Foundation KMS key policy still allows CloudFront service access from any distribution in the account; T35 tracks exact distribution scoping.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
