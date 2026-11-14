@@ -34,6 +34,13 @@
 - Verified `rekognition:DetectFaces` requires `Resource: "*"`; collection-bound actions remain on the collection ARN. AWS docs: [Rekognition IAM guide](https://docs.aws.amazon.com/rekognition/latest/dg/security_iam_service-with-iam.html).
 - Found a separate deployment blocker: several recognition handlers hard-code `ap-south-1`, while Terraform targets `us-east-1`. Added T31 to correct runtime region selection across all Lambda handlers/shared code before deployment.
 
+### T31 — Lambda runtime region alignment
+
+- **Status:** implementation complete; CI validation pending.
+- Root cause: all seven data handlers and all seven recognition handlers contained an explicit `ap-south-1` region constant; shared DynamoDB helpers and the result handler also fell back to `ap-south-1`. Terraform provider and backend roots target `us-east-1`, so these SDK clients could address the wrong regional resources.
+- Fix: all 14 Lambda handlers now derive their region from Lambda's reserved `AWS_REGION` environment variable with `us-east-1` as the local/test fallback. Shared `get_settings` and `record_scan` helpers use the same environment variable and fallback.
+- No AWS resources or live AWS calls were used. Python and Terraform CI are the validation gates.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
