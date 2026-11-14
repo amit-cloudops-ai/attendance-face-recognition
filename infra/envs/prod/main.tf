@@ -11,6 +11,7 @@ module "data" {
   source = "../../modules/data"
 
   env                         = var.env
+  account_id                  = var.account_id
   execution_role_boundary_arn = var.execution_role_boundary_arn
   kms_key_arn                 = module.foundation.kms_key_arn
   raw_bucket_name             = module.foundation.raw_bucket_name
@@ -42,6 +43,7 @@ module "access" {
 
   env                             = var.env
   account_id                      = var.account_id
+  kms_key_id                      = module.foundation.kms_key_id
   raw_bucket_name                 = module.foundation.raw_bucket_name
   web_bucket_name                 = module.foundation.web_bucket_name
   web_bucket_arn                  = module.foundation.web_bucket_arn

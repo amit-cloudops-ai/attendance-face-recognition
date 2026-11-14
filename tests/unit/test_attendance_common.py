@@ -17,12 +17,12 @@ UTC = ZoneInfo("UTC")
 @pytest.fixture
 def aws_tables(monkeypatch):
     with mock_aws():
-        monkeypatch.setenv("AWS_REGION", "ap-south-1")
+        monkeypatch.setenv("AWS_REGION", "us-east-1")
         monkeypatch.setenv("TABLE_EMPLOYEES", "employees")
         monkeypatch.setenv("TABLE_ATTENDANCE", "attendance")
         monkeypatch.delenv("TABLE_CONFIG", raising=False)
         config._reset_cache()
-        db = boto3.resource("dynamodb", region_name="ap-south-1")
+        db = boto3.resource("dynamodb", region_name="us-east-1")
         employees = db.create_table(TableName="employees", KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"}],
             AttributeDefinitions=[{"AttributeName": "employee_id", "AttributeType": "S"}], BillingMode="PAY_PER_REQUEST")
         attendance = db.create_table(TableName="attendance", KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"},

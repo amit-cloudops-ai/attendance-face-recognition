@@ -1,0 +1,100 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LambdaLifecycle",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:DeleteFunction",
+        "lambda:PublishVersion",
+        "lambda:GetFunctionConcurrency",
+        "lambda:PutFunctionConcurrency",
+        "lambda:DeleteFunctionConcurrency",
+        "lambda:ListTags",
+        "lambda:TagResource",
+        "lambda:UntagResource"
+      ],
+      "Resource": [
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-employees",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-attendance-query",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-daily-job",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-weekly-job",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-reports",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-override",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-settings",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-presign",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-result",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-recognize",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-enroll",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-enroll-url",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-faces-delete",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-failure"
+      ]
+    },
+    {
+      "Sid": "LambdaInvokeConfiguration",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:PutFunctionEventInvokeConfig",
+        "lambda:GetFunctionEventInvokeConfig",
+        "lambda:DeleteFunctionEventInvokeConfig",
+        "lambda:AddPermission",
+        "lambda:GetPolicy",
+        "lambda:RemovePermission"
+      ],
+      "Resource": [
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-employees",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-attendance-query",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-daily-job",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-weekly-job",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-reports",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-override",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-settings",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-presign",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-result",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-recognize",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-enroll",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-enroll-url",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-faces-delete",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-failure"
+      ]
+    },
+    {
+      "Sid": "LambdaEventSourceMappingCreate",
+      "Effect": "Allow",
+      "Action": "lambda:CreateEventSourceMapping",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "lambda:FunctionArn": "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-failure"
+        }
+      }
+    },
+    {
+      "Sid": "LambdaEventSourceMappingManage",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetEventSourceMapping",
+        "lambda:UpdateEventSourceMapping",
+        "lambda:DeleteEventSourceMapping"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:${account_id}:event-source-mapping:*",
+      "Condition": {
+        "StringEquals": {
+          "lambda:FunctionArn": "arn:aws:lambda:us-east-1:${account_id}:function:attendance-prod-failure"
+        }
+      }
+    },
+    {
+      "Sid": "LambdaCommonLayer",
+      "Effect": "Allow",
+      "Action": "lambda:GetLayerVersion",
+      "Resource": "arn:aws:lambda:us-east-1:${account_id}:layer:attendance-prod-common:*"
+    }
+  ]
+}

@@ -26,12 +26,12 @@ def admin_event(body=None, method="POST", group="admin"):
 @pytest.fixture
 def admin_resources(monkeypatch):
     with mock_aws():
-        monkeypatch.setenv("AWS_REGION", "ap-south-1")
+        monkeypatch.setenv("AWS_REGION", "us-east-1")
         monkeypatch.setenv("TABLE_EMPLOYEES", "employees")
         monkeypatch.setenv("TABLE_ATTENDANCE", "attendance")
         monkeypatch.setenv("TABLE_CONFIG", "config")
         monkeypatch.setenv("TABLE_AUDIT", "audit")
-        db = boto3.resource("dynamodb", region_name="ap-south-1")
+        db = boto3.resource("dynamodb", region_name="us-east-1")
         employees = db.create_table(
             TableName="employees",
             KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"}],

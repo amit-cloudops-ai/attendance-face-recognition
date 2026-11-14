@@ -4,22 +4,25 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 5.0, < 7.0"
+      version = "= 6.73.0"
     }
     archive = {
       source  = "hashicorp/archive"
-      version = ">= 2.4, < 3.0"
+      version = "= 2.8.1"
     }
   }
 
   backend "s3" {
     key          = "attendance/prod/terraform.tfstate"
-    region       = "us-east-1"
     encrypt      = true
     use_lockfile = true
   }
 }
 
+locals {
+  deployment_region = jsondecode(file("${path.module}/../../../config/deployment.json")).aws_region
+}
+
 provider "aws" {
-  region = "us-east-1"
+  region = local.deployment_region
 }

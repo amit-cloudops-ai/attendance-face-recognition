@@ -14,7 +14,7 @@ Turn "an image landed in S3" into "a correct, safe, fast recognition result", an
 ## Build steps (with why)
 **1. Collection.** Terraform resource for the Rekognition collection `attendance-{env}-faces` (if your provider version lacks it, create it once in CloudShell with `create-collection` and import/data-source it). *Why:* the collection holds face vectors, not photos.
 
-**2. `presign` Lambda** (256 MB, 5 s). Generate `request_id` (uuid4); write scan-results row `{kind: scan, code: pending, created_at, ttl}`; create a pre-signed **POST** for `captures/{request_id}.jpg` with conditions: `Content-Type = image/jpeg`, `content-length-range 1024..1048576`, expiry 60 s. Create the S3 client with `region_name="ap-south-1"` and `signature_version="s3v4"`. Return the contract shape. *Why:* POST lets the server enforce size/type; the regional client avoids redirect/CORS failures on new buckets.
+**2. `presign` Lambda** (256 MB, 5 s). Generate `request_id` (uuid4); write scan-results row `{kind: scan, code: pending, created_at, ttl}`; create a pre-signed **POST** for `captures/{request_id}.jpg` with conditions: `Content-Type = image/jpeg`, `content-length-range 1024..1048576`, expiry 60 s. Create the S3 client using the Lambda-reserved `AWS_REGION` value and `signature_version="s3v4"`; never hard-code a region. CI enforces the repository-wide region invariant. Return the contract shape. *Why:* POST lets the server enforce size/type; the regional client avoids redirect/CORS failures on new buckets.
 
 **3. `result` Lambda** (128 MB). `GetItem` scan-results by `request_id` from the path; 404 `not_found` if missing; return the contract shape. Strip internal fields. *Why:* the browser polls this every 500 ms, so keep it tiny.
 

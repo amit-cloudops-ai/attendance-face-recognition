@@ -22,12 +22,12 @@ def admin_event(query=None, group="admin"):
 @pytest.fixture
 def job_resources(monkeypatch):
     with mock_aws():
-        monkeypatch.setenv("AWS_REGION", "ap-south-1")
+        monkeypatch.setenv("AWS_REGION", "us-east-1")
         monkeypatch.setenv("TABLE_EMPLOYEES", "employees")
         monkeypatch.setenv("TABLE_ATTENDANCE", "attendance")
         monkeypatch.setenv("TABLE_CONFIG", "config")
         monkeypatch.setenv("BUCKET_REPORTS", "attendance-reports")
-        db = boto3.resource("dynamodb", region_name="ap-south-1")
+        db = boto3.resource("dynamodb", region_name="us-east-1")
         employees = db.create_table(
             TableName="employees",
             KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"}],
@@ -61,12 +61,11 @@ def job_resources(monkeypatch):
             BillingMode="PAY_PER_REQUEST",
         )
         settings.put_item(Item={"pk": "SETTINGS", "weekend_days": [6, 7]})
-        s3 = boto3.client("s3", region_name="ap-south-1")
+        s3 = boto3.client("s3", region_name="us-east-1")
         s3.create_bucket(
             Bucket="attendance-reports",
-            CreateBucketConfiguration={"LocationConstraint": "ap-south-1"},
         )
-        sns = boto3.client("sns", region_name="ap-south-1")
+        sns = boto3.client("sns", region_name="us-east-1")
         topic = sns.create_topic(Name="attendance-alerts")["TopicArn"]
         monkeypatch.setenv("ALERTS_TOPIC_ARN", topic)
         config._reset_cache()

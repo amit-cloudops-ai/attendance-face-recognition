@@ -1,6 +1,6 @@
 # Foundation Terraform module
 
-Creates the shared KMS key, private raw/reports/web buckets, SSE-KMS bucket encryption, public-access blocks, raw-image lifecycle backstop, report-bucket versioning, common Python Lambda layer, encrypted SNS alerts topic and USD 15 monthly AWS Budget.
+Creates the shared KMS key, private raw/reports/web buckets, SSE-KMS bucket encryption, public-access blocks, raw-image lifecycle backstop, report-bucket versioning, common Python Lambda layer, encrypted SNS alerts topic. AWS Budgets are isolated in the separate `infra/billing` root and are not part of normal environment deployments.
 
 ## Inputs
 

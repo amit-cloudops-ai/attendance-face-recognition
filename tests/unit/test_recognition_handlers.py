@@ -25,12 +25,12 @@ def api_event(group="kiosk", request_id=None):
 @pytest.fixture
 def aws_env(monkeypatch):
     with mock_aws():
-        monkeypatch.setenv("AWS_REGION", "ap-south-1")
+        monkeypatch.setenv("AWS_REGION", "us-east-1")
         monkeypatch.setenv("TABLE_SCAN_RESULTS", "scan-results")
         monkeypatch.setenv("TABLE_EMPLOYEES", "employees")
         monkeypatch.setenv("BUCKET_RAW", "attendance-raw")
         monkeypatch.setenv("COLLECTION_ID", "attendance-dev-faces")
-        db = boto3.resource("dynamodb", region_name="ap-south-1")
+        db = boto3.resource("dynamodb", region_name="us-east-1")
         scans = db.create_table(TableName="scan-results",
             KeySchema=[{"AttributeName": "request_id", "KeyType": "HASH"}],
             AttributeDefinitions=[{"AttributeName": "request_id", "AttributeType": "S"}],
@@ -39,9 +39,8 @@ def aws_env(monkeypatch):
             KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"}],
             AttributeDefinitions=[{"AttributeName": "employee_id", "AttributeType": "S"}],
             BillingMode="PAY_PER_REQUEST")
-        boto3.client("s3", region_name="ap-south-1").create_bucket(
+        boto3.client("s3", region_name="us-east-1").create_bucket(
             Bucket="attendance-raw",
-            CreateBucketConfiguration={"LocationConstraint": "ap-south-1"},
         )
         config._reset_cache()
         yield scans, employees

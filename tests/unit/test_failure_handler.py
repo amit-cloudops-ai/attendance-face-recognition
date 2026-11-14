@@ -25,13 +25,13 @@ class FakeRekognition:
 @pytest.fixture
 def aws_env(monkeypatch):
     with mock_aws():
-        monkeypatch.setenv("AWS_REGION", "ap-south-1")
+        monkeypatch.setenv("AWS_REGION", "us-east-1")
         monkeypatch.setenv("TABLE_SCAN_RESULTS", "scan-results")
         monkeypatch.setenv("TABLE_ATTENDANCE", "attendance")
         monkeypatch.setenv("TABLE_EMPLOYEES", "employees")
         monkeypatch.setenv("BUCKET_RAW", "attendance-raw")
         monkeypatch.setenv("COLLECTION_ID", "attendance-dev-faces")
-        db = boto3.resource("dynamodb", region_name="ap-south-1")
+        db = boto3.resource("dynamodb", region_name="us-east-1")
         scans = db.create_table(
             TableName="scan-results",
             KeySchema=[{"AttributeName": "request_id", "KeyType": "HASH"}],
@@ -64,10 +64,9 @@ def aws_env(monkeypatch):
             AttributeDefinitions=[{"AttributeName": "employee_id", "AttributeType": "S"}],
             BillingMode="PAY_PER_REQUEST",
         )
-        s3 = boto3.client("s3", region_name="ap-south-1")
+        s3 = boto3.client("s3", region_name="us-east-1")
         s3.create_bucket(
             Bucket="attendance-raw",
-            CreateBucketConfiguration={"LocationConstraint": "ap-south-1"},
         )
         fake_rekognition = FakeRekognition()
         monkeypatch.setattr(

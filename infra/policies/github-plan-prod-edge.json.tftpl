@@ -1,0 +1,156 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "KmsKeyRead",
+      "Effect": "Allow",
+      "Action": [
+        "kms:DescribeKey",
+        "kms:GetKeyPolicy",
+        "kms:GetKeyRotationStatus",
+        "kms:ListResourceTags"
+      ],
+      "Resource": "arn:aws:kms:us-east-1:${account_id}:key/*",
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "kms:ResourceAliases": "alias/attendance-prod"
+        }
+      }
+    },
+    {
+      "Sid": "KmsAliasList",
+      "Effect": "Allow",
+      "Action": [
+        "kms:ListAliases"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3BucketRead",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:GetBucketPolicy",
+        "s3:GetBucketAcl",
+        "s3:GetBucketCORS",
+        "s3:GetBucketWebsite",
+        "s3:GetBucketVersioning",
+        "s3:GetAccelerateConfiguration",
+        "s3:GetBucketRequestPayment",
+        "s3:GetBucketLogging",
+        "s3:GetLifecycleConfiguration",
+        "s3:GetReplicationConfiguration",
+        "s3:GetEncryptionConfiguration",
+        "s3:GetBucketObjectLockConfiguration",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:GetBucketNotification",
+        "s3:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:s3:::attendance-prod-${account_id}-raw",
+        "arn:aws:s3:::attendance-prod-${account_id}-reports",
+        "arn:aws:s3:::attendance-prod-${account_id}-web"
+      ]
+    },
+    {
+      "Sid": "S3WebObjectHead",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::attendance-prod-${account_id}-web/*"
+    },
+    {
+      "Sid": "CognitoPoolRead",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:GetUserPoolMfaConfig",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:DescribeUserPoolDomain",
+        "cognito-idp:GetGroup",
+        "cognito-idp:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-east-1:${account_id}:userpool/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "attendance",
+          "aws:ResourceTag/Environment": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "ApiGatewayV2Read",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET"
+      ],
+      "Resource": [
+        "arn:aws:apigateway:us-east-1::/apis",
+        "arn:aws:apigateway:us-east-1::/apis/*"
+      ]
+    },
+    {
+      "Sid": "CloudFrontDistributionRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:distribution/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "attendance",
+          "aws:ResourceTag/Environment": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "CloudFrontFunctionRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:DescribeFunction",
+        "cloudfront:GetFunction"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:function/attendance-prod-directory-index"
+    },
+    {
+      "Sid": "CloudFrontOacRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:GetOriginAccessControlConfig"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:origin-access-control/*"
+    },
+    {
+      "Sid": "CloudFrontCachePolicyRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetCachePolicy",
+        "cloudfront:GetCachePolicyConfig"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:cache-policy/*"
+    },
+    {
+      "Sid": "CloudFrontOriginPolicyRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetOriginRequestPolicy",
+        "cloudfront:GetOriginRequestPolicyConfig"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:origin-request-policy/*"
+    },
+    {
+      "Sid": "CloudFrontResponsePolicyRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetResponseHeadersPolicy",
+        "cloudfront:GetResponseHeadersPolicyConfig"
+      ],
+      "Resource": "arn:aws:cloudfront::${account_id}:response-headers-policy/*"
+    }
+  ]
+}

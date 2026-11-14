@@ -323,6 +323,12 @@ resource "aws_cloudfront_function" "directory_index" {
   publish = true
   comment = "Rewrite static directory routes to their index.html object."
 
+  tags = {
+    Project     = "attendance"
+    Environment = var.env
+    Component   = "access"
+  }
+
   code = <<-JAVASCRIPT
     function handler(event) {
       var request = event.request;
@@ -414,6 +420,38 @@ resource "aws_cloudfront_distribution" "site" {
 
 data "aws_iam_policy_document" "web_bucket" {
   statement {
+    sid    = "AllowDynamoDBUseOfKeyThroughService"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:CreateGrant",
+      "kms:DescribeKey"
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:CallerAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["dynamodb.us-east-1.amazonaws.com"]
+    }
+  }
+
+  statement {
     sid    = "AllowCloudFrontOACRead"
     effect = "Allow"
 
@@ -450,6 +488,105 @@ data "aws_iam_policy_document" "web_bucket" {
       values   = ["false"]
     }
   }
+}
+
+
+data "aws_iam_policy_document" "attendance_kms_key" {
+  statement {
+    sid    = "EnableAccountRootPermissions"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${var.account_id}:root"]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowEncryptedAlertsTopic"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["sns.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:sns:us-east-1:${var.account_id}:attendance-${var.env}-alerts"]
+    }
+  }
+
+  statement {
+    sid    = "AllowLambdaFailureDestinationsToUseSQSKey"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values = [
+        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-recognize-dlq",
+        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-enroll-dlq"
+      ]
+    }
+  }
+
+  statement {
+    sid    = "AllowCloudFrontOACRead"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_cloudfront_distribution.site.arn]
+    }
+  }
+}
+
+resource "aws_kms_key_policy" "attendance" {
+  key_id = var.kms_key_id
+  policy = data.aws_iam_policy_document.attendance_kms_key.json
 }
 
 resource "aws_s3_bucket_policy" "web" {

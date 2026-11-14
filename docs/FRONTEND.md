@@ -18,12 +18,12 @@ The access module uploads every file under `web/` to the private web bucket and 
 
 ```json
 {
-  "region": "ap-south-1",
+  "region": "us-east-1",
   "userPoolId": "<dev Cognito user pool ID>",
   "clientId": "<dev public app client ID>",
-  "cognitoDomain": "https://<dev Cognito domain>.auth.ap-south-1.amazoncognito.com",
+  "cognitoDomain": "https://<dev Cognito domain>.auth.us-east-1.amazoncognito.com",
   "apiBase": "https://<dev API Gateway endpoint>/api",
-  "rawBucketUrl": "https://<dev raw bucket>.s3.ap-south-1.amazonaws.com"
+  "rawBucketUrl": "https://<dev raw bucket>.s3.us-east-1.amazonaws.com"
 }
 ```
 

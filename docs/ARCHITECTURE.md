@@ -121,7 +121,7 @@ See [COST.md](COST.md). About 10 to 14 USD per month at 100 employees x 2 scans/
 | D8 | Pre-signed POST, not PUT | Server-enforced size and content-type limits |
 | D9 | Cognito Hosted UI + PKCE + groups | No custom login code, MFA ready later |
 | D10 | Thresholds in config table | Tune accuracy without redeploy |
-| D11 | Single region ap-south-1 | Closest to users, Rekognition available, simplest |
+| D11 | Single region us-east-1 | Existing deployment target and verified service/IAM policy alignment; one region keeps resource, identity and signing endpoints consistent |
 | D12 | Liveness deferred | Time; risk documented, mitigations listed |
 
 ## 11. Deployment

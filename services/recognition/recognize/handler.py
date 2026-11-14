@@ -12,7 +12,8 @@ from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = "ap-south-1"
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 
 
 def _required_env(name: str) -> str:
@@ -24,7 +25,7 @@ def _required_env(name: str) -> str:
 
 def _table(env_name: str):
     return boto3.resource(
-        "dynamodb", region_name=os.getenv("AWS_REGION", REGION)
+        "dynamodb", region_name=_region()
     ).Table(_required_env(env_name))
 
 
@@ -98,7 +99,7 @@ def _process_record(record: dict) -> None:
     if not request_id:
         return
 
-    s3 = boto3.client("s3", region_name=REGION)
+    s3 = boto3.client("s3", region_name=_region())
     results = _table("TABLE_SCAN_RESULTS")
     pending = results.get_item(
         Key={"request_id": request_id}, ConsistentRead=True
@@ -118,7 +119,7 @@ def _process_record(record: dict) -> None:
         raise
 
     settings = get_settings()
-    rekognition = boto3.client("rekognition", region_name=REGION)
+    rekognition = boto3.client("rekognition", region_name=_region())
     image = {"S3Object": {"Bucket": bucket, "Name": key}}
     detection = rekognition.detect_faces(Image=image, Attributes=["DEFAULT"])
     faces = detection.get("FaceDetails", [])

@@ -1,93 +1,3 @@
-data "aws_iam_policy_document" "kms_key" {
-  statement {
-    sid    = "EnableAccountRootPermissions"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::${var.account_id}:root"]
-    }
-
-    actions   = ["kms:*"]
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "AllowEncryptedAlertsTopic"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["sns.amazonaws.com"]
-    }
-
-    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
-    resources = ["*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [var.account_id]
-    }
-
-    condition {
-      test     = "ArnLike"
-      variable = "aws:SourceArn"
-      values   = ["arn:aws:sns:us-east-1:${var.account_id}:attendance-${var.env}-alerts"]
-    }
-  }
-
-  statement {
-    sid    = "AllowLambdaFailureDestinationsToUseSQSKey"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-
-    actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
-    resources = ["*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [var.account_id]
-    }
-
-    condition {
-      test     = "ArnLike"
-      variable = "aws:SourceArn"
-      values   = ["arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-*-dlq"]
-    }
-  }
-
-  statement {
-    sid    = "AllowCloudFrontOACRead"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["cloudfront.amazonaws.com"]
-    }
-
-    actions   = ["kms:Decrypt"]
-    resources = ["*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [var.account_id]
-    }
-
-    condition {
-      test     = "ArnLike"
-      variable = "aws:SourceArn"
-      values   = ["arn:aws:cloudfront::${var.account_id}:distribution/*"]
-    }
-  }
-}
-
 data "archive_file" "common_layer" {
   type        = "zip"
   source_dir  = "${path.module}/../../../shared"
@@ -98,7 +8,6 @@ resource "aws_kms_key" "attendance" {
   description             = "Attendance ${var.env} data encryption key"
   deletion_window_in_days = 30
   enable_key_rotation     = true
-  policy                  = data.aws_iam_policy_document.kms_key.json
 
   tags = {
     Project     = "attendance"
@@ -297,26 +206,3 @@ resource "aws_lambda_layer_version" "common" {
   description         = "Shared timezone, configuration, response and attendance helpers."
 }
 
-resource "aws_budgets_budget" "monthly" {
-  name         = "attendance-${var.env}-monthly-cost"
-  budget_type  = "COST"
-  limit_amount = "15"
-  limit_unit   = "USD"
-  time_unit    = "MONTHLY"
-
-  notification {
-    comparison_operator        = "GREATER_THAN"
-    threshold                  = 80
-    threshold_type             = "PERCENTAGE"
-    notification_type          = "ACTUAL"
-    subscriber_email_addresses = [var.alert_email]
-  }
-
-  notification {
-    comparison_operator        = "GREATER_THAN"
-    threshold                  = 100
-    threshold_type             = "PERCENTAGE"
-    notification_type          = "ACTUAL"
-    subscriber_email_addresses = [var.alert_email]
-  }
-}

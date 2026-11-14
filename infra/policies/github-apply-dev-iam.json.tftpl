@@ -1,0 +1,158 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "IamRoleCreate",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::${account_id}:role/attendance-dev-employees",
+        "arn:aws:iam::${account_id}:role/attendance-dev-attendance-query",
+        "arn:aws:iam::${account_id}:role/attendance-dev-daily-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-weekly-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-reports",
+        "arn:aws:iam::${account_id}:role/attendance-dev-override",
+        "arn:aws:iam::${account_id}:role/attendance-dev-settings",
+        "arn:aws:iam::${account_id}:role/attendance-dev-presign",
+        "arn:aws:iam::${account_id}:role/attendance-dev-result",
+        "arn:aws:iam::${account_id}:role/attendance-dev-recognize",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll-url",
+        "arn:aws:iam::${account_id}:role/attendance-dev-faces-delete",
+        "arn:aws:iam::${account_id}:role/attendance-dev-failure"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::${account_id}:policy/attendance-dev-execution-boundary",
+          "aws:RequestTag/Project": "attendance",
+          "aws:RequestTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "IamRoleManage",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:DeleteRole",
+        "iam:ListRoleTags",
+        "iam:TagRole",
+        "iam:UntagRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::${account_id}:role/attendance-dev-employees",
+        "arn:aws:iam::${account_id}:role/attendance-dev-attendance-query",
+        "arn:aws:iam::${account_id}:role/attendance-dev-daily-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-weekly-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-reports",
+        "arn:aws:iam::${account_id}:role/attendance-dev-override",
+        "arn:aws:iam::${account_id}:role/attendance-dev-settings",
+        "arn:aws:iam::${account_id}:role/attendance-dev-presign",
+        "arn:aws:iam::${account_id}:role/attendance-dev-result",
+        "arn:aws:iam::${account_id}:role/attendance-dev-recognize",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll-url",
+        "arn:aws:iam::${account_id}:role/attendance-dev-faces-delete",
+        "arn:aws:iam::${account_id}:role/attendance-dev-failure"
+      ]
+    },
+    {
+      "Sid": "IamInlinePolicies",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PutRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:DeleteRolePolicy"
+      ],
+      "Resource": [
+        "arn:aws:iam::${account_id}:role/attendance-dev-employees",
+        "arn:aws:iam::${account_id}:role/attendance-dev-attendance-query",
+        "arn:aws:iam::${account_id}:role/attendance-dev-daily-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-weekly-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-reports",
+        "arn:aws:iam::${account_id}:role/attendance-dev-override",
+        "arn:aws:iam::${account_id}:role/attendance-dev-settings",
+        "arn:aws:iam::${account_id}:role/attendance-dev-presign",
+        "arn:aws:iam::${account_id}:role/attendance-dev-result",
+        "arn:aws:iam::${account_id}:role/attendance-dev-recognize",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll-url",
+        "arn:aws:iam::${account_id}:role/attendance-dev-faces-delete",
+        "arn:aws:iam::${account_id}:role/attendance-dev-failure"
+      ]
+    },
+    {
+      "Sid": "PassRoleToLambda",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::${account_id}:role/attendance-dev-employees",
+        "arn:aws:iam::${account_id}:role/attendance-dev-attendance-query",
+        "arn:aws:iam::${account_id}:role/attendance-dev-daily-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-weekly-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-reports",
+        "arn:aws:iam::${account_id}:role/attendance-dev-override",
+        "arn:aws:iam::${account_id}:role/attendance-dev-settings",
+        "arn:aws:iam::${account_id}:role/attendance-dev-presign",
+        "arn:aws:iam::${account_id}:role/attendance-dev-result",
+        "arn:aws:iam::${account_id}:role/attendance-dev-recognize",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll-url",
+        "arn:aws:iam::${account_id}:role/attendance-dev-faces-delete",
+        "arn:aws:iam::${account_id}:role/attendance-dev-failure"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "PassRoleToScheduler",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::${account_id}:role/attendance-dev-daily-job-scheduler",
+        "arn:aws:iam::${account_id}:role/attendance-dev-weekly-job-scheduler"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "scheduler.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "IamRoleBoundaryEnforcement",
+      "Effect": "Allow",
+      "Action": "iam:PutRolePermissionsBoundary",
+      "Resource": [
+        "arn:aws:iam::${account_id}:role/attendance-dev-employees",
+        "arn:aws:iam::${account_id}:role/attendance-dev-attendance-query",
+        "arn:aws:iam::${account_id}:role/attendance-dev-daily-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-weekly-job",
+        "arn:aws:iam::${account_id}:role/attendance-dev-reports",
+        "arn:aws:iam::${account_id}:role/attendance-dev-override",
+        "arn:aws:iam::${account_id}:role/attendance-dev-settings",
+        "arn:aws:iam::${account_id}:role/attendance-dev-presign",
+        "arn:aws:iam::${account_id}:role/attendance-dev-result",
+        "arn:aws:iam::${account_id}:role/attendance-dev-recognize",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll",
+        "arn:aws:iam::${account_id}:role/attendance-dev-enroll-url",
+        "arn:aws:iam::${account_id}:role/attendance-dev-faces-delete",
+        "arn:aws:iam::${account_id}:role/attendance-dev-failure"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::${account_id}:policy/attendance-dev-execution-boundary"
+        }
+      }
+    }
+  ]
+}

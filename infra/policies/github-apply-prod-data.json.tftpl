@@ -1,0 +1,52 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DynamoDBTableCreate",
+      "Effect": "Allow",
+      "Action": "dynamodb:CreateTable",
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-employees",
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-attendance",
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-scan-results",
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-config",
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-audit"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "attendance",
+          "aws:RequestTag/Environment": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "DynamoDBTableLifecycle",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:DescribeTable",
+        "dynamodb:UpdateTable",
+        "dynamodb:DeleteTable",
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:UpdateTimeToLive",
+        "dynamodb:DescribeContinuousBackups",
+        "dynamodb:UpdateContinuousBackups",
+        "dynamodb:ListTagsOfResource",
+        "dynamodb:TagResource",
+        "dynamodb:UntagResource"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-employees",
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-attendance",
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-scan-results",
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-config",
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-audit"
+      ]
+    },
+    {
+      "Sid": "DynamoDBIndexRead",
+      "Effect": "Allow",
+      "Action": "dynamodb:DescribeTable",
+      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-prod-attendance/index/date-index"
+    }
+  ]
+}

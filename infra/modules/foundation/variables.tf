@@ -19,7 +19,7 @@ variable "account_id" {
 }
 
 variable "alert_email" {
-  description = "Email address subscribed to the attendance alerts topic and AWS Budget notifications."
+  description = "Email address subscribed to the attendance alerts topic."
   type        = string
 }
 
