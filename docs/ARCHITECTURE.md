@@ -121,10 +121,11 @@ See [COST.md](COST.md). About 10 to 14 USD per month at 100 employees x 2 scans/
 | D12 | Liveness deferred | Time; risk documented, mitigations listed |
 
 ## 11. Deployment
-1. **Bootstrap (once, Lead, Console):** create S3 bucket `attendance-tfstate-<account_id>` (versioning on, encryption on); IAM OIDC provider `token.actions.githubusercontent.com`; deploy roles `attendance-github-deploy-dev` (trust: repo `amit-cloudops-ai/attendance-face-recognition`, branch `develop`) and `attendance-github-deploy-prod` (trust: GitHub environment `prod`). Details arrive in `infra/bootstrap/README.md`.
-2. Set GitHub repo variables `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `ALERT_EMAIL`; create GitHub environment `prod` with required reviewer.
-3. Merge to `develop` deploys dev; merge `develop` to `main` deploys prod after approval. CI applies Terraform, syncs `web/` to the web bucket and invalidates CloudFront.
-4. Post-deploy: create Cognito users (`kiosk-01`, admins), confirm SNS email subscription, run the e2e smoke script.
+1. **Bootstrap (once, Lead, Console):** create S3 bucket `attendance-tfstate-<account_id>` (versioning on, encryption on, TLS-only); create the IAM OIDC provider `token.actions.githubusercontent.com`; create scoped roles `attendance-github-deploy-dev` and `attendance-github-deploy-prod` with trust subjects for the GitHub `dev` and `prod` environments. See `infra/bootstrap/README.md`.
+2. Create GitHub environments `dev` (deployment branch `develop`) and `prod` (deployment branch `main`, required reviewer). Configure repository/environment variables: `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `TF_STATE_BUCKET`, `AWS_ACCOUNT_ID`, `ALERT_EMAIL`, `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS`, and `ALLOWED_ORIGINS`. The three URL/origin variables are non-empty JSON arrays of strings.
+3. Merge reviewed changes to `develop` or `main`. Deployment is **manual only**: trigger `.github/workflows/deploy.yml` from the matching branch, choose `plan`, review the one-day plan artifact, then trigger `apply` explicitly. Production apply is gated by the `prod` environment reviewer. CI push events never apply Terraform.
+4. On first apply, localhost is used for Cognito callback/logout and raw-bucket CORS to avoid a module dependency cycle. After CloudFront is created, update `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS` and `ALLOWED_ORIGINS` to include the exact HTTPS site origin, then plan and apply the reviewed update.
+5. Post-deploy: create Cognito users (`kiosk-01`, admins), confirm SNS email subscription, and run the e2e smoke script. No deployment has been executed from this branch; no AWS resources have been provisioned.
 
 ## 12. Operations runbook
 | Task | How |
