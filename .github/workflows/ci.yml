@@ -29,3 +29,5 @@ jobs:
       - run: terraform -chdir=infra/modules/data validate
       - run: terraform -chdir=infra/modules/foundation init -backend=false -input=false
       - run: terraform -chdir=infra/modules/foundation validate
+      - run: terraform -chdir=infra/envs/dev init -backend=false -input=false
+      - run: terraform -chdir=infra/envs/dev validate
