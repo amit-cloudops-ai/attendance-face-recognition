@@ -274,6 +274,26 @@ jobs:
               raise SystemExit("Cognito issuer output must match the provider region")
           PY
 
+      - name: Validate Lambda JSON logging and retention
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          for module in ("data", "recognition"):
+              source = Path(f"infra/modules/{module}/main.tf").read_text(encoding="utf-8")
+              required = (
+                  'logging_config {',
+                  'log_format            = "JSON"',
+                  'application_log_level = "INFO"',
+                  'system_log_level      = "WARN"',
+                  'log_group             = aws_cloudwatch_log_group.lambda[each.key].name',
+                  'retention_in_days = 30',
+              )
+              for item in required:
+                  if item not in source:
+                      raise SystemExit(f"{module} Lambda logging configuration missing: {item}")
+          PY
+
       - name: Validate DynamoDB customer-managed KMS policies
         run: |
           python - <<'PY'
