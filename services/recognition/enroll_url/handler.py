@@ -13,7 +13,7 @@ from botocore.config import Config
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = "ap-south-1"
+REGION = os.getenv("AWS_REGION", "us-east-1")
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
 
 

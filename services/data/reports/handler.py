@@ -11,7 +11,7 @@ from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = "ap-south-1"
+REGION = os.getenv("AWS_REGION", "us-east-1")
 _DAILY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _WEEKLY = re.compile(r"^(\d{4})-W(\d{2})$")
 

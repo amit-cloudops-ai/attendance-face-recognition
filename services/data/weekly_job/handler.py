@@ -14,7 +14,7 @@ from boto3.dynamodb.conditions import Key
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = "ap-south-1"
+REGION = os.getenv("AWS_REGION", "us-east-1")
 _WEEK = re.compile(r"^(\d{4})-W(\d{2})$")
 
 

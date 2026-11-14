@@ -12,7 +12,7 @@ from botocore.config import Config
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = "ap-south-1"
+REGION = os.getenv("AWS_REGION", "us-east-1")
 MAX_IMAGE_BYTES = 1_048_576
 MIN_IMAGE_BYTES = 1_024
 POST_EXPIRY_SECONDS = 60

@@ -14,7 +14,7 @@ from attendance_common.tz import now_ist, to_iso
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = "ap-south-1"
+REGION = os.getenv("AWS_REGION", "us-east-1")
 IST = ZoneInfo("Asia/Kolkata")
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
 _STATUSES = {"present", "late", "absent"}

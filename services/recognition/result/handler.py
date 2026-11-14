@@ -36,7 +36,7 @@ def lambda_handler(event, context):
         return error(400, "invalid_request_id", "A valid request_id is required.")
     try:
         table = boto3.resource(
-            "dynamodb", region_name=os.getenv("AWS_REGION", "ap-south-1")
+            "dynamodb", region_name=os.getenv("AWS_REGION", "us-east-1")
         ).Table(_required_env("TABLE_SCAN_RESULTS"))
         item = table.get_item(
             Key={"request_id": request_id}, ConsistentRead=True

@@ -21,7 +21,7 @@ def _load() -> dict[str, Any]:
     table_name = os.getenv("TABLE_CONFIG")
     if not table_name:
         return DEFAULT_SETTINGS.copy()
-    table = boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "ap-south-1")).Table(table_name)
+    table = boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "us-east-1")).Table(table_name)
     item = table.get_item(Key={"pk": "SETTINGS"}, ConsistentRead=True).get("Item", {})
     settings = DEFAULT_SETTINGS.copy()
     settings.update({key: value for key, value in item.items() if key in settings})
