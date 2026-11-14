@@ -331,6 +331,7 @@ jobs:
 
           access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
           data = Path("infra/modules/data/main.tf").read_text(encoding="utf-8")
+          foundation = Path("infra/modules/foundation/main.tf").read_text(encoding="utf-8")
           key_policy = access.split('data "aws_iam_policy_document" "attendance_kms_key"', 1)[1].split(
               'resource "aws_kms_key_policy"', 1
           )[0]
@@ -342,6 +343,14 @@ jobs:
               raise SystemExit("Encrypted SNS topic must permit SNS to use the customer-managed key")
           if "cloudwatch.amazonaws.com" not in cloudwatch:
               raise SystemExit("CloudWatch alarm service principal is missing from the alerts KMS key policy")
+          topic_policy = foundation.split('data "aws_iam_policy_document" "alerts_topic"', 1)[1].split(
+              'resource "aws_sns_topic_policy" "alerts"', 1
+          )[0]
+          if "cloudwatch.amazonaws.com" not in topic_policy or 'actions   = ["sns:Publish"]' not in topic_policy:
+              raise SystemExit("SNS topic policy does not allow CloudWatch alarms to publish")
+          for required in ("aws:SourceAccount", "aws:SourceArn", "ArnLike"):
+              if required not in topic_policy:
+                  raise SystemExit(f"SNS topic CloudWatch policy missing {required}")
           for required in ("kms:Decrypt", "kms:GenerateDataKey*", "aws:SourceAccount", "aws:SourceArn", "ArnLike"):
               if required not in cloudwatch:
                   raise SystemExit(f"CloudWatch encrypted SNS KMS statement missing {required}")
