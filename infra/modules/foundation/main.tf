@@ -38,6 +38,31 @@ data "aws_iam_policy_document" "kms_key" {
   }
 
   statement {
+    sid    = "AllowLambdaFailureDestinationsToUseSQSKey"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-*-dlq"]
+    }
+  }
+
+  statement {
     sid    = "AllowCloudFrontOACRead"
     effect = "Allow"
 
