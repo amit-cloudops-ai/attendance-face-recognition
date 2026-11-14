@@ -148,7 +148,10 @@ def _process_record(record: dict) -> None:
                 "Face not recognised. Please try again.")
         return
     face = matches[0].get("Face") or {}
-    employee_id = face.get("ExternalImageId")
+    external_image_id = face.get("ExternalImageId") or ""
+    # New enrollment IDs include the originating request. Older collection
+    # entries used the employee ID directly and remain readable.
+    employee_id = external_image_id.split("#", 1)[0]
     if not employee_id:
         _finish(s3, bucket, key, results, request_id, "no_match",
                 "Face not recognised. Please try again.")
