@@ -65,3 +65,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 11 and [infra/bootstrap
 | [DEMO_SCRIPT](docs/DEMO_SCRIPT.md) | Video storyboard |
 | [AI_CONTEXT](docs/AI_CONTEXT.md) | Paste into any AI assistant at the start of a session |
 | [FRONTEND](docs/FRONTEND.md) | Local run, Cognito config and browser verification |
+| [SCRIPTS](scripts/README.md) | Consent-gated deployed dev smoke test |
