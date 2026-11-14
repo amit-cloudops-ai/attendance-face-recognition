@@ -1,39 +1,32 @@
 #!/usr/bin/env bash
-# Configure GitHub Actions environments and deployment-branch restrictions.
+# Configure GitHub Actions environments for a solo repository owner.
 # Dry-run by default. Requires gh CLI authenticated as a repository administrator.
 set -euo pipefail
 
 REPO="amit-cloudops-ai/attendance-face-recognition"
-REVIEWER=""
 APPLY=false
 
 usage() {
   cat <<'USAGE'
 Usage:
-  bash scripts/configure_github_environments.sh --reviewer GITHUB_USERNAME
-  bash scripts/configure_github_environments.sh --reviewer GITHUB_USERNAME --apply
+  bash scripts/configure_github_environments.sh
+  bash scripts/configure_github_environments.sh --apply
 
-Dry-run is the default. --apply creates/updates six environments, applies exact
-deployment-branch restrictions, and configures independent reviewers.
-It does not set AWS variables or secrets; those require verified AWS resource ARNs
-and generated age identities after bootstrap.
+Dry-run is the default. The script resolves the repository owner from GitHub,
+uses that same owner as the sole manual deployment reviewer for apply environments,
+and explicitly allows self-review. This is an owner checkpoint, NOT independent
+separation of duties. It creates/updates six environments and their exact
+deployment-branch restrictions. It does not set AWS variables or secrets.
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --reviewer) REVIEWER="\${2:?Missing GitHub username}"; shift 2 ;;
     --apply) APPLY=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
-
-if [[ -z "$REVIEWER" ]]; then
-  echo "An independent GitHub reviewer username is required." >&2
-  usage >&2
-  exit 2
-fi
 
 command -v gh >/dev/null || { echo "GitHub CLI (gh) is required." >&2; exit 2; }
 command -v jq >/dev/null || { echo "jq is required." >&2; exit 2; }
@@ -45,43 +38,34 @@ if [[ "$ADMIN" != "true" ]]; then
   exit 2
 fi
 
-REVIEWER_ID="$(gh api "users/$REVIEWER" --jq '.id')"
-if [[ ! "$REVIEWER_ID" =~ ^[0-9]+$ ]]; then
-  echo "Could not resolve reviewer GitHub numeric ID." >&2
-  exit 2
-fi
-
 OWNER="$(gh api "repos/$REPO" --jq '.owner.login')"
-if [[ "$REVIEWER" == "$OWNER" ]]; then
-  echo "The repository owner cannot be the independent reviewer." >&2
+OWNER_ID="$(gh api "users/$OWNER" --jq '.id')"
+if [[ ! "$OWNER_ID" =~ ^[0-9]+$ ]]; then
+  echo "Could not resolve repository owner's GitHub numeric ID." >&2
   exit 2
 fi
-REVIEWER_PERMISSION="$(gh api "repos/$REPO/collaborators/$REVIEWER/permission" --jq '.permission')"
-case "$REVIEWER_PERMISSION" in
-  write|maintain|admin) ;;
-  *) echo "Reviewer must have repository access; current permission: $REVIEWER_PERMISSION" >&2; exit 2 ;;
-esac
 
-# environment|branch|require independent reviewer
+# environment|branch|owner approval required
 ENVIRONMENTS=(
   "dev-plan|develop|false"
   "dev-apply|develop|true"
-  "prod-plan|main|true"
+  "prod-plan|main|false"
   "prod-apply|main|true"
-  "billing-plan|main|true"
+  "billing-plan|main|false"
   "billing-apply|main|true"
 )
 
 echo "Repository: $REPO"
-echo "Independent reviewer: $REVIEWER (ID $REVIEWER_ID)"
+echo "Repository owner / sole deployment reviewer: $OWNER (ID $OWNER_ID)"
+echo "Self-review: allowed (solo-owner manual checkpoint; not independent approval)"
 echo "Mode: $([[ "$APPLY" == true ]] && echo APPLY || echo DRY RUN)"
 echo
 
-for item in "\${ENVIRONMENTS[@]}"; do
-  IFS='|' read -r environment allowed_branch require_reviewer <<<"$item"
+for item in "${ENVIRONMENTS[@]}"; do
+  IFS='|' read -r environment allowed_branch require_owner_approval <<<"$item"
   reviewers='[]'
-  if [[ "$require_reviewer" == true ]]; then
-    reviewers="$(jq -cn --argjson id "$REVIEWER_ID" '[{type:"User",id:$id}]')"
+  if [[ "$require_owner_approval" == true ]]; then
+    reviewers="$(jq -cn --argjson id "$OWNER_ID" '[{type:"User",id:$id}]')"
   fi
 
   payload="$(jq -cn \
@@ -89,7 +73,7 @@ for item in "\${ENVIRONMENTS[@]}"; do
     '{
       wait_timer: 0,
       reviewers: $reviewers,
-      prevent_self_review: true,
+      prevent_self_review: false,
       can_admins_bypass: false,
       deployment_branch_policy: {
         protected_branches: false,
@@ -102,7 +86,8 @@ for item in "\${ENVIRONMENTS[@]}"; do
 
   echo "Environment: $environment"
   echo "  Allowed branch: $allowed_branch"
-  echo "  Independent reviewer required: $require_reviewer"
+  echo "  Owner approval checkpoint: $require_owner_approval"
+  echo "  Self-review: allowed"
   echo "  Admin bypass: disabled"
 
   if [[ "$APPLY" != true ]]; then
