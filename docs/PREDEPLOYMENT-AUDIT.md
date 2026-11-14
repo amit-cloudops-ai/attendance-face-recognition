@@ -76,12 +76,12 @@ The previous recommendation to bypass OIDC and apply locally as the broad `Amit-
 - Inactive employees with remaining face templates now have a visible retry-deletion action.
 - Enrollment photo selection and display now respect the configured maximum and remaining slots.
 - E2E smoke polling increased to 60 seconds; it tracks exact raw object keys and removes only test-created objects if application cleanup fails.
-- Remaining in this part: transactional audit consistency, explicit pending-request UX after long async retries, and manual browser verification.
+- Remaining in this part: transactional audit consistency, explicit pending-request UX after long async retries, and manual browser verification. A one-command local check is now provided at `scripts/local_predeploy_check.sh`; it uses backend-disabled Terraform init only and makes no AWS API calls.
 
 ### Part 2 — Terraform, IAM and AWS configuration correctness
 
 - Verify CI for the SNS topic/KMS static corrections, then test encrypted Lambda and CloudWatch alarm email delivery in dev.
-- Run local WSL Terraform formatting/validation and verify the new boundary/account guards.
+- Run `bash scripts/local_predeploy_check.sh` from WSL on the current PR head; this checks Python, browser JS/HTML, shell, YAML, Terraform fmt and backend-disabled Terraform validate without AWS access.
 - Confirm CI enforces generated `config.json` ownership.
 - Run the local wrapper against the verified profile in read-only/validate mode; do not initialize the remote backend until separately approved.
 - Pin Terraform CI to the deployment version.
