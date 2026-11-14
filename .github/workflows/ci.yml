@@ -323,6 +323,20 @@ jobs:
               raise SystemExit("Billing tfvars example is missing the expected account ID")
           PY
 
+      - name: Validate foundation dependency ordering
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          for env in ("dev", "prod"):
+              root = Path(f"infra/envs/{env}/main.tf").read_text(encoding="utf-8")
+              for module in ("data", "recognition"):
+                  start = root.index(f'module "{module}"')
+                  end = root.find("\\n}", start)
+                  if "depends_on = [module.foundation]" not in root[start:end]:
+                      raise SystemExit(f"{env} {module} module must wait for foundation resources and SNS topic policy")
+          PY
+
       - name: Validate encrypted SNS notification KMS permissions
         run: |
           python - <<'PY'
