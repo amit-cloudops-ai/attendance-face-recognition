@@ -34,7 +34,7 @@ Run the dry-run first and inspect the exact changes. Apply mode requires GitHub 
 
 ## Read-only AWS bootstrap inventory
 
-`scripts/aws_preflight_readonly.sh` verifies the authenticated STS identity and inspects the GitHub OIDC provider, runtime boundaries, six deployment roles and (when `TF_STATE_BUCKET` is supplied) state-bucket controls. It contains no create/update/delete/attach operations. Access-denied results are reported as unknown, not as proof that a resource is absent. The script was run read-only on 14 November 2026 with profile `default`; STS verified account `924422830139` in `us-east-1`. The expected OIDC provider and six roles returned `NoSuchEntity`; neither runtime boundary policy was returned; no matching project state bucket was found. Treat unconfirmed results as unknown where read permissions may be incomplete. No AWS resources or policies were changed.
+`scripts/aws_preflight_readonly.sh` verifies STS identity and inventories the GitHub OIDC provider, runtime boundaries, six deployment roles, project-prefixed IAM/Lambda/DynamoDB/KMS/Rekognition/Cognito/API Gateway/SQS/SNS/Scheduler/CloudWatch/Budgets/CloudFront resources, exact application bucket-name collisions, and state-bucket controls. It contains no create/update/delete/attach operations. Access-denied results are reported as unknown, not as proof that a resource is absent. The first run on 14 November 2026 used profile `default` and verified account `924422830139` in `us-east-1`; that earlier script version checked bootstrap resources only. The expanded application-resource inventory has not yet been run. No AWS resources or policies were changed.
 
 Run it only with an intentionally selected AWS profile and read-only permissions:
 
