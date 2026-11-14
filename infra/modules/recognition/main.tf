@@ -208,12 +208,25 @@ locals {
       },
       {
         Effect   = "Allow"
-        Action   = ["dynamodb:UpdateItem"]
-        Resource = [var.tables.scan_results.arn]
+        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
+        Resource = [var.tables.scan_results.arn, var.tables.employees.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
+        Resource = [
+          var.tables.attendance.arn,
+          "${var.tables.attendance.arn}/index/date-index"
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["rekognition:SearchFacesByImage", "rekognition:DeleteFaces"]
+        Resource = [aws_rekognition_collection.faces.arn]
       },
       {
         Effect = "Allow"
-        Action = ["s3:DeleteObject"]
+        Action = ["s3:GetObject", "s3:DeleteObject"]
         Resource = [
           "${var.raw_bucket_arn}/captures/*",
           "${var.raw_bucket_arn}/enroll/*"
