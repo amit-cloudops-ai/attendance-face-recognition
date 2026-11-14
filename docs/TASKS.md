@@ -20,7 +20,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T05 | Finalize dev/prod execution-role permissions boundaries | DONE | Two environment-specific allow-list boundary templates cap runtime permissions; no IAM/STS self-management, PassRole or provisioning actions; CI validates rendered policy envelope, conditions and size. Boundary templates are not created or attached in AWS. |
 | T06 | Verify Terraform provider IAM actions for foundation module | DONE | Create/read/update/delete/tag operations mapped to exact IAM actions and resource scopes |
 | T07 | Verify Terraform provider IAM actions for data and recognition modules | DONE | All provider operations mapped, including Lambda, IAM, DynamoDB, Scheduler, SQS, Rekognition and CloudWatch |
-| T08 | Verify Terraform provider IAM actions for access module | TODO | Cognito, API Gateway v2, CloudFront, S3 and Lambda permission operations mapped |
+| T08 | Verify Terraform provider IAM actions for access module | IN_PROGRESS | Cognito, API Gateway v2, CloudFront, S3 and Lambda permission operations mapped |
 | T09 | Build dev plan-role policy | TODO | Read-only planning permissions, dev-only state/lock access, no resource mutation |
 | T10 | Build dev apply-role policy | TODO | Exact dev resource permissions, boundary enforcement and exact iam:PassRole scopes |
 | T11 | Build prod plan-role policy | TODO | Read-only planning permissions, prod-only state/lock access, no resource mutation |
