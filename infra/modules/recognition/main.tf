@@ -97,8 +97,8 @@ locals {
         Resource = ["${var.raw_bucket_arn}/captures/*"]
       },
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:UpdateItem"
@@ -106,8 +106,8 @@ locals {
         Resource = [var.tables.attendance.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
         Resource = [
           var.tables.employees.arn,
           var.tables.config.arn,
@@ -132,8 +132,8 @@ locals {
         Resource = ["*"]
       },
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "rekognition:SearchFacesByImage",
           "rekognition:IndexFaces",
           "rekognition:DeleteFaces"
@@ -212,8 +212,8 @@ locals {
         Resource = [var.tables.scan_results.arn, var.tables.employees.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:Query"]
+        Effect = "Allow"
+        Action = ["dynamodb:Query"]
         Resource = [
           var.tables.attendance.arn,
           "${var.tables.attendance.arn}/index/date-index"
@@ -225,8 +225,8 @@ locals {
         Resource = [aws_rekognition_collection.faces.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:DeleteObject"]
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:DeleteObject"]
         Resource = [
           "${var.raw_bucket_arn}/captures/*",
           "${var.raw_bucket_arn}/enroll/*"
