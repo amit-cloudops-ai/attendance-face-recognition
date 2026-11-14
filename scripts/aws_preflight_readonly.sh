@@ -22,14 +22,6 @@ export AWS_DEFAULT_REGION="$REGION"
 echo "=== Canonical deployment region ==="
 echo "$REGION"
 
-echo
-echo
-echo "=== Account and service quota preflight (read-only) ==="
-report "Lambda concurrency limits and current usage" aws lambda get-account-settings --region "$REGION" \
-  --query "{ConcurrentExecutions:AccountLimit.ConcurrentExecutions,UnreservedConcurrentExecutions:AccountLimit.UnreservedConcurrentExecutions,FunctionCount:AccountUsage.FunctionCount}" --output json
-report "Amazon Rekognition service quotas" aws service-quotas list-service-quotas --service-code rekognition --region "$REGION" \
-  --query "Quotas[].{Name:QuotaName,Value:Value,Adjustable:Adjustable}" --output json
-
 echo "=== Authenticated AWS identity (read-only STS) ==="
 IDENTITY="$(aws sts get-caller-identity --output json)"
 printf '%s\n' "$IDENTITY"
@@ -50,6 +42,15 @@ report() {
     echo "NOT CONFIRMED: resource may be absent or caller may lack read permission."
   fi
 }
+
+echo
+echo
+echo "=== Account and service quota preflight (read-only) ==="
+report "Lambda concurrency limits and current usage" aws lambda get-account-settings --region "$REGION" \
+  --query "{ConcurrentExecutions:AccountLimit.ConcurrentExecutions,UnreservedConcurrentExecutions:AccountLimit.UnreservedConcurrentExecutions,FunctionCount:AccountUsage.FunctionCount}" --output json
+report "Amazon Rekognition service quotas" aws service-quotas list-service-quotas --service-code rekognition --region "$REGION" \
+  --query "Quotas[].{Name:QuotaName,Value:Value,Adjustable:Adjustable}" --output json
+
 
 OIDC_ARN="arn:aws:iam::$ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
 report "GitHub OIDC provider" aws iam get-open-id-connect-provider \
