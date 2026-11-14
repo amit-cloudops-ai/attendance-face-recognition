@@ -64,6 +64,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python scripts/check_region_consistency.py
           region="$(python scripts/check_region_consistency.py --print-region)"
           echo "AWS_REGION=$region" >> "$GITHUB_ENV"
 
