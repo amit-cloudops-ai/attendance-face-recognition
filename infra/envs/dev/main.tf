@@ -40,6 +40,7 @@ module "access" {
 
   env                             = var.env
   account_id                      = var.account_id
+  raw_bucket_name                 = module.foundation.raw_bucket_name
   web_bucket_name                 = module.foundation.web_bucket_name
   web_bucket_arn                  = module.foundation.web_bucket_arn
   web_bucket_regional_domain_name = module.foundation.web_bucket_regional_domain_name
