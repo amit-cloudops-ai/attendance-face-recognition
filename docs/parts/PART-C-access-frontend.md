@@ -12,7 +12,7 @@ Deliver the browser-facing kiosk and admin experience using the frozen API. Prio
 - `web/kiosk/**`
 - `web/admin/**`
 - Frontend-specific run instructions
-Do not edit backend handlers, shared Python modules, SAM template, frozen contracts, contract tests or other contributor paths.
+Do not edit backend handlers, shared Python modules, Terraform access module, frozen contracts, contract tests or other contributor paths.
 
 ## Required implementation
 1. **Authentication/API client:** Cognito Hosted UI authorization-code + PKCE with public SPA client; callback exchange, logout and token handling; attach Bearer access token to protected routes; handle missing/expired token, 401/403 and network errors. Never log tokens or place them in URLs.
@@ -31,4 +31,4 @@ Provide screenshots or short recording. Test desktop Chrome and Android Chrome a
 - No AWS provisioning, credentials, tokens or employee biometric images in Git.
 
 ## Out of scope
-Attendance calculation, Lambda/data code, SAM infrastructure, API/schema changes and contract-test edits. Ask Amit before adding dependencies or changing interfaces.
+Attendance calculation, Lambda/data code, Terraform access module, API/schema changes and contract-test edits. Ask Amit before adding dependencies or changing interfaces.
