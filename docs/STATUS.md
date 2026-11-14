@@ -8,7 +8,7 @@ The region-consistency implementation is complete on this branch: `config/deploy
 
 **No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
 
-Target region: `us-east-1`, sourced from `config/deployment.json`. Target account: the owner's existing AWS account; the exact 12-digit account ID has not been verified in this session.
+Target region: `us-east-1`, sourced from `config/deployment.json`. Read-only STS verification on 14 November 2026 confirmed AWS account `924422830139`, IAM user `Amit-admin`, through the `default` profile. This is the verified target account for the next planning step; no AWS mutation was performed.
 
 ## Source of truth and branch discipline
 
@@ -53,11 +53,13 @@ No system can guarantee that a future contributor never writes an incorrect regi
 
 **Status: BLOCKED — repository administrator action required.**
 
-The required environments are `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan` and `billing-apply`. Each must have the correct environment-scoped `AWS_ROLE_ARN`, account/bucket values, plan-only age recipient, apply-only private age identity secret, branch restriction and independent apply reviewer.
+The required environments are `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan` and `billing-apply`. Each must have the correct environment-scoped `AWS_ROLE_ARN`, account/bucket values, plan-only age recipient, apply-only private age identity secret and exact deployment-branch restriction.
 
-The GitHub connector cannot inspect or configure Actions environment secrets/protection settings, and branch-protection reads returned 403. Their actual existence and values remain unverified. I added two guarded GitHub CLI helpers: `scripts/configure_github_environments.sh` (six exact environments, allowed branches and independent reviewers) and `scripts/configure_branch_protection.sh` (PR reviews, CI checks and protected branches). Both default to dry-run and require an explicit `--apply`; neither has been executed. Environment AWS variables/secrets remain intentionally unset until the AWS account inventory and bootstrap create the roles, bucket and boundaries.
+The agreed governance model is **solo-owner**: the repository owner is the sole manual reviewer on apply environments, with self-review allowed. This is an owner checkpoint, not independent separation of duties. No teammate or second GitHub username is required. Branch protection requires PRs, CI checks, conversation resolution and protection against force-push/deletion, but does not require an independent approval or latest-push approval.
 
-**Owner action:** provide the GitHub username of an independent reviewer, run both helpers' dry-runs, inspect the output, then run their `--apply` modes from an authenticated repository-admin GitHub CLI session. Populate AWS role/account/bucket variables and age keys only after approved bootstrap. Provide confirmation or an authorized read-only verification path.
+The GitHub connector cannot inspect or configure Actions environment secrets/protection settings, and branch-protection reads returned 403. Their actual existence and values remain unverified. The guarded helpers `scripts/configure_github_environments.sh` and `scripts/configure_branch_protection.sh` have been revised for this model. Both default to dry-run and require an explicit `--apply`; neither has been executed. Environment AWS variables/secrets remain intentionally unset until the AWS bootstrap is approved and creates the roles, bucket and boundaries.
+
+**Owner action:** run both helpers' dry-runs, inspect the output, then decide whether to run their `--apply` modes from an authenticated repository-admin GitHub CLI session. Populate AWS role/account/bucket variables and age keys only after approved bootstrap. Provide confirmation or an authorized read-only verification path.
 
 ### T18 — exact manual AWS bootstrap plan
 
@@ -72,15 +74,15 @@ The plan enumerates:
 - Six matching GitHub environments and the required variables/secrets.
 - Read-only existence checks, bootstrap order, rollback and approval gates.
 
-The exact 12-digit AWS account ID, final bucket suffix and current resource inventory are not known. A read-only inventory script now exists at `scripts/aws_preflight_readonly.sh`, but it has not been run against the owner's account. The bootstrap plan must be rendered with verified account values and presented to the owner before any write operation.
+The exact account ID is now verified as `924422830139` through read-only STS in `us-east-1`. The read-only inventory completed on 14 November 2026 using profile `default`: GitHub OIDC `GetOpenIDConnectProvider` returned `NoSuchEntity`; the six expected GitHub roles returned `NoSuchEntity`; neither runtime boundary policy was returned; and no bucket matching `attendance-tf-state-924422830139-*` was found. The script labels these findings as unconfirmed where permissions could affect visibility. No matching project state bucket candidate was identified, and no AWS resource or policy was changed. The inventory output is recorded in the current conversation; the account-specific plan must use the verified account ID and clearly distinguish confirmed absence from unconfirmed visibility.
 
-**Owner action:** provide/confirm the account ID and final bucket suffix, run or authorize read-only inventory, then review and explicitly approve the exact resource and policy inventory. Approval for bootstrap writes and approval for Terraform plan/apply remain separate.
+**Owner action:** choose/approve a globally unique state bucket suffix, review the exact resource and policy inventory rendered for account `924422830139`, and explicitly approve any bootstrap writes. Approval for bootstrap writes, Terraform backend initialization and Terraform plan/apply remain separate gates.
 
 ## IAM design limitations requiring explicit review
 
 - API Gateway v2 child-resource paths remain scoped to the `/apis/*` resource family until the generated API ID can be pinned.
 - Some AWS create APIs require `Resource: "*"`; request-tag, function and service conditions are used where supported.
-- Billing's `aws-portal:ModifyBilling` is account-level and cannot be scoped to an individual budget ARN. It is isolated to the billing-apply role, main branch and independent reviewer gate; it must never be attached to dev/prod roles.
+- Billing's `aws-portal:ModifyBilling` is account-level and cannot be scoped to an individual budget ARN. It is isolated to the billing-apply role, main branch and owner approval checkpoint; it must never be attached to dev/prod roles.
 - Static template validation does not prove live AWS authorization. Rendered policies still require IAM Access Analyzer/review and a controlled dev deployment.
 
 ## Exact bootstrap inventory — not executed
@@ -98,7 +100,7 @@ The exact role trust documents, managed policy JSON, account IDs and bucket name
 
 ## Next sequence
 
-1. Complete T16: configure and verify the six GitHub environments, their branch restrictions, environment variables/secrets and independent apply reviewers. The current GitHub connector cannot configure or verify these settings; repository-admin action is required.
+1. Complete T16: configure and verify the six GitHub environments, their branch restrictions, environment variables/secrets and owner approval checkpoints. The current GitHub connector cannot configure or verify these settings; repository-admin action is required.
 2. Complete T18 read-only verification: run `bash scripts/aws_preflight_readonly.sh` with an approved read-only AWS profile; verify the account ID, OIDC provider, state bucket, two boundaries, six roles and policy documents; choose a globally unique state bucket suffix.
 3. Render the exact account-specific bucket policy, OIDC trust policies, boundaries and all 26 managed policy documents. Perform static and AWS-side policy validation; present the exact resource/action inventory and obtain explicit approval before any AWS write.
 4. After separate bootstrap approval, create only the approved missing state bucket/OIDC provider/boundaries/roles/policies; verify all settings with read-only calls.
