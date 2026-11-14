@@ -27,3 +27,5 @@ jobs:
       - run: terraform -chdir=infra/modules/recognition validate
       - run: terraform -chdir=infra/modules/data init -backend=false -input=false
       - run: terraform -chdir=infra/modules/data validate
+      - run: terraform -chdir=infra/modules/foundation init -backend=false -input=false
+      - run: terraform -chdir=infra/modules/foundation validate
