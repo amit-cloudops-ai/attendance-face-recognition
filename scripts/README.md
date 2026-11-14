@@ -23,7 +23,7 @@ The apply mode changes GitHub environment protection and deployment-branch setti
 
 ## Branch protection
 
-\`configure_branch_protection.sh\` is dry-run by default. It configures PR reviews, required CI checks, conversation resolution, admin enforcement and force-push/deletion restrictions for \`main\`, \`develop\` and \`solo/amit-monday\`.
+\`configure_branch_protection.sh\` is dry-run by default. It requires PRs and CI checks, but no independent approval (solo-owner model); it also configures conversation resolution, admin enforcement and force-push/deletion restrictions for \`main\`, \`develop\` and \`solo/amit-monday\`.
 
 \`\`\`bash
 bash scripts/configure_branch_protection.sh
@@ -34,7 +34,7 @@ Run the dry-run first and inspect the exact changes. Apply mode requires GitHub 
 
 ## Read-only AWS bootstrap inventory
 
-`scripts/aws_preflight_readonly.sh` verifies the authenticated STS identity and inspects the GitHub OIDC provider, runtime boundaries, six deployment roles and (when `TF_STATE_BUCKET` is supplied) state-bucket controls. It contains no create/update/delete/attach operations. Access-denied results are reported as unknown, not as proof that a resource is absent. The script has not been run against the owner's AWS account in this session.
+`scripts/aws_preflight_readonly.sh` verifies the authenticated STS identity and inspects the GitHub OIDC provider, runtime boundaries, six deployment roles and (when `TF_STATE_BUCKET` is supplied) state-bucket controls. It contains no create/update/delete/attach operations. Access-denied results are reported as unknown, not as proof that a resource is absent. The script was run read-only on 14 November 2026 with profile `default`; STS verified account `924422830139` in `us-east-1`. No matching project state bucket was found, and expected OIDC/role lookups returned `NoSuchEntity`. Treat other unconfirmed results as unknown; no AWS resources or policies were changed.
 
 Run it only with an intentionally selected AWS profile and read-only permissions:
 
