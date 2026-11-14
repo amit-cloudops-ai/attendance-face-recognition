@@ -558,6 +558,46 @@ jobs:
                   raise SystemExit(f"OIDC deployment guide missing: {required}")
           PY
 
+      - name: Validate encrypted Terraform plan artifact lifecycle
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          required = (
+              "age --recipient",
+              "TF_PLAN_AGE_RECIPIENT",
+              "retention-days: 1",
+              "if-no-files-found: error",
+              "github.run_attempt",
+              "plan_path",
+              ".github/workflows/deploy.yml",
+              "plan_attempt",
+              "steps.plan-provenance.outputs.run_attempt",
+              "run-id: ${{ inputs.plan_run_id }}",
+              "TF_PLAN_AGE_IDENTITY",
+              "umask 077",
+              "trap 'rm -f \"$identity_file\"' EXIT",
+              "always() && inputs.operation == 'apply'",
+              'rm -f "$TF_ROOT/tfplan"',
+          )
+          for item in required:
+              if item not in workflow:
+                  raise SystemExit(f"Encrypted plan lifecycle missing: {item}")
+          if "path: infra/envs/${{ inputs.environment }}/tfplan.age" not in workflow:
+              raise SystemExit("Only the encrypted plan may be uploaded")
+          if "tfplan" in workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]:
+              upload = workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]
+              if "path: infra/envs/${{ inputs.environment }}/tfplan.age" not in upload:
+                  raise SystemExit("Plan upload path must be encrypted age artifact")
+          if "AWS_ACCESS_KEY_ID" in workflow or "AWS_SECRET_ACCESS_KEY" in workflow:
+              raise SystemExit("Static AWS credentials are prohibited")
+          docs = Path("docs/TERRAFORM-PLAN-ARTIFACT.md").read_text(encoding="utf-8")
+          for item in ("run attempt", "workflow_dispatch", "one-day", "TF_PLAN_AGE_IDENTITY", "umask 077"):
+              if item not in docs:
+                  raise SystemExit(f"Plan artifact documentation missing: {item}")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
