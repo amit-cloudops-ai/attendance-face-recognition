@@ -332,7 +332,7 @@ jobs:
               root = Path(f"infra/envs/{env}/main.tf").read_text(encoding="utf-8")
               for module in ("data", "recognition"):
                   start = root.index(f'module "{module}"')
-                  end = root.find("\\n}", start)
+                  end = root.find("\n}", start)
                   if "depends_on = [module.foundation]" not in root[start:end]:
                       raise SystemExit(f"{env} {module} module must wait for foundation resources and SNS topic policy")
           PY
