@@ -72,7 +72,7 @@ The role/policy inventory, exact trust documents, rendered policy JSON and bucke
 
 ## Read-only account verification before bootstrap
 
-After the owner supplies or authorizes an authenticated AWS CLI session, first run a read-only identity and resource inventory. Verify the active account via STS; inspect the OIDC provider; check whether the proposed state bucket exists and inspect its region, ownership, public-access block, versioning, encryption and policy; inspect the two boundary policies, six role trust policies and attached policies. Record exact ARNs and distinguish "not found" from "access denied". Do not create missing resources during this pass.
+After the owner supplies or authorizes an authenticated AWS CLI session, run `bash scripts/aws_preflight_readonly.sh` with read-only permissions. It verifies STS identity/region, inspects the OIDC provider, two boundary policies, six role trust policies/attachments and, when `TF_STATE_BUCKET` is supplied, bucket location/ownership/public-access/versioning/encryption/policy. Record exact ARNs and distinguish "not found" from "access denied". Do not create missing resources during this pass.
 
 The repository contains no verified account ID or live AWS inventory yet. A repository connection is not proof of AWS account access.
 
