@@ -1,16 +1,16 @@
 # Manual AWS deployment bootstrap plan — approval required
 
-**Status:** prepared for owner review only. Nothing in this document has been executed. No AWS API calls, resource creation, IAM role/policy attachment, remote backend initialization, Terraform plan or apply has been performed.
+**Status:** prepared for owner review only. A read-only STS identity and inventory pass was executed on 14 November 2026. No AWS resource creation, IAM role/policy attachment, remote backend initialization, Terraform plan or apply has been performed.
 
 ## Target account and region
 
-- AWS account: existing owner account; exact 12-digit account ID must be confirmed from the authenticated AWS identity before any mutation.
+- AWS account: `924422830139`, confirmed by `aws sts get-caller-identity` using the `default` profile.
 - Region: `us-east-1`, sourced from `config/deployment.json`. Do not configure a second region value in local backend files or GitHub variables.
 - Repository: amit-cloudops-ai/attendance-face-recognition.
 - GitHub OIDC issuer: https://token.actions.githubusercontent.com.
 - OIDC audience: sts.amazonaws.com.
 
-Do not assume an account ID, bucket suffix, existing OIDC provider state, or resource absence. The first step is a read-only identity and inventory check; only after that should the exact write plan be presented for owner approval. If an OIDC provider, bucket, role, policy or boundary already exists, inspect and reconcile it; do not create duplicates.
+The account identity and first read-only inventory are now verified. The preflight returned `NoSuchEntity` for the expected GitHub OIDC provider and six expected roles, returned no matching dev/prod boundary policies, and found no state bucket matching `attendance-tf-state-924422830139-*`. Treat any visibility affected by missing IAM read permissions as unknown. If an OIDC provider, bucket, role, policy or boundary already exists but was not visible, inspect and reconcile it; do not create duplicates.
 
 ## Bootstrap inventory
 
@@ -51,7 +51,7 @@ Billing has dedicated plan/apply policy templates and OIDC trust templates in T3
 
 ### 1. Read-only identity and existence checks
 
-Before any write operation, use an authenticated read-only AWS session to verify the active STS identity and region. Inspect whether the OIDC provider, state bucket, boundary policies, deployment roles and policy names already exist. Record exact ARNs and current trust/permission documents. No writes in this step. Use `bash scripts/aws_preflight_readonly.sh` with an approved read-only AWS profile. The script discovers a unique existing bucket matching `attendance-tf-state-<account-id>-*`; if none or multiple are found, set `TF_STATE_BUCKET` explicitly to inspect a known candidate. No live inventory has been performed by this repository session.
+Before any write operation, use an authenticated read-only AWS session to verify the active STS identity and region. Inspect whether the OIDC provider, state bucket, boundary policies, deployment roles and policy names already exist. Record exact ARNs and current trust/permission documents. No writes in this step. Use `bash scripts/aws_preflight_readonly.sh` with an approved read-only AWS profile. The script discovers a unique existing bucket matching `attendance-tf-state-<account-id>-*`; if none or multiple are found, set `TF_STATE_BUCKET` explicitly to inspect a known candidate. The read-only inventory was performed on 14 November 2026; no AWS writes were made.
 
 ### 2. State bucket
 
@@ -79,7 +79,7 @@ Every trust policy requires aud=sts.amazonaws.com and exact sub equality. Attach
 
 ### 6. GitHub environment configuration
 
-Complete docs/GITHUB-ENVIRONMENT-SETUP.md. Configure environment-scoped AWS_ROLE_ARN variables, account/bucket/boundary/configuration variables, plan age recipients and apply-only private age identity secrets. Enforce branch restrictions and independent apply reviewers. Verify actual settings before continuing.
+Complete docs/GITHUB-ENVIRONMENT-SETUP.md. Configure environment-scoped AWS_ROLE_ARN variables, account/bucket/boundary/configuration variables, plan age recipients and apply-only private age identity secrets. Enforce branch restrictions and the repository owner's manual apply checkpoint, with self-review allowed. This is not independent separation of duties. Verify actual settings before continuing.
 
 ### 7. First dev deployment
 
