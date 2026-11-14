@@ -49,6 +49,16 @@ locals {
       timeout                        = 10
       reserved_concurrent_executions = null
     }
+    override = {
+      memory_size                    = 256
+      timeout                        = 10
+      reserved_concurrent_executions = null
+    }
+    settings = {
+      memory_size                    = 256
+      timeout                        = 10
+      reserved_concurrent_executions = null
+    }
   }
 
   lambda_environment = merge(var.common_env, {
@@ -167,6 +177,35 @@ locals {
         Effect   = "Allow"
         Action   = ["s3:GetObject"]
         Resource = ["${var.reports_bucket_arn}/reports/*"]
+      }
+    ]
+    override = [
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem"]
+        Resource = [aws_dynamodb_table.employees.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem"]
+        Resource = [aws_dynamodb_table.attendance.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
+        Resource = [aws_dynamodb_table.audit.arn]
+      }
+    ]
+    settings = [
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem"]
+        Resource = [aws_dynamodb_table.config.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
+        Resource = [aws_dynamodb_table.audit.arn]
       }
     ]
   }
