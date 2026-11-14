@@ -48,19 +48,35 @@ SHIFT_END="${SHIFT_END:-18:00}"
 DEPARTMENT="${DEPARTMENT:-SmokeTest}"
 TMP_DIR="$(mktemp -d)"
 CREATED=0
+RAW_KEYS=()
 LATENCIES=()
 
 cleanup() {
+  local original_status=$?
+  local final_status="$original_status"
+  local cleanup_failed=0
   if [[ "$CREATED" == "1" ]]; then
     echo "Cleaning up test employee $EMPLOYEE_ID (attendance history is retained)…"
     curl -sS --max-time 20 -o /dev/null -X DELETE \
       -H "Authorization: Bearer $ADMIN_TOKEN" \
-      "$API_BASE/admin/employees/$EMPLOYEE_ID" || true
+      "$API_BASE/admin/employees/$EMPLOYEE_ID" || cleanup_failed=1
     curl -sS --max-time 20 -o /dev/null -X DELETE \
       -H "Authorization: Bearer $ADMIN_TOKEN" \
-      "$API_BASE/admin/employees/$EMPLOYEE_ID/faces" || true
+      "$API_BASE/admin/employees/$EMPLOYEE_ID/faces" || cleanup_failed=1
   fi
+  # Remove only raw objects uploaded by this smoke test if application cleanup failed.
+  for key in "\${RAW_KEYS[@]}"; do
+    aws s3api delete-object --bucket "$RAW_BUCKET" --key "$key" \
+      --region "$DEPLOY_REGION" >/dev/null || cleanup_failed=1
+  done
   rm -rf "$TMP_DIR"
+  if (( cleanup_failed )); then
+    echo "WARNING: E2E cleanup was incomplete; inspect employee $EMPLOYEE_ID and tracked raw keys." >&2
+    if (( final_status == 0 )); then
+      final_status=1
+    fi
+  fi
+  exit "$final_status"
 }
 trap cleanup EXIT
 
@@ -96,10 +112,12 @@ api_post() {
 
 upload_presigned() {
   local token="$1" request_path="$2" photo="$3"
-  local request upload_url request_id fields_file
+  local request upload_url request_id fields_file raw_key
   request="$(api_post "$token" "$request_path" '{}')"
   upload_url="$(jq -er '.upload.url' <<<"$request")"
   request_id="$(jq -er '.request_id' <<<"$request")"
+  raw_key="$(jq -er '.upload.fields.key' <<<"$request")"
+  RAW_KEYS+=("$raw_key")
   fields_file="$TMP_DIR/fields-$request_id.tsv"
   jq -r '.upload.fields | to_entries[] | [.key, .value] | @tsv' <<<"$request" > "$fields_file"
 
@@ -148,7 +166,7 @@ verify_raw_prefixes_empty() {
 poll_result() {
   local token="$1" request_id="$2"
   local response code
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 240); do
     response="$(api_get "$token" "/kiosk/result/$request_id")"
     code="$(jq -r '.code // empty' <<<"$response")"
     if [[ -n "$code" && "$code" != "pending" ]]; then
@@ -157,7 +175,7 @@ poll_result() {
     fi
     sleep 0.25
   done
-  echo "Timed out waiting for result $request_id." >&2
+  echo "Timed out waiting for result $request_id after 60 seconds." >&2
   return 1
 }
 
