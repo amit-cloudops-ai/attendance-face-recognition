@@ -452,19 +452,6 @@ data "aws_iam_policy_document" "web_bucket" {
   }
 
   statement {
-    sid    = "AllowDynamoDBDirectKeyMetadata"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["dynamodb.amazonaws.com"]
-    }
-
-    actions   = ["kms:Describe*", "kms:Get*", "kms:List*"]
-    resources = ["*"]
-  }
-
-  statement {
     sid    = "AllowCloudFrontOACRead"
     effect = "Allow"
 
