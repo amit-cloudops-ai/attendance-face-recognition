@@ -666,6 +666,36 @@ jobs:
           print(f"Validated {len(policies)} IAM policy JSON templates; no CloudFormation/SAM templates are present.")
           PY
 
+      - name: Validate approval-gated AWS bootstrap plan
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          plan = Path("docs/MANUAL-AWS-BOOTSTRAP-PLAN.md").read_text(encoding="utf-8")
+          for required in (
+              "us-east-1", "12-digit account ID", "attendance-tf-state-",
+              "token.actions.githubusercontent.com", "sts.amazonaws.com",
+              "attendance-github-dev-plan", "attendance-github-dev-apply",
+              "attendance-github-prod-plan", "attendance-github-prod-apply",
+              "attendance-dev-execution-boundary", "attendance-prod-execution-boundary",
+              "docs/STATE-BUCKET-BOOTSTRAP.md", "docs/GITHUB-ENVIRONMENT-SETUP.md",
+              "explicitly approves", "No action may proceed",
+              "Billing deployment is a separate follow-up",
+          ):
+              if required not in plan:
+                  raise SystemExit(f"Manual bootstrap plan missing: {required}")
+          if "aws s3api create-bucket" in plan or "terraform apply -auto-approve" in plan:
+              raise SystemExit("Bootstrap plan must not contain executable auto-approval commands")
+          policy_dir = Path("infra/policies")
+          for env in ("dev", "prod"):
+              for operation in ("plan", "apply"):
+                  if not list(policy_dir.glob(f"github-{operation}-{env}-*.json.tftpl")):
+                      raise SystemExit(f"Missing {env} {operation} role policy templates")
+                  trust = policy_dir / f"github-oidc-trust-{env}-{operation}.json.tftpl"
+                  if not trust.exists():
+                      raise SystemExit(f"Missing OIDC trust template: {trust}")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
