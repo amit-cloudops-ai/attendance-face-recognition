@@ -16,9 +16,9 @@ This root wires the shared foundation, data/automation, recognition and access m
 ## Commands
 
 ```bash
-terraform init -backend-config=backend.hcl
-terraform validate
-terraform plan -var-file=terraform.tfvars -out=tfplan
+bash scripts/terraform.sh -chdir=infra/envs/prod init -backend-config=backend.hcl
+bash scripts/terraform.sh -chdir=infra/envs/prod validate
+bash scripts/terraform.sh -chdir=infra/envs/prod plan -var-file=terraform.tfvars -out=tfplan
 ```
 
 Do not run `terraform apply` without explicit release approval and a reviewed plan. No resources are provisioned by validation or plan.
