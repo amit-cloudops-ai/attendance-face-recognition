@@ -10,7 +10,7 @@
 - GitHub OIDC issuer: https://token.actions.githubusercontent.com.
 - OIDC audience: sts.amazonaws.com.
 
-Do not assume an account ID, bucket suffix, existing OIDC provider state, or resource absence. The first step after approval is a read-only identity and inventory check. If an OIDC provider, bucket, role, policy or boundary already exists, inspect and reconcile it; do not create duplicates.
+Do not assume an account ID, bucket suffix, existing OIDC provider state, or resource absence. The first step is a read-only identity and inventory check; only after that should the exact write plan be presented for owner approval. If an OIDC provider, bucket, role, policy or boundary already exists, inspect and reconcile it; do not create duplicates.
 
 ## Bootstrap inventory
 
