@@ -1,69 +1,93 @@
 # Phase B — Deployment readiness and AWS access design
 
-**Working branch:** `solo/amit-monday`  
-**Scope:** Prepare a controlled development deployment. This document does not authorize AWS resource creation or Terraform apply.
+**Consolidation branch:** `release/phase-b-region-guard`  
+**Application baseline:** `solo/amit-monday`  
+**Scope:** Complete the deployment-security implementation and prepare an approval-gated development deployment. This document does not authorize AWS resource creation, IAM policy attachment, remote backend initialization, Terraform plan or Terraform apply.
 
 ## Verified deployment baseline
 
-- Target account: existing user AWS account; target region: `us-east-1`.
-- Dev state key: `attendance/dev/terraform.tfstate`; prod state key: `attendance/prod/terraform.tfstate`.
-- Terraform S3 native lock file is enabled (`use_lockfile = true`); Terraform version is constrained to >= 1.10.
-- The solo deployment workflow uses GitHub OIDC, separate plan/apply role variables per environment, encrypted saved plan artifacts using `age`, exact plan commit/branch checks and environment branch gates.
-- Dev workflow runs only from `develop`; prod only from `main`. The solo branch must be promoted through a reviewed PR before workflow dispatch.
-- The workflow and Terraform roots have been migrated to `us-east-1`. The repository's current `main` branch has not been promoted and must not be used as the deployment source.
+- Target AWS account: the owner's existing account; exact 12-digit account ID remains unverified.
+- Canonical deployment region: `us-east-1`, declared only in `config/deployment.json`.
+- Dev, prod and billing state keys are isolated: `attendance/dev/terraform.tfstate`, `attendance/prod/terraform.tfstate`, `attendance/billing/terraform.tfstate`.
+- Terraform S3 native lock files are enabled (`use_lockfile = true`); Terraform is pinned to 1.10.5 in CI.
+- Terraform providers load the region from the canonical manifest. The S3 backend receives the same value through `scripts/terraform.sh` locally and the deployment workflow in GitHub Actions.
+- Lambda SDK clients use the Lambda-reserved `AWS_REGION`; the local/test fallback is the canonical region.
+- CI includes a region-consistency gate intended to fail on conflicting region literals, stale regional endpoints, or Terraform roots that bypass the manifest. The gate is not considered complete until the consolidation branch's own CI passes.
+- The manual deployment workflow uses GitHub OIDC, operation-specific plan/apply environments, encrypted saved-plan artifacts using `age`, exact plan commit/branch/run provenance and explicit environment gates.
+- Dev workflow runs only from `develop`; prod and billing run only from `main`. The release branch must be reviewed and promoted through a PR before deployment workflow dispatch.
+
+## Phase B implementation status
+
+The task chain T01–T15, T17 and T31–T37 has implementation/documentation and historical CI evidence recorded in `docs/TASKS.md` and `docs/STATUS.md`. This includes:
+
+- Per-handler runtime IAM reconciliation and environment-specific runtime permissions boundaries.
+- Terraform provider IAM action mapping for foundation, data, recognition and access modules.
+- Separate dev/prod plan and apply policies with exact environment resource/state scope.
+- S3 state-bucket security specification and native lockfile permissions.
+- Exact GitHub OIDC subjects and operation-specific deployment environments.
+- Encrypted Terraform plan artifact provenance, one-day retention and cleanup.
+- Terraform policy-template validation and provider lockfiles.
+- Scheduler trust hardening, CloudFront KMS scope, DynamoDB KMS ViaService access and isolated billing roles.
+
+T16 and T18 remain blocked on actions that cannot be completed by repository code changes alone. T38 (canonical region manifest and drift-prevention gate) is in progress until this branch's CI validates it.
 
 ## Security design requirements
 
-1. Plan roles must only refresh/read infrastructure and access the matching environment state/lock object. They must not mutate AWS infrastructure.
-2. Apply roles may mutate only the resources in their matching environment root. They must not receive `AdministratorAccess`.
-3. Dev and prod roles must never access each other's Terraform state or lock file.
+1. Plan roles may refresh/read infrastructure and access only their matching state/lock paths. They must not mutate application infrastructure.
+2. Apply roles may mutate only resources in their matching environment root. They must not receive broad account administration.
+3. Dev, prod and billing roles must never access each other's Terraform state or lock objects.
 4. `iam:PassRole` must be limited to exact application execution-role ARNs and the correct service principal.
-5. Every Terraform-created Lambda and Scheduler role must have the exact pre-created environment permissions boundary. GitHub apply roles may attach the boundary but must not modify/delete its policy or create an unbounded role.
-6. The public repository must not upload cleartext Terraform plan files. The current workflow encrypts the plan artifact and decrypts it only during its matching apply job.
-7. GitHub environment branch restrictions are required: dev from `develop`, prod from `main`; prod must require reviewer approval.
+5. Every Terraform-created Lambda and Scheduler role must receive the exact pre-created environment permissions boundary. Apply roles may attach the boundary but must not edit/delete its policy or create an unbounded role.
+6. The public repository must not upload cleartext Terraform plans. Plans are encrypted with environment-specific age recipients; private identities exist only as matching apply-environment secrets.
+7. GitHub environments must enforce exact branch restrictions and independent reviewer approval for apply operations.
+8. Billing actions remain isolated to the billing role pair. In particular, account-level `aws-portal:ModifyBilling` must never be attached to dev/prod roles.
+9. No AWS write, role assumption, backend initialization, plan or apply may occur before the corresponding owner approval.
 
-## Required policy artifacts before bootstrap
+## Remaining owner/repository-administrator gates
 
-- Two runtime permissions-boundary policies: dev and prod. Each caps the allowed runtime actions for the Lambda and Scheduler execution roles. Boundary policies do not grant access by themselves.
-- Four GitHub deployment policies: dev plan, dev apply, prod plan, prod apply.
-- Two exact OIDC trust documents per environment role pair (dev/prod subjects), with audience `sts.amazonaws.com`.
-- A state bucket policy template with public-access block, versioning, SSE-S3, bucket-owner-enforced ownership and TLS-only access.
-- Explicit resource ARNs and condition keys wherever supported; unavoidable wildcard resource actions documented individually.
+### T16 — GitHub environment configuration
 
-The action inventory in `docs/IAM-LEAST-PRIVILEGE-INVENTORY.md` is an initial candidate list, not a final policy. Before bootstrap, each action must be checked against the pinned AWS provider's actual refresh and mutation calls and AWS service authorization resource-level support. Runtime policies must be reconciled against actual handlers, not inferred only from Terraform resource blocks.
+Create and verify six exact environments: `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan`, `billing-apply`. Configure environment-scoped `AWS_ROLE_ARN`, account/state bucket values, separate age recipients and apply-only private age identity secrets. Restrict dev environments to `develop`; restrict prod and billing to `main`. Apply environments require an independent reviewer and self-review prevention.
 
-## Remaining Phase B sequence
+The current GitHub connection cannot inspect or configure environment settings/secrets or branch protection. This remains an explicit repository-admin task.
 
-1. Finish Terraform formatting for `infra/modules/data/main.tf` and `infra/modules/recognition/main.tf` using the pinned Terraform 1.10.5 CLI; the last CI run still reports formatting differences in these two files. Then rerun CI and verify the full Terraform validation matrix.
-2. Inspect every Lambda handler and reconcile exact runtime actions with each Terraform execution-role policy.
-3. Verify AWS service action names, resource ARN support, request condition keys and provider read/write calls for all four modules.
-4. Produce the two execution-role boundary policies and four deployment policies, including strict state object/lock isolation.
-5. Review workflow and GitHub environment protections, including plan artifact provenance, key isolation and minimum GitHub token permissions.
-6. Validate the state bucket security configuration and create the manual bootstrap proposal.
-7. Open a reviewed solo-only PR from `solo/amit-monday` into `develop` once the release candidate is ready.
+### T18 — exact account-specific bootstrap plan
 
-## Manual bootstrap proposal — not yet approved
+The policy templates and manual bootstrap inventory are prepared, but the account ID, final globally unique bucket name and current AWS resource inventory are not verified. The plan must be rendered against the authenticated account and checked for existing providers, buckets, roles, policies and boundaries before any create operation is proposed.
 
-The eventual bootstrap proposal is expected to include:
-- One state bucket in `us-east-1` with public access blocked, versioning, SSE-S3, bucket-owner-enforced ownership and TLS-only bucket policy.
-- One GitHub Actions OIDC identity provider, reusing an existing matching provider if present.
-- Two customer-managed application execution-role permissions boundaries (dev and prod).
-- Four GitHub deployment roles: dev plan/apply and prod plan/apply, with exact trust and permission policies.
-- GitHub environments and environment-specific variables/secrets, including separate `age` identity pairs.
+## Manual bootstrap inventory — proposal only
 
-No account discovery, account mutation or remote state initialization is part of this proposal. Exact bucket name, account-specific ARNs and policies must be shown before any bootstrap action. Nothing in this document authorizes creating these resources.
+| Resource | Count | Proposed identity |
+|---|---:|---|
+| S3 state bucket | 1 | `attendance-tf-state-<account-id>-<approved-suffix>` |
+| IAM OIDC provider | 1 | `token.actions.githubusercontent.com`; reuse if present |
+| Runtime permissions boundaries | 2 | `attendance-dev-execution-boundary`, `attendance-prod-execution-boundary` |
+| GitHub plan/apply roles | 6 | dev-plan, dev-apply, prod-plan, prod-apply, billing-plan, billing-apply |
+| Managed policy templates | 26 | 22 dev/prod plan/apply policies + 4 billing policies |
+| GitHub environments | 6 | Exact names listed under T16 |
 
-## Dev release gates after approved bootstrap
+The bucket must be in `us-east-1`, with all four S3 Block Public Access settings enabled, versioning, SSE-S3 default encryption, BucketOwnerEnforced ownership and a TLS-only deny policy. It must not have Object Lock or automatic state expiration.
 
-1. Trigger a manual dev `plan` from `develop`.
-2. Download/decrypt and review the exact plan artifact. Check for unexpected creates, deletes, replacements, public access, broad IAM grants, incorrect region or data-loss risks.
-3. Present the complete plan and exact resource changes for explicit approval.
-4. Only after separate approval, trigger `apply` for that exact plan run and commit.
-5. Perform CloudFront-origin URL second pass for Cognito callbacks/logout and S3 CORS.
-6. Run consent-gated dev integration and end-to-end tests; record latency, deletion and browser evidence.
+The role/policy inventory, exact trust documents, rendered policy JSON and bucket policy are documented in `docs/MANUAL-AWS-BOOTSTRAP-PLAN.md`, `docs/STATE-BUCKET-BOOTSTRAP.md` and `infra/policies/`. These remain templates until the account ID is verified and the owner approves the exact inventory.
 
-Production remains blocked until dev acceptance, separate policy review and explicit production approval.
+## Read-only account verification before bootstrap
+
+After the owner supplies or authorizes an authenticated AWS CLI session, first run a read-only identity and resource inventory. Verify the active account via STS; inspect the OIDC provider; check whether the proposed state bucket exists and inspect its region, ownership, public-access block, versioning, encryption and policy; inspect the two boundary policies, six role trust policies and attached policies. Record exact ARNs and distinguish "not found" from "access denied". Do not create missing resources during this pass.
+
+The repository contains no verified account ID or live AWS inventory yet. A repository connection is not proof of AWS account access.
+
+## Deployment sequence after gates are satisfied
+
+1. Complete T16 GitHub environment and branch-protection configuration.
+2. Verify the AWS account ID and run the read-only inventory described above.
+3. Choose the globally unique state bucket suffix and render the exact bootstrap resource/policy inventory.
+4. Present the full bootstrap plan to the owner and obtain explicit approval for the listed AWS mutations.
+5. Bootstrap only the approved state bucket/OIDC provider/permissions boundaries/roles/policies; reuse existing compatible resources rather than duplicating them.
+6. Verify every created/attached resource using read-only calls and record the exact ARNs.
+7. Initialize the dev backend and generate a dev plan only after separate approval. Review the complete plan, cost and resource actions with the owner; obtain explicit apply approval before applying that exact saved plan.
+8. Complete dev authentication, upload/recognition, attendance, reports, alarms, privacy, deletion, latency and browser acceptance.
+9. Production and billing operations require their own exact plan review and separate approval. Production remains blocked until dev acceptance and an independent production review.
 
 ## Safety boundary
 
-No AWS resources have been created by this preparation. No IAM roles, OIDC provider, state bucket, or permissions boundaries have been created; no remote backend has been initialized; no Terraform plan or apply has been run.
+No AWS resources have been created by this preparation. No IAM roles or policies have been created/attached, no OIDC provider or state bucket has been created, no remote backend has been initialized, and no Terraform plan or apply has been run. Any AWS mutation requires an exact written plan and separate explicit owner approval.
