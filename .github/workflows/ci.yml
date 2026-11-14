@@ -571,6 +571,7 @@ jobs:
           required = (
               "age --recipient",
               "TF_PLAN_AGE_RECIPIENT",
+              "-lockfile=readonly",
               "retention-days: 1",
               "if-no-files-found: error",
               "github.run_attempt",
