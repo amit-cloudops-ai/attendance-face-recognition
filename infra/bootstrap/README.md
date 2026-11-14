@@ -30,15 +30,26 @@ Reuse the provider if it already exists in the account.
 
 Create two roles only after the deployment workflow and its exact permissions policy have been reviewed:
 
-- `attendance-github-deploy-dev`: trust only `repo:amit-cloudops-ai/attendance-face-recognition:ref:refs/heads/develop`
+- `attendance-github-deploy-dev`: trust only `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev`
 - `attendance-github-deploy-prod`: trust only `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`
 
 Both trust policies must require audience `sts.amazonaws.com`. Do not use wildcard repository, branch or environment subjects. Do not attach `AdministratorAccess`; the deploy policy must be scoped to the resources and actions required by the reviewed Terraform plan.
 
-## 4. GitHub configuration
+## 4. GitHub environments and variables
 
-After creating and reviewing the roles, configure repository secrets/variables for the role ARNs used by the deployment workflow. The workflow must use GitHub OIDC and short-lived credentials; do not store AWS access keys.
+Create GitHub Environments:
+
+- `dev`: allow deployments from `develop`; no required reviewer is necessary for the dev environment.
+- `prod`: allow deployments from `main`; require at least one designated reviewer.
+
+Configure these repository/environment variables:
+
+- `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`
+- `TF_STATE_BUCKET`, `AWS_ACCOUNT_ID`, `ALERT_EMAIL`
+- `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS`, `ALLOWED_ORIGINS` (each a non-empty JSON array of strings)
+
+The manual workflow is `.github/workflows/deploy.yml`. Trigger it from `develop` for dev or `main` for prod, choose `plan` first, review the uploaded plan artifact, then explicitly trigger `apply` when approved. Production runs are gated by the `prod` environment reviewer. The workflow uses GitHub OIDC and short-lived credentials; never store AWS access keys.
 
 ## Safety gate
 
-The bootstrap steps above are intentionally manual. The repository's current CI runs Python tests, Ruff, Terraform formatting, initialization and validation only. It does not authenticate to AWS, create resources, or run `terraform apply`. Production role creation and any apply require explicit approval.
+The bootstrap steps above are intentionally manual. Normal CI runs Python tests, Ruff, browser syntax/CSP checks, Terraform formatting and static validation. The deployment workflow is manual-only and has not been run. No AWS resources have been provisioned from this repository work. Any `apply` must follow an explicitly approved plan.
