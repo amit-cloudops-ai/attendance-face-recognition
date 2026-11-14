@@ -35,7 +35,7 @@ The task PR CI runs are historical evidence for their respective commits. The co
 
 ## Full pre-deployment audit — PR #29
 
-**Audit status: IN PROGRESS.** This audit is being performed against the integrated solo release and the current fix branch. The changes below are in PR #29 and are not yet merged into `solo/amit-monday`.
+**Audit status: IN PROGRESS.** The full phased findings are recorded in [`docs/PREDEPLOYMENT-AUDIT.md`](PREDEPLOYMENT-AUDIT.md). The current audit fixes remain in PR #29 and are not yet merged into `solo/amit-monday`.
 
 ### Static issues found and corrections prepared
 
@@ -73,6 +73,19 @@ The task PR CI runs are historical evidence for their respective commits. The co
 - The expanded AWS inventory has not been executed. The earlier read-only run verified STS account `924422830139` and inspected bootstrap resources only; it did not check all application resource-name collisions.
 - The local Ubuntu checkout cannot be inspected from GitHub. The owner must pull the audited branch and run the prescribed local checks.
 - No AWS write, remote backend initialization, Terraform plan or apply has been performed.
+
+### Latest application audit corrections
+
+The audited code commit `31bb951c9c6dcffe3ddd95e9aa9b2d9df4808d75` passed CI run [43628880020](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43628880020): 95 tests passed, Ruff clean, JS/shell/CSP checks passed, and Terraform fmt/validate passed for all modules and roots.
+
+PR #29 now also:
+- Filters weekend/holiday attendance out of weekly working-day percentages and adds regression data.
+- Extends kiosk/enrollment polling windows to 30 seconds.
+- Adds a retry action for face-template deletion on inactive employees.
+- Makes enrollment photo selection respect configured maximum/remaining slots.
+- Tracks exact E2E raw-image keys and attempts test-only cleanup if application cleanup fails.
+
+This is CI evidence for the code commit, not local WSL evidence or a live AWS test. The latest documentation-only commit will receive its own CI run. The SNS/KMS notification defect, local Terraform input/account guard, config.json collision, and other items in the phased audit remain open.
 
 ## Region-consistency implementation
 
