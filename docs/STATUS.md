@@ -211,3 +211,12 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - The production state object is read-only; only the production `.tflock` object can be Get/Put/Deleted for native S3 locking.
 - CI checks read-only action sets, 6,144-character policy size, exact `attendance-prod` Scheduler group/schedule ARNs, and rejects dev resources/state paths from prod policies.
 - No AWS resources or IAM roles created; no remote backend initialization, plan or apply.
+
+
+### T12 — production Terraform apply-role policy
+
+- **Status:** policy templates drafted; CI validation pending.
+- Added the production counterpart to the split dev apply set: core, data, Lambda, IAM, foundation, access, state and DynamoDB KMS templates.
+- Production policies use exact prod table/function/queue/role ARNs, `attendance-prod` KMS alias, prod tags, prod schedule group, and the prod execution-role boundary. The prod state object is Get/Put only; the prod lockfile is the only state path with Get/Put/Delete.
+- CI validates each policy's JSON, size, absence of dev resource/state paths and billing permissions, exact PassRole role/service scope, required prod boundary, five DynamoDB table ARNs, failure processor function condition and prod KMS alias/ViaService/GrantIsForAWSResource conditions.
+- No AWS resources, IAM roles or policies created or attached; no remote backend initialization, Terraform plan or apply.
