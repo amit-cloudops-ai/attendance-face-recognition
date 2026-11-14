@@ -17,9 +17,9 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T02 | Validate KMS key policy for Lambda asynchronous failure destinations | DONE | Confirm AWS service-principal model, source ARN/account conditions, encryption context and exact DLQ ARNs against AWS docs; update policy only with evidence |
 | T03 | Reconcile recognition Lambda runtime IAM permissions | DONE | Every SDK call mapped to exact action/resource; Rekognition, S3, DynamoDB, SQS, KMS and logs checked |
 | T04 | Reconcile data Lambda runtime IAM permissions | DONE | Every SDK call mapped to exact action/resource; no unused permissions or unjustified KMS grants |
-| T05 | Finalize dev/prod execution-role permissions boundaries | DONE | Two environment-specific boundary documents, least-privilege union, explicit deny/guardrails, no self-management path |
+| T05 | Finalize dev/prod execution-role permissions boundaries | DONE | Two environment-specific allow-list boundary templates cap runtime permissions; no IAM/STS self-management, PassRole or provisioning actions; CI validates rendered policy envelope, conditions and size. Boundary templates are not created or attached in AWS. |
 | T06 | Verify Terraform provider IAM actions for foundation module | DONE | Create/read/update/delete/tag operations mapped to exact IAM actions and resource scopes |
-| T07 | Verify Terraform provider IAM actions for data and recognition modules | IN_PROGRESS | All provider operations mapped, including Lambda, IAM, DynamoDB, Scheduler, SQS, Rekognition and CloudWatch |
+| T07 | Verify Terraform provider IAM actions for data and recognition modules | DONE | All provider operations mapped, including Lambda, IAM, DynamoDB, Scheduler, SQS, Rekognition and CloudWatch |
 | T08 | Verify Terraform provider IAM actions for access module | TODO | Cognito, API Gateway v2, CloudFront, S3 and Lambda permission operations mapped |
 | T09 | Build dev plan-role policy | TODO | Read-only planning permissions, dev-only state/lock access, no resource mutation |
 | T10 | Build dev apply-role policy | TODO | Exact dev resource permissions, boundary enforcement and exact iam:PassRole scopes |
@@ -68,6 +68,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 ## Task execution notes
 
 - T01 is complete: governance files restored and branch CI passed on commits `be5b4e94c41f760d6bd750bf283f76dec222b2ef` and `aa293276cc8d35961ac75b6cd70ccd681105ae0f`.
-- T02 is the next active task: validate the KMS key policy for Lambda asynchronous failure destinations.
+- T07 is complete: provider v6.73.0 operations for DynamoDB, CloudWatch, IAM, Lambda, Scheduler, SQS, Rekognition and S3 notifications are mapped in `docs/security/DATA-RECOGNITION-PROVIDER-IAM.md`. CI run [43614059591](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43614059591) passed Python and Terraform jobs.
+- T08 is next: map access module provider IAM actions. Do not reorder or mark tasks complete without evidence.
 - Do not reorder or mark tasks complete without evidence.
 - The task board is a plan, not proof that implementation or AWS validation has occurred.
