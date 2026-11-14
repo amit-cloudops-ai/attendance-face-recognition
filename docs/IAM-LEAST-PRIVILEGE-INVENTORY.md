@@ -126,23 +126,22 @@ The GitHub apply role may attach the expected boundary to approved `attendance-<
 
 ## 6. Terraform state isolation
 
-- Dev state: `attendance/dev/terraform.tfstate`
-- Dev lock: `attendance/dev/terraform.tfstate.tflock`
-- Prod state: `attendance/prod/terraform.tfstate`
-- Prod lock: `attendance/prod/terraform.tfstate.tflock`
+- Dev state: `attendance/dev/terraform.tfstate`; lock: `attendance/dev/terraform.tfstate.tflock`
+- Prod state: `attendance/prod/terraform.tfstate`; lock: `attendance/prod/terraform.tfstate.tflock`
+- Billing state: `attendance/billing/terraform.tfstate`; lock: `attendance/billing/terraform.tfstate.tflock`
 
 Scope object read/write to the matching state key. Allow `s3:DeleteObject` only on the matching lock object. Scope `s3:ListBucket` by the corresponding `s3:prefix`. Do not grant one environment access to the other's state.
 
 ## 7. Remaining validation
 
-1. Verify CI after the Terraform formatting correction.
-2. Inspect all application Lambda handlers and compare each AWS SDK operation to its role policy.
-3. Validate all Terraform provider read/write actions and AWS IAM resource/condition support.
-4. Produce two execution boundaries and four GitHub plan/apply policy documents with exact resource scopes.
-5. Validate backend bucket controls and state permissions separately.
-6. Review GitHub Environment branch controls, workflow token scopes, encrypted plan handoff and provenance checks.
-7. Run static tests and Terraform validation without a remote backend.
-8. Submit the solo-only PR to `develop` only after the release candidate is reviewed.
+1. Run the full CI matrix on `release/phase-b-region-guard`, including the canonical region drift gate, Python tests, Ruff, policy rendering, Terraform formatting and all module/root validations.
+2. Resolve any findings from the consolidation branch; do not treat historical task-branch CI as validation of the consolidated head.
+3. Obtain repository-admin confirmation for the six GitHub environments, branch restrictions, variables, secrets and independent apply reviewers (T16).
+4. Verify the AWS account ID and existing OIDC provider, state bucket, runtime boundaries, six deployment roles and policy attachments using read-only AWS calls (T18).
+5. Render all 26 managed policy templates and the two boundary policies with the verified account ID and final bucket name; review exact trust subjects, ARN scopes, resource-level support, PassRole conditions and policy sizes.
+6. Use IAM Access Analyzer and AWS authorization validation only after explicit owner approval for the required AWS access/deployment steps.
+7. Present the exact bootstrap resource list and policies for owner approval. Bootstrap, backend initialization, dev plan and dev apply remain separate approval gates.
+8. Open the solo-only deployment-readiness PR to `develop` only after T16/T18 and the consolidated CI/security gates are resolved.
 
 ## Safety boundary
 
