@@ -31,15 +31,56 @@ Target region: `us-east-1`, sourced from `config/deployment.json`. Read-only STS
 | T32–T36 | Scheduler trust isolation, provider lockfiles, billing isolation, CloudFront KMS scope and DynamoDB KMS authorization | PRs #13–#17; CI runs 43616332197, 43616787686, 43617044959, 43617191177 |
 | T37 | Dedicated billing plan/apply policy and OIDC roles, isolated billing state root | PR #27; CI run 43620012088 |
 
-The task PR CI runs are historical evidence for their respective commits. The final consolidated CI passed on head `8bae76d`: Python/security 27/27 and Terraform 21/21. The merge into `solo/amit-monday` has also triggered a fresh post-merge CI run; its final result is being checked. IAM templates have not been attached to AWS roles. IAM Access Analyzer and live AWS authorization tests have not been performed.
+The task PR CI runs are historical evidence for their respective commits. The consolidated solo baseline CI passed on head `8bae76d`: Python/security 27/27 and Terraform 21/21. The solo baseline's later CI run 43623141820 also passed. PR #29 contains additional audit fixes and its latest CI result must be checked before merge. IAM templates have not been attached to AWS roles. IAM Access Analyzer and live AWS authorization tests have not been performed.
+
+## Full pre-deployment audit — PR #29
+
+**Audit status: IN PROGRESS.** This audit is being performed against the integrated solo release and the current fix branch. The changes below are in PR #29 and are not yet merged into `solo/amit-monday`.
+
+### Static issues found and corrections prepared
+
+| Finding | Correction in PR #29 | Verification still required |
+|---|---|---|
+| DynamoDB `kms:ViaService` statement was placed in the S3 web-bucket policy, not the KMS key policy | Moved the DynamoDB use statement into the actual KMS key policy; separated `CreateGrant` and constrained it with `kms:GrantIsForAWSResource=true`; added CI structural checks | Terraform validate and IAM Access Analyzer/live authorization in dev |
+| Access module duplicated `us-east-1` literals | Uses `data.aws_region.current.name` from the configured provider | Terraform validate and region guard |
+| Local wrappers and deployment workflow used `python` | Switched to `python3` | Local Ubuntu execution and GitHub CI |
+| Deployment workflow did not assert the assumed AWS account | Added read-only STS check against `TF_VAR_account_id` before backend initialization | GitHub workflow plan run after approved bootstrap |
+| Lambda application logs were not explicitly configured as JSON | Added JSON logging configuration and explicit 30-day log group references | Terraform validate and sample CloudWatch log inspection |
+| Contract tests did not verify Terraform API route parity | Added static contract tests for route map/document parity, handler existence and JWT route authorization; clarified the `record_scan(request_id)` contract | Latest pytest run; expand payload-shape contract coverage |
+| E2E smoke did not verify raw-image deletion or AWS account identity | Added STS account guard, per-object deletion checks and empty raw-prefix checks | Run only against dev after deployment, with a consenting participant |
+| Solo-owner instructions conflicted with old reviewer/Part A/B/C instructions | Updated governance helpers, CODEOWNERS, AI instructions and deployment docs | GitHub settings dry-run and owner verification |
+| Preflight checked bootstrap resources but not application resource-name collisions | Expanded read-only inventory to inspect project-prefixed S3, IAM, Lambda, DynamoDB, KMS, Rekognition, Cognito, API Gateway, SQS, SNS, Scheduler, CloudWatch, Budgets and CloudFront resources | Run expanded script; current AWS inventory output is still incomplete |
+
+### Acceptance evidence status
+
+| Requirement | Current status |
+|---|---|
+| N01 — browser capture-to-result p95 | NOT VERIFIED; API-path smoke timing is supplemental and excludes camera/rendering |
+| N02 — raw image deletion within 10 minutes | Test strengthened; NOT RUN against dev |
+| N03 — KMS encryption and TLS-only policies | Static Terraform/policy review only; no live resource verification |
+| N04 — least-privilege runtime IAM | Static call-site review only; no IAM Access Analyzer/live authorization test |
+| N05 — no public buckets / CloudFront-only web access | Static configuration only; no deployed bucket policy verification |
+| N06 — clean checkout Terraform deployment | NOT RUN; no remote backend init, plan or apply |
+| N07 — PR governance and branch protection | Helper scripts revised; GitHub environment/branch settings NOT APPLIED or verified |
+| N08 — alarms and notifications | Terraform definitions exist; no alarm trigger test; SNS subscription confirmation pending |
+| N09 — cost | Estimate only; saved Pricing Calculator estimate absent; budget scope is blocked (see T26) |
+| N10 — JSON logs and 30-day retention | JSON logging configuration added in PR #29; no sample CloudWatch logs observed |
+| N11 — Chrome/Android/Safari/iOS matrix | NOT RUN; browser matrix remains blank |
+
+### Remaining limitations
+
+- `tests/contract` now has static API route contract checks, but it does not yet assert every Lambda's full request/response and DynamoDB/S3 side-effect shapes. `tests/integration` remains empty.
+- The expanded AWS inventory has not been executed. The earlier read-only run verified STS account `924422830139` and inspected bootstrap resources only; it did not check all application resource-name collisions.
+- The local Ubuntu checkout cannot be inspected from GitHub. The owner must pull the audited branch and run the prescribed local checks.
+- No AWS write, remote backend initialization, Terraform plan or apply has been performed.
 
 ## Region-consistency implementation
 
 - Canonical value: `config/deployment.json` → `aws_region: us-east-1`.
-- Dev, prod and billing Terraform providers load the canonical manifest rather than carrying separate provider-region literals.
+- Dev, prod and billing Terraform provider roots load the canonical manifest; the access module now derives regional endpoints from the configured provider region rather than hardcoding a second region literal.
 - S3 backend region is supplied from the same manifest through `scripts/terraform.sh` locally and the deployment workflow in GitHub Actions.
 - Lambda SDK clients use the Lambda-reserved `AWS_REGION`; the local/test fallback remains `us-east-1`.
-- Contracts are amended to v1.1 for the region-only change. SPEC is amended to v1.1; functional scope and acceptance criteria are unchanged.
+- Contracts are amended to v1.2: canonical region alignment plus explicit optional `request_id` argument for exactly-once scan processing and deterministic offboarding audit IDs. SPEC is v1.2; external HTTP request/response shapes remain unchanged.
 - Frontend runtime examples, Cognito domain examples, raw-bucket endpoints, architecture decision log and cost assumptions are aligned.
 - Moto test fixtures are aligned to the target region.
 - CI runs `scripts/check_region_consistency.py`, which checks the manifest, Terraform roots, backend configuration, all repository text for noncanonical region tokens, regional ARNs/endpoints and Lambda region selection. The local Terraform wrapper and GitHub deployment workflow also run the full gate before proceeding.
