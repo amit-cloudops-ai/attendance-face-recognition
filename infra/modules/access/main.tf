@@ -452,6 +452,105 @@ data "aws_iam_policy_document" "web_bucket" {
   }
 }
 
+
+data "aws_iam_policy_document" "attendance_kms_key" {
+  statement {
+    sid    = "EnableAccountRootPermissions"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${var.account_id}:root"]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowEncryptedAlertsTopic"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["sns.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:sns:us-east-1:${var.account_id}:attendance-${var.env}-alerts"]
+    }
+  }
+
+  statement {
+    sid    = "AllowLambdaFailureDestinationsToUseSQSKey"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values = [
+        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-recognize-dlq",
+        "arn:aws:sqs:us-east-1:${var.account_id}:attendance-${var.env}-enroll-dlq"
+      ]
+    }
+  }
+
+  statement {
+    sid    = "AllowCloudFrontOACRead"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_cloudfront_distribution.site.arn]
+    }
+  }
+}
+
+resource "aws_kms_key_policy" "attendance" {
+  key_id = var.kms_key_id
+  policy = data.aws_iam_policy_document.attendance_kms_key.json
+}
+
 resource "aws_s3_bucket_policy" "web" {
   bucket = var.web_bucket_name
   policy = data.aws_iam_policy_document.web_bucket.json
