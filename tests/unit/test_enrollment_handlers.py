@@ -268,3 +268,14 @@ def test_enrollment_retry_after_employee_commit_does_not_index_twice(aws_env, mo
     assert committed["photo_count"] == 1
     assert fake_rekognition.index_calls == 1
     assert fake_s3.deleted == [f"enroll/EMP001/{request_id}.jpg"]
+
+
+
+def test_employee_lease_blocks_concurrent_duplicate_invocation(aws_env):
+    _, employees, _ = aws_env
+    employees.put_item(Item={"employee_id": "EMP001", "active": True})
+    request_id = str(uuid.uuid4())
+    enroll._acquire_employee_lock(employees, "EMP001", request_id)
+    with pytest.raises(RuntimeError, match="another enrollment"):
+        enroll._acquire_employee_lock(employees, "EMP001", request_id)
+    enroll._release_employee_lock(employees, "EMP001", request_id)
