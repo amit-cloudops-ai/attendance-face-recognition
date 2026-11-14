@@ -58,6 +58,7 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 | enroll | `rekognition:DetectFaces`; `IndexFaces`, `SearchFacesByImage`, `DeleteFaces` on the collection; `s3:GetObject`, `s3:DeleteObject` on raw `enroll/*`; `dynamodb:GetItem`/`UpdateItem` employees; `GetItem` config; `GetItem`/`UpdateItem` scan-results; DLQ send |
 | enroll-url | `s3:PutObject` on raw `enroll/*`; `dynamodb:GetItem` employees; `PutItem` scan-results |
 | faces-delete | `rekognition:DeleteFaces` on the collection; `dynamodb:GetItem`/`UpdateItem` employees; `PutItem` audit |
+| failure | `sqs:ReceiveMessage`/`DeleteMessage`/`GetQueueAttributes`/`ChangeMessageVisibility` on recognition/enrollment DLQs; `dynamodb:GetItem`/`UpdateItem` scan-results + employees; `dynamodb:Query` attendance + date-index; `rekognition:SearchFacesByImage`/`DeleteFaces` on collection; `s3:GetObject`/`DeleteObject` raw captures/enroll prefixes |
 | employees | `dynamodb:GetItem`/`PutItem`/`UpdateItem`/`Scan` employees; `PutItem` audit |
 | attendance-query | `dynamodb:Query` attendance and `attendance/index/date-index`; `Scan` employees |
 | reports | `s3:GetObject` on reports `reports/*` |
@@ -69,7 +70,7 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 
 ### 6.2 Controls
 - Encryption at rest: DynamoDB (KMS), S3 (SSE-KMS with bucket key), CloudWatch logs unencrypted of PII by design (no PII logged). TLS enforced by bucket policies (`aws:SecureTransport`) and CloudFront (redirect to HTTPS, TLS 1.2+).
-- Raw bucket: Block Public Access, no versioning, Lambda deletes the image right after processing, lifecycle expires `captures/` and `enroll/` after 1 day (S3 minimum granularity) plus noncurrent versions and incomplete multipart uploads. Reports bucket: versioning on (audit trail). Web bucket: private, CloudFront OAC only.
+- Raw bucket: Block Public Access, no versioning. Workers delete images after a durable terminal result; retryable failures retain images while Lambda retries. The failure consumer reconciles already-committed attendance/enrollment writes, removes an uncommitted request-scoped face template, finalizes exhausted requests and deletes the image. Lifecycle expires `captures/` and `enroll/` after 1 day (S3 minimum granularity) as a backstop, plus incomplete multipart uploads. Reports bucket: versioning on (audit trail). Web bucket: private, CloudFront OAC only.
 - Pre-signed POST: 60 s expiry, JPEG only, 1 KB to 1 MB, key fixed by server.
 - API: Cognito JWT authorizer on every route + group check in the Lambda; API Gateway throttling (10 req/s, burst 20 per stage); Lambda reserved concurrency caps on `recognize` and `enroll` to bound Rekognition spend.
 - Response headers on CloudFront: HSTS, CSP (self + S3 regional endpoint + Cognito domain), `X-Content-Type-Options`, `Permissions-Policy: camera=(self)`.
@@ -81,7 +82,7 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 | Photo/video of an employee shown to the camera | Strict threshold, supervised kiosk, audit trail | Real in v1; fix is Face Liveness (LATER) |
 | Someone abuses upload endpoint | Auth required, pre-signed POST limits, throttling, concurrency cap, budget alarm | Low |
 | Stolen kiosk token | Dedicated `kiosk` user with kiosk-only routes, 60 min access tokens, disable the user to revoke | Medium (device theft) |
-| Biometric data leak | Images deleted immediately; only Rekognition feature vectors kept; KMS, least privilege | Low |
+| Biometric data leak | Raw images are retained only for the bounded retry/recovery window, then deleted; only Rekognition feature vectors remain for enrolled employees; KMS, least privilege and offboarding deletion | Low |
 | Admin misuse | Cognito admin group, override requires reason and is audited | Low |
 | Cost attack | Throttling, reserved concurrency, AWS Budget alarm | Low |
 ### 6.4 Privacy and compliance
@@ -90,9 +91,12 @@ Biometric data is personal data (India DPDP Act 2023 applies). Controls: explici
 ## 7. Reliability and failure modes
 | Failure | Behaviour |
 |---|---|
-| Duplicate S3 event | `recognize` updates the scan-results row only if `code = pending` (conditional write); second delivery is a no-op |
-| Rekognition throttle/error | boto3 standard retries; row set to `error`; failed async invocations go to the DLQ; alarm fires |
-| Image already deleted when event retried | Handler exits quietly |
+| Duplicate S3 event | Attendance transition is idempotent by `request_id`; the exact outcome is stored atomically in `attendance.scan_events`. Terminal result updates are conditional; duplicate deliveries only repeat safe image cleanup |
+| Retryable Rekognition/DynamoDB error | Worker leaves the result `pending`, retains the image and raises. Lambda asynchronous invocation retries twice (up to the configured 1-hour event age) |
+| Exhausted recognition retries | Failure consumer queries attendance by IST date and request ID. If the attendance write committed, it repairs the result to `matched`; otherwise it marks `error`. It then deletes the raw image |
+| Exhausted enrollment retries | If the employee request marker exists, the consumer repairs the result to `enrolled`; otherwise it searches for and deletes any FaceId tagged with that exact request ID, marks `error`, and deletes the image |
+| Failure consumer cannot process a message | SQS retries it five times, then moves it to the separately alarmed failure-processor DLQ |
+| Image already deleted when event retried | Terminal result is left unchanged; repeated `DeleteObject` is safe. If the request is still pending, it is finalized as an error |
 | Cold start | Keep-warm schedule (SHOULD) during 08:00-20:00 IST every 5 min; small zip, 512 MB memory |
 | Browser never gets a result | UI times out at 8 s, shows "try again" (nothing is lost; user can rescan) |
 | Daily job fails midway | Idempotent conditional puts: re-run with `{"date": ...}`; SNS alert on error |
