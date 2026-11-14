@@ -493,11 +493,11 @@ locals {
 resource "aws_s3_object" "frontend" {
   for_each = local.frontend_files
 
-  bucket       = var.web_bucket_name
-  key          = each.value
-  source       = "${local.frontend_root}/${each.value}"
-  etag         = filemd5("${local.frontend_root}/${each.value}")
-  content_type = lookup(local.frontend_mime_types, regex("\\.[^.]+$", each.value), "application/octet-stream")
+  bucket        = var.web_bucket_name
+  key           = each.value
+  source        = "${local.frontend_root}/${each.value}"
+  etag          = filemd5("${local.frontend_root}/${each.value}")
+  content_type  = lookup(local.frontend_mime_types, regex("\\.[^.]+$", each.value), "application/octet-stream")
   cache_control = "no-cache, no-store, must-revalidate"
 }
 
@@ -505,12 +505,12 @@ resource "aws_s3_object" "frontend_config" {
   bucket  = var.web_bucket_name
   key     = "config.json"
   content = jsonencode({
-    region       = local.region
-    userPoolId   = aws_cognito_user_pool.main.id
-    clientId     = aws_cognito_user_pool_client.web.id
+    region        = local.region
+    userPoolId    = aws_cognito_user_pool.main.id
+    clientId      = aws_cognito_user_pool_client.web.id
     cognitoDomain = "https://${local.cognito_base_url}"
-    apiBase      = "/api"
-    rawBucketUrl = "https://${var.raw_bucket_name}.s3.${local.region}.amazonaws.com"
+    apiBase       = "/api"
+    rawBucketUrl  = "https://${var.raw_bucket_name}.s3.${local.region}.amazonaws.com"
   })
 
   content_type  = "application/json"
