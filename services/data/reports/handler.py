@@ -13,7 +13,7 @@ LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 REGION = "ap-south-1"
 _DAILY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_WEEKLY = re.compile(r"^\d{4}-W\d{2}$")
+_WEEKLY = re.compile(r"^(\d{4})-W(\d{2})$")
 
 
 def _required_env(name: str) -> str:
