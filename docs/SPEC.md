@@ -1,6 +1,6 @@
 # SPEC: Scope and Finish Line
 
-**Version 1.0, FROZEN on 11 Nov 2026.** Any change needs lead approval and an update to this file in the same PR.
+**Version 1.1, FROZEN on 14 Nov 2026.** This amendment changes only the deployment region to `us-east-1`; functional scope and acceptance criteria are unchanged. Any further change needs lead approval and an update to this file in the same PR.
 **Target:** production-ready and live by **15 Nov 2026**. Submission 16 Nov (buffer day).
 
 ## 1. Purpose
@@ -70,4 +70,4 @@ Contactless attendance for ~100 employees: face capture in browser, recognition 
 ## 8. Known limitations (declared up front)
 - **Still-photo spoofing:** v1 uses still images; a printed or on-screen photo of an enrolled employee could match. Mitigations in v1: strict threshold (default 95, tunable), kiosk supervised by reception, audit trail. Planned fix (LATER): Rekognition Face Liveness.
 - Lighting and camera quality affect accuracy; enrollment with 3-5 varied photos is mandatory.
-- Single region (ap-south-1), no multi-region failover.
+- Single region (us-east-1), no multi-region failover. The canonical region is `config/deployment.json`.
