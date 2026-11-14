@@ -27,7 +27,7 @@ variable "alert_email" {
 variable "callback_urls" {
   description = "Exact Cognito Hosted UI callback URLs. Add the CloudFront site URL after the first apply."
   type        = list(string)
-  default     = ["http://localhost:8000/auth/callback/"]
+  default     = ["http://localhost:8000/callback.html"]
 }
 
 variable "logout_urls" {
