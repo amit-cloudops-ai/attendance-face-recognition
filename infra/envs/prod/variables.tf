@@ -59,7 +59,7 @@ variable "execution_role_boundary_arn" {
   type        = string
 
   validation {
-    condition     = can(regex("^arn:aws:iam::\\d{12}:policy/attendance-prod-execution-boundary$", var.execution_role_boundary_arn))
+    condition     = var.execution_role_boundary_arn == format("arn:aws:iam::%s:policy/attendance-prod-execution-boundary", var.account_id)
     error_message = "execution_role_boundary_arn must be the pre-created attendance-prod-execution-boundary policy in this AWS account."
   }
 }
