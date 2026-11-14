@@ -1,0 +1,47 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StateBucketLocation",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation"
+      ],
+      "Resource": "arn:aws:s3:::${state_bucket}"
+    },
+    {
+      "Sid": "DevStateBucketList",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::${state_bucket}",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "attendance/dev/terraform.tfstate",
+            "attendance/dev/terraform.tfstate.tflock"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DevStateReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::${state_bucket}/attendance/dev/terraform.tfstate"
+    },
+    {
+      "Sid": "DevLockfileLifecycle",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::${state_bucket}/attendance/dev/terraform.tfstate.tflock"
+    }
+  ]
+}
