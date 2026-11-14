@@ -16,10 +16,10 @@
 | Module | Owner | Status (not started / in progress / on dev / on prod) | Tests | Notes |
 |---|---|---|---|---|
 | bootstrap + foundation | Lead | not started | - | |
-| shared layer (tz, config, responses) | Lead | not started | - | |
+| shared layer (tz, config, responses) | Lead | in progress | Unit tests added; CI pending | Implemented IST helpers, cached config defaults/lookup, and API proxy responses on solo/amit-monday |
 | Part A: recognition | | not started | - | |
 | Part B: data + automation | | not started | - | |
-| shared record_scan | Part B | not started | - | |
+| shared record_scan | Part B interface / Amit solo implementation | in progress | Unit tests added; CI pending | Implemented conditional clock-in, debounce, clock-out, IST date, absent-row promotion and out-of-order event protection on solo/amit-monday |
 | Part C: access + web | | not started | - | |
 | CI/CD | Lead | CI file in repo; deploy workflow pending | - | |
 
@@ -37,3 +37,4 @@ Paste links/screenshots per SPEC ID (F01-F13, N01-N11) as they pass.
 
 ## Session log
 - 11 Nov: repo scaffold, SPEC, contracts, architecture, part guides created.
+- 14 Nov: Amit solo T10 implementation added: attendance_common timezone/config/response helpers, record_scan, and focused moto-backed unit tests. GitHub Actions validation for this commit is pending; no AWS resources provisioned.
