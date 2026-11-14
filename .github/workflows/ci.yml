@@ -26,6 +26,8 @@ jobs:
             echo "Inline styles conflict with the strict Content-Security-Policy."
             exit 1
           fi
+      - name: Check shell script syntax
+        run: bash -n scripts/e2e_smoke.sh
       - name: Validate GitHub Actions workflow YAML
         run: |
           python - <<'PY'
