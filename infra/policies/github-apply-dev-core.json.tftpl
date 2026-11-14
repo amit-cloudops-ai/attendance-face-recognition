@@ -5,7 +5,11 @@
       "Sid": "SqsQueueCreate",
       "Effect": "Allow",
       "Action": "sqs:CreateQueue",
-      "Resource": "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-*",
+      "Resource": [
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-recognize-dlq",
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-enroll-dlq",
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-failure-processor-dlq"
+      ],
       "Condition": {
         "StringEquals": {
           "aws:RequestTag/Project": "attendance",
@@ -82,7 +86,11 @@
         "sqs:TagQueue",
         "sqs:UntagQueue"
       ],
-      "Resource": "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-*"
+      "Resource": [
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-recognize-dlq",
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-enroll-dlq",
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-failure-processor-dlq"
+      ]
     },
     {
       "Sid": "RekognitionCollectionCreate",
