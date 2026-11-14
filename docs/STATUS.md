@@ -17,7 +17,7 @@
 |---|---|---|---|---|
 | bootstrap + foundation | Lead | not started | - | |
 | shared layer (tz, config, responses) | Lead | in progress | 16 tests passed; Ruff passed | Implemented IST helpers, cached config defaults/lookup, and API proxy responses on solo/amit-monday |
-| Part A: recognition | | not started | - | |
+| Part A: recognition | Amit (solo) | in progress | 12 recognition tests; CI green | Implemented presign, result polling and S3-triggered recognize handlers; enroll, faces-delete and Terraform module remain |
 | Part B: data + automation | | not started | - | |
 | shared record_scan | Part B interface / Amit solo implementation | in progress | 16 tests passed; Ruff passed | Implemented conditional clock-in, debounce, clock-out, IST date, absent-row promotion and out-of-order event protection on solo/amit-monday |
 | Part C: access + web | | not started | - | |
@@ -30,7 +30,8 @@ Paste links/screenshots per SPEC ID (F01-F13, N01-N11) as they pass.
 - UI direction: A (clean light enterprise admin + high-contrast kiosk), confirmed 11 Nov.
 
 ## Known issues
-(none yet)
+- Part A is not complete: enrollment, enroll-url, faces-delete and the Terraform recognition module remain to be implemented and validated.
+- AWS integration, biometric accuracy, IAM, raw-bucket deletion behaviour and end-to-end latency are not yet verified; no AWS resources have been provisioned from this work session.
 
 ## Decisions made after freeze
 (none; contracts are frozen. List approved changes here with date and reason.)
@@ -38,3 +39,4 @@ Paste links/screenshots per SPEC ID (F01-F13, N01-N11) as they pass.
 ## Session log
 - 11 Nov: repo scaffold, SPEC, contracts, architecture, part guides created.
 - 14 Nov: Amit solo T10 implementation added: attendance_common timezone/config/response helpers, record_scan, and focused moto-backed unit tests. GitHub Actions passed: Ruff, pytest (16 passed), and terraform fmt. No AWS resources provisioned.
+- 14 Nov: Amit solo T11 batch added Cognito group helpers plus presign, result-polling and S3-triggered recognize handlers. Added mocked-AWS coverage for authorization, pre-signed POST, result contract, recognition outcomes, duplicate delivery and image cleanup. GitHub Actions passed: Ruff, pytest (28 passed), and terraform fmt. No AWS resources provisioned.
