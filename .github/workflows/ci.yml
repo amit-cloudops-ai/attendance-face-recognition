@@ -26,6 +26,15 @@ jobs:
             echo "Inline styles conflict with the strict Content-Security-Policy."
             exit 1
           fi
+      - name: Validate GitHub Actions workflow YAML
+        run: |
+          python - <<'PY'
+          import yaml
+
+          for path in (".github/workflows/ci.yml", ".github/workflows/deploy.yml"):
+              with open(path, encoding="utf-8") as stream:
+                  yaml.compose(stream, Loader=yaml.BaseLoader)
+          PY
 
   terraform-fmt:
     runs-on: ubuntu-latest
