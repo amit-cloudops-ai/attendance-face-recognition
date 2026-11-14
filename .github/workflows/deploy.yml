@@ -121,6 +121,7 @@ jobs:
         if: ${{ inputs.operation == 'plan' }}
         run: |
           set -euo pipefail
+          trap 'rm -f "$TF_ROOT/tfplan"' EXIT
           terraform -chdir="$TF_ROOT" plan -input=false -out=tfplan
           age --recipient "$TF_PLAN_AGE_RECIPIENT" --output "$TF_ROOT/tfplan.age" "$TF_ROOT/tfplan"
           rm -f "$TF_ROOT/tfplan"
@@ -129,12 +130,13 @@ jobs:
         if: ${{ inputs.operation == 'plan' }}
         uses: actions/upload-artifact@v4
         with:
-          name: attendance-${{ inputs.environment }}-terraform-plan-${{ github.run_id }}
+          name: attendance-${{ inputs.environment }}-terraform-plan-${{ github.run_id }}-${{ github.run_attempt }}
           path: infra/envs/${{ inputs.environment }}/tfplan.age
           retention-days: 1
           if-no-files-found: error
 
       - name: Verify saved plan belongs to this exact release revision
+        id: plan-provenance
         if: ${{ inputs.operation == 'apply' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -145,17 +147,20 @@ jobs:
           plan_branch="$(jq -r '.head_branch' <<<"$plan_run")"
           plan_result="$(jq -r '.conclusion' <<<"$plan_run")"
           plan_event="$(jq -r '.event' <<<"$plan_run")"
+          plan_path="$(jq -r '.path' <<<"$plan_run")"
+          plan_attempt="$(jq -r '.run_attempt' <<<"$plan_run")"
           expected_branch="${{ inputs.environment == 'prod' && 'main' || 'develop' }}"
-          if [[ "$plan_sha" != "$GITHUB_SHA" || "$plan_branch" != "$expected_branch" || "$plan_result" != "success" || "$plan_event" != "workflow_dispatch" ]]; then
-            echo "Plan must be a successful manual run for this exact commit and environment branch."
+          if [[ "$plan_sha" != "$GITHUB_SHA" || "$plan_branch" != "$expected_branch" || "$plan_result" != "success" || "$plan_event" != "workflow_dispatch" || "$plan_path" != ".github/workflows/deploy.yml" || ! "$plan_attempt" =~ ^[0-9]+$ ]]; then
+            echo "Plan must be a successful run of the deployment workflow for this exact commit, attempt and environment branch."
             exit 1
           fi
+          echo "run_attempt=$plan_attempt" >> "$GITHUB_OUTPUT"
 
       - name: Download the previously reviewed plan
         if: ${{ inputs.operation == 'apply' }}
         uses: actions/download-artifact@v4
         with:
-          name: attendance-${{ inputs.environment }}-terraform-plan-${{ inputs.plan_run_id }}
+          name: attendance-${{ inputs.environment }}-terraform-plan-${{ inputs.plan_run_id }}-${{ steps.plan-provenance.outputs.run_attempt }}
           path: ${{ env.TF_ROOT }}
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
@@ -182,6 +187,10 @@ jobs:
       - name: Apply the exact reviewed plan
         if: ${{ inputs.operation == 'apply' }}
         run: terraform -chdir="$TF_ROOT" apply -input=false -auto-approve tfplan
+
+      - name: Remove decrypted plan from runner
+        if: ${{ always() && inputs.operation == 'apply' }}
+        run: rm -f "$TF_ROOT/tfplan"
 
       - name: Print deployed site URL
         if: ${{ inputs.operation == 'apply' }}
