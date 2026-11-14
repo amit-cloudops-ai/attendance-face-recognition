@@ -3,155 +3,67 @@
 **Working branch:** `solo/amit-monday`  
 **Scope:** Prepare a controlled development deployment. This document does not authorize AWS resource creation or Terraform apply.
 
-## Current findings
+## Verified deployment baseline
 
-**Deployment target confirmed:** the user's existing AWS account, region `us-east-1`. Region literals in the workflow, dev/prod provider and backend blocks, bootstrap instructions, KMS/SNS policy ARN, Cognito issuer/domain and frontend CSP/config were updated on `solo/amit-monday`. Do not use `ap-south-1` for this deployment.
+- Target account: existing user AWS account; target region: `us-east-1`.
+- Dev state key: `attendance/dev/terraform.tfstate`; prod state key: `attendance/prod/terraform.tfstate`.
+- Terraform S3 native lock file is enabled (`use_lockfile = true`); Terraform version is constrained to >= 1.10.
+- The solo deployment workflow uses GitHub OIDC, separate plan/apply role variables per environment, encrypted saved plan artifacts using `age`, exact plan commit/branch checks and environment branch gates.
+- Dev workflow runs only from `develop`; prod only from `main`. The solo branch must be promoted through a reviewed PR before workflow dispatch.
+- The workflow and Terraform roots have been migrated to `us-east-1`. The repository's current `main` branch has not been promoted and must not be used as the deployment source.
 
-The detailed resource/action inventory and permissions-boundary design are maintained in [`docs/IAM-LEAST-PRIVILEGE-INVENTORY.md`](./IAM-LEAST-PRIVILEGE-INVENTORY.md). The inventory is a draft requiring API-level action/resource-scope validation before role creation.
+## Security design requirements
 
-### 1. Terraform state backend
+1. Plan roles must only refresh/read infrastructure and access the matching environment state/lock object. They must not mutate AWS infrastructure.
+2. Apply roles may mutate only the resources in their matching environment root. They must not receive `AdministratorAccess`.
+3. Dev and prod roles must never access each other's Terraform state or lock file.
+4. `iam:PassRole` must be limited to exact application execution-role ARNs and the correct service principal.
+5. Every Terraform-created Lambda and Scheduler role must have the exact pre-created environment permissions boundary. GitHub apply roles may attach the boundary but must not modify/delete its policy or create an unbounded role.
+6. The public repository must not upload cleartext Terraform plan files. The current workflow encrypts the plan artifact and decrypts it only during its matching apply job.
+7. GitHub environment branch restrictions are required: dev from `develop`, prod from `main`; prod must require reviewer approval.
 
-Both environment roots use Terraform's S3 backend with distinct keys:
+## Required policy artifacts before bootstrap
 
-- Dev: `attendance/dev/terraform.tfstate`
-- Prod: `attendance/prod/terraform.tfstate`
+- Two runtime permissions-boundary policies: dev and prod. Each caps the allowed runtime actions for the Lambda and Scheduler execution roles. Boundary policies do not grant access by themselves.
+- Four GitHub deployment policies: dev plan, dev apply, prod plan, prod apply.
+- Two exact OIDC trust documents per environment role pair (dev/prod subjects), with audience `sts.amazonaws.com`.
+- A state bucket policy template with public-access block, versioning, SSE-S3, bucket-owner-enforced ownership and TLS-only access.
+- Explicit resource ARNs and condition keys wherever supported; unavoidable wildcard resource actions documented individually.
 
-Both pin the native S3 lock file with `use_lockfile = true`. Terraform is constrained to >= 1.10, so the separate DynamoDB lock table is not part of this design. The shared state bucket is a manual bootstrap prerequisite and is not created by the application roots.
+The action inventory in `docs/IAM-LEAST-PRIVILEGE-INVENTORY.md` is an initial candidate list, not a final policy. Before bootstrap, each action must be checked against the pinned AWS provider's actual refresh and mutation calls and AWS service authorization resource-level support. Runtime policies must be reconciled against actual handlers, not inferred only from Terraform resource blocks.
 
-Required bucket controls before init:
-- Block all S3 public access.
-- Enable versioning.
-- Enable default server-side encryption (use SSE-S3 unless a KMS key is deliberately configured in both backend blocks and role policy).
-- Enforce TLS-only access.
-- Set Object Ownership to Bucket owner enforced.
-- Keep state bucket separate from application data buckets.
-- Restrict dev and prod roles to their own state key and lock-file key.
+## Remaining Phase B sequence
 
-Backend object permissions should be scoped to the exact environment key:
-- `s3:GetObject` and `s3:PutObject` on that environment's state object.
-- `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on that environment's `.tflock` object.
-- `s3:ListBucket` on the state bucket, constrained by `s3:prefix` to that environment's state key and lock key.
-- No permission to list or read the other environment's state.
+1. Verify all post-format CI runs are green.
+2. Inspect every Lambda handler and reconcile exact runtime actions with each Terraform execution-role policy.
+3. Verify AWS service action names, resource ARN support, request condition keys and provider read/write calls for all four modules.
+4. Produce the two execution-role boundary policies and four deployment policies, including strict state object/lock isolation.
+5. Review workflow and GitHub environment protections, including plan artifact provenance, key isolation and minimum GitHub token permissions.
+6. Validate the state bucket security configuration and create the manual bootstrap proposal.
+7. Open a reviewed solo-only PR from `solo/amit-monday` into `develop` once the release candidate is ready.
 
-### 2. GitHub OIDC and deployment workflow
+## Manual bootstrap proposal — not yet approved
 
-The workflow uses short-lived GitHub OIDC credentials and separate plan/apply roles per environment. Plan roles are read-only apart from state-lock operations; apply roles carry the resource mutation permissions. The trust policy subject must match the exact GitHub Environment:
-- Dev plan/apply: `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev`
-- Prod plan/apply: `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`
+The eventual bootstrap proposal is expected to include:
+- One state bucket in `us-east-1` with public access blocked, versioning, SSE-S3, bucket-owner-enforced ownership and TLS-only bucket policy.
+- One GitHub Actions OIDC identity provider, reusing an existing matching provider if present.
+- Two customer-managed application execution-role permissions boundaries (dev and prod).
+- Four GitHub deployment roles: dev plan/apply and prod plan/apply, with exact trust and permission policies.
+- GitHub environments and environment-specific variables/secrets, including separate `age` identity pairs.
 
-Both trust policies must require audience `sts.amazonaws.com`. GitHub Environments must restrict deployment branches: dev to `develop`, prod to `main`; prod must require a reviewer. Do not use static AWS access keys or wildcard OIDC subjects.
+No account discovery, account mutation or remote state initialization is part of this proposal. Exact bucket name, account-specific ARNs and policies must be shown before any bootstrap action. Nothing in this document authorizes creating these resources.
 
-The workflow deliberately permits dev deployment only from `develop` and prod only from `main`. It will not deploy directly from `solo/amit-monday`. When the solo implementation is ready, promote it through a reviewed solo-only PR into `develop`; keep teammate branches and PRs separate.
+## Dev release gates after approved bootstrap
 
-### 3. OIDC trust and state access policy templates
+1. Trigger a manual dev `plan` from `develop`.
+2. Download/decrypt and review the exact plan artifact. Check for unexpected creates, deletes, replacements, public access, broad IAM grants, incorrect region or data-loss risks.
+3. Present the complete plan and exact resource changes for explicit approval.
+4. Only after separate approval, trigger `apply` for that exact plan run and commit.
+5. Perform CloudFront-origin URL second pass for Cognito callbacks/logout and S3 CORS.
+6. Run consent-gated dev integration and end-to-end tests; record latency, deletion and browser evidence.
 
-Use the following trust relationship for each role. Substitute the AWS account ID and set the environment subject to exactly `dev` or `prod`; the plan and apply role for one environment use the same environment-bound subject because the GitHub Environment is the branch gate.
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:amit-cloudops-ai/attendance-face-recognition:environment:dev"
-        }
-      }
-    }
-  ]
-}
-```
-
-For prod, change only the subject suffix from `environment:dev` to `environment:prod`. Do not add wildcard subjects.
-
-Example state permissions for the dev role (the prod role gets only the prod key and lock-file ARNs):
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "ListOnlyDevStatePrefix",
-      "Effect": "Allow",
-      "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::<STATE_BUCKET>",
-      "Condition": {
-        "StringLike": {
-          "s3:prefix": [
-            "attendance/dev/terraform.tfstate",
-            "attendance/dev/terraform.tfstate.tflock"
-          ]
-        }
-      }
-    },
-    {
-      "Sid": "ReadWriteDevState",
-      "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:PutObject"],
-      "Resource": "arn:aws:s3:::<STATE_BUCKET>/attendance/dev/terraform.tfstate"
-    },
-    {
-      "Sid": "ManageDevStateLock",
-      "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-      "Resource": "arn:aws:s3:::<STATE_BUCKET>/attendance/dev/terraform.tfstate.tflock"
-    }
-  ]
-}
-```
-
-The plan role needs these state permissions because Terraform acquires/releases the native S3 lock while planning. This policy does not grant access to the prod state. Confirm the exact S3 backend calls against the pinned Terraform version before attaching it.
-
-### 4. Public-repository plan artifact protection
-
-The repository is public. GitHub Actions artifacts are available to repository readers, while Terraform saved plan files may contain sensitive values in clear text. The deployment workflow was updated to encrypt the plan with `age` before artifact upload and decrypt it only in the matching apply run.
-
-Each GitHub Environment needs its own key pair:
-- Variable: `TF_PLAN_AGE_RECIPIENT` (public recipient).
-- Secret: `TF_PLAN_AGE_IDENTITY` (private identity).
-- Use separate dev and prod key pairs; keep private identity backups outside the repository.
-
-The encrypted artifact is retained for one day. The apply job still verifies that the plan came from a successful manual plan run for the same environment branch and exact commit SHA.
-
-### 5. Deployment IAM policy — not yet approved or created
-
-Do not attach `AdministratorAccess`. A safe policy must be derived from the full Terraform resource/action inventory and must separate the GitHub deployment role from the application execution roles.
-
-The current Terraform roots manage resources across:
-- S3, KMS, SNS, AWS Budgets and Lambda layers (foundation).
-- DynamoDB, Lambda, IAM execution roles/policies, EventBridge Scheduler, CloudWatch Logs and alarms (data).
-- Rekognition collections, SQS queues/redrive, Lambda async destinations/event mappings, Lambda permissions and CloudWatch alarms (recognition).
-- Cognito, API Gateway v2, CloudFront, CloudFront Functions/cache/origin/response policies, S3 objects/bucket policies and Lambda invoke permissions (access).
-
-The workflow selects four role ARNs through `AWS_ROLE_ARN_DEV_PLAN`, `AWS_ROLE_ARN_DEV_APPLY`, `AWS_ROLE_ARN_PROD_PLAN` and `AWS_ROLE_ARN_PROD_APPLY`. The plan role must not have resource mutation permissions.
-
-The application execution role names follow `attendance-<env>-<function>`; the scheduler roles follow `attendance-<env>-<job>-scheduler`. The deployment policy must scope `iam:PassRole` to only these exact environment role ARNs and the required AWS service principals. Role creation/update permissions need a separate review, including whether a permissions boundary should be added to every application role before allowing CI to create or modify IAM roles.
-
-The exact deployment policy is intentionally not guessed in this phase. It must be checked against the provider's actual create/read/update/delete calls, resource-level IAM support, tagging conditions and any `iam:PassRole` dependencies before an AWS role is created.
-
-## Phase B gates
-
-- [x] Inspect current backend configuration and deployment workflow.
-- [x] Identify public plan-artifact exposure.
-- [x] Encrypt saved Terraform plan artifacts before upload.
-- [x] Separate Terraform plan and apply role selection in the deployment workflow.
-- [x] Document age key setup and environment isolation.
-- [x] Draft Terraform resource/action inventory and least-privilege role separation (API-level validation remains).
-- [x] Require a pre-created environment-specific permissions boundary on every application Lambda/Scheduler role.
-- [ ] Decide and document permissions-boundary treatment for application IAM roles.
-- [ ] Confirm state bucket encryption and exact bucket policy.
-- [ ] Configure GitHub dev/prod environments and variables/secrets.
-- [ ] Create OIDC provider and environment-specific AWS roles (manual bootstrap; explicit approval required).
-- [ ] Open reviewed solo-only PR from `solo/amit-monday` to `develop` when release candidate is ready.
-- [ ] Generate and review dev plan; obtain explicit approval before apply.
-- [ ] Deploy dev, complete CloudFront/Cognito/CORS second pass, then run real AWS and browser/device acceptance tests.
+Production remains blocked until dev acceptance, separate policy review and explicit production approval.
 
 ## Safety boundary
 
-No AWS resources have been created, no OIDC roles have been created, no Terraform backend has been initialized against an AWS account, and no plan or apply has been run as part of this phase. The encrypted-plan workflow and plan/apply role selection passed CI at commit `df98ed0`; the latest documentation-only changes are awaiting CI. The workflow still requires environment secrets/variables and reviewed AWS roles before use.
+No AWS resources have been created by this preparation. No IAM roles, OIDC provider, state bucket, or permissions boundaries have been created; no remote backend has been initialized; no Terraform plan or apply has been run.
