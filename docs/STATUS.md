@@ -114,7 +114,8 @@
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - Complete: T01–T09, T31–T36. PRs #3–#17 are open and remain unmerged pending owner review.
-- Active: T10 dev apply-role policy. The policy set is drafted and CI validation is pending.
+- Complete: T10 dev apply-role policy templates; CI run [43617809368](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43617809368) passed.
+- Active: T11 production read-only plan-role policy.
 - Remaining deployment policies: T11 prod plan, T12 prod apply. T09 dev plan is complete; T10 is being finalized.
 - Remaining operational/security gates: T13 state bucket bootstrap specification; T14 GitHub OIDC/workflow permissions; T15 encrypted plan artifact lifecycle; T16 GitHub environment variables/secrets/protection; T17 template linting; T18 exact manual bootstrap plan; T19 solo-only deployment-readiness PR.
 - Release gates T20–T24 remain explicitly approval-gated.
@@ -194,7 +195,11 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T10 — dev Terraform apply-role policy
 
-- **Status:** policy set drafted; CI validation pending.
+- **Status:** complete on `ai/T10-dev-apply-policy-v2`.
+- Split dev apply-role policy set includes core, DynamoDB, Lambda, IAM, foundation, access, state and DynamoDB KMS permissions. Every rendered policy is below 6,144 characters.
+- Exact 14 Lambda and 2 Scheduler role ARNs for `iam:PassRole`, separate service conditions, mandatory execution boundary, exact five DynamoDB tables, 14 Lambda functions, exact queues, environment KMS alias and dev-only state/lock permissions.
+- CI run [43617809368](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43617809368), commit `98fbe1910d`: Python and Terraform jobs passed. Python validated rendered policy JSON, policy size, dev-only scope, absence of billing permissions, PassRole/boundary constraints, state and lock object isolation, exact DynamoDB table scope, Lambda event-source mapping condition, and API Gateway path family. Terraform formatting, all module validations, dev/prod root validation and billing root validation passed using committed lockfiles in read-only mode.
+- Residual API Gateway v2 resource-ID scope and create-action `Resource: "*"` cases are documented in `infra/policies/README.md`. No AWS role or policy has been attached; this remains a reviewed policy template.
 - Added split managed-policy templates for core services, DynamoDB, Lambda, IAM, foundation, access, dev state and DynamoDB KMS provisioning. Each rendered policy is below the 6,144-character managed-policy limit.
 - IAM role creation requires the exact dev execution boundary and required Project/Environment tags. `iam:PassRole` is split between the exact 14 Lambda execution-role ARNs and two Scheduler role ARNs, with `iam:PassedToService` constrained separately.
 - DynamoDB table permissions use five exact dev table ARNs and the attendance date GSI. Lambda permissions use 14 exact function ARNs; the event-source-mapping create action is the one documented `Resource: "*"` exception and is constrained by `lambda:FunctionArn` to the failure processor.
