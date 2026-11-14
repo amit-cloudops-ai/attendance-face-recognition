@@ -5,7 +5,6 @@ import uuid
 import boto3
 import pytest
 from attendance_common import config
-from attendance_common.auth import get_username
 from moto import mock_aws
 
 from services.recognition.enroll import handler as enroll
