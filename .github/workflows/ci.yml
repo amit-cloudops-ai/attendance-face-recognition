@@ -513,7 +513,7 @@ jobs:
 
           repo = "amit-cloudops-ai/attendance-face-recognition"
           provider = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
-          for env in ("dev", "prod"):
+          for env in ("dev", "prod", "billing"):
               for operation in ("plan", "apply"):
                   path = Path(f"infra/policies/github-oidc-trust-{env}-{operation}.json.tftpl")
                   rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
@@ -555,7 +555,7 @@ jobs:
               raise SystemExit("Static AWS credentials are not permitted in deployment workflow")
 
           docs = Path("docs/GITHUB-OIDC-DEPLOYMENT.md").read_text(encoding="utf-8")
-          for required in ("dev-plan", "dev-apply", "prod-plan", "prod-apply",
+          for required in ("dev-plan", "dev-apply", "prod-plan", "prod-apply", "billing-plan", "billing-apply",
                            "prevent self-review", "TF_PLAN_AGE_RECIPIENT",
                            "TF_PLAN_AGE_IDENTITY", "CODEOWNERS"):
               if required not in docs:
@@ -588,11 +588,11 @@ jobs:
           for item in required:
               if item not in workflow:
                   raise SystemExit(f"Encrypted plan lifecycle missing: {item}")
-          if "path: infra/envs/" + "$" + "{{ inputs.environment }}/tfplan.age" not in workflow:
+          if "path: " + "$" + "{{ env.TF_ROOT }}/tfplan.age" not in workflow:
               raise SystemExit("Only the encrypted plan may be uploaded")
           if "tfplan" in workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]:
               upload = workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]
-              if ("path: infra/envs/" + "$" + "{{ inputs.environment }}/tfplan.age") not in upload:
+              if ("path: " + "$" + "{{ env.TF_ROOT }}/tfplan.age") not in upload:
                   raise SystemExit("Plan upload path must be encrypted age artifact")
           if "AWS_ACCESS_KEY_ID" in workflow or "AWS_SECRET_ACCESS_KEY" in workflow:
               raise SystemExit("Static AWS credentials are prohibited")
