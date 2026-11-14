@@ -68,7 +68,14 @@ For each key pair:
 - Keep the identity files outside the repository and store a protected offline backup. Never paste the private identity into a workflow variable, commit, issue, or chat.
 - Use the dev recipient/identity only in the `dev` environment and the prod pair only in `prod`.
 
-The plan artifact remains encrypted at rest in GitHub Actions and expires after one day. Only a run with access to the matching environment secret can decrypt it. The GitHub environment branch restrictions and production reviewer remain mandatory controls.
+The plan artifact remains encrypted in GitHub Actions and expires after one day. Only the matching environment's apply job receives the private identity secret, and only in the decryption step. To review the full plan locally, download the encrypted artifact from the successful plan run, then decrypt it using the matching private identity file:
+
+```bash
+age --decrypt --identity attendance-dev-plan-identity.txt --output tfplan attendance-dev-plan/tfplan.age
+terraform show -no-color tfplan
+```
+
+Use the prod identity and artifact for production. Keep the decrypted `tfplan` file private and delete it after review; it can contain sensitive infrastructure values. The GitHub environment branch restrictions and production reviewer remain mandatory controls.
 
 ## Safety gate
 
