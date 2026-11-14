@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [solo/amit-monday, develop, main]
   push:
-    branches: [develop, main]
+    branches: [solo/amit-monday, develop, main]
 
 jobs:
   python:
@@ -20,6 +20,6 @@ jobs:
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@v4
       - run: terraform fmt -check -recursive infra
