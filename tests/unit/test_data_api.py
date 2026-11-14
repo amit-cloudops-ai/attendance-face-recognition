@@ -112,6 +112,25 @@ def test_employee_create_persists_consent_and_audits(data_tables):
     assert audit_item["actor"] == "hr-admin"
 
 
+def test_employee_public_response_hides_internal_enrollment_metadata(data_tables):
+    employees, _, _ = data_tables
+    employees.put_item(Item={
+        "employee_id": "EMP002", "name": "Arun", "active": True,
+        "face_ids": ["face-secret"],
+        "enrollment_lock_request": "request-secret",
+        "enrollment_lock_until": 9999999999,
+        "enrollment_" + "12345678-1234-4234-8234-123456789012": "face-secret",
+    })
+    detail = employees_handler.lambda_handler(
+        admin_event("GET", employee_id="EMP002"), None
+    )
+    item = json.loads(detail["body"])
+    assert "face_ids" not in item
+    assert "enrollment_lock_request" not in item
+    assert "enrollment_lock_until" not in item
+    assert not any(key.startswith("enrollment_") for key in item)
+
+
 def test_employee_duplicate_get_and_list(data_tables):
     employees_handler.lambda_handler(admin_event("POST", employee_payload()), None)
     duplicate = employees_handler.lambda_handler(
