@@ -106,6 +106,65 @@ for role in \
   fi
 done
 
+echo
+echo "=== Existing application resources (read-only, project prefixes only) ==="
+report "Project DynamoDB tables" aws dynamodb list-tables --region "$REGION" \
+  --query "TableNames[?starts_with(@, 'attendance-dev-') || starts_with(@, 'attendance-prod-')]" --output json
+report "Project KMS aliases" aws kms list-aliases --region "$REGION" \
+  --query "Aliases[?AliasName=='alias/attendance-dev' || AliasName=='alias/attendance-prod']" --output json
+report "Project Rekognition collections" aws rekognition list-collections --region "$REGION" \
+  --query "CollectionIds[?starts_with(@, 'attendance-dev-') || starts_with(@, 'attendance-prod-')]" --output json
+report "Project Cognito user pools" aws cognito-idp list-user-pools --max-results 60 --region "$REGION" \
+  --query "UserPools[?starts_with(Name, 'attendance-dev-') || starts_with(Name, 'attendance-prod-')]" --output json
+report "Project API Gateway v2 APIs" aws apigatewayv2 get-apis --region "$REGION" \
+  --query "Items[?starts_with(Name, 'attendance-dev-') || starts_with(Name, 'attendance-prod-')]" --output json
+report "Project Lambda functions" aws lambda list-functions --region "$REGION" \
+  --query "Functions[?starts_with(FunctionName, 'attendance-dev-') || starts_with(FunctionName, 'attendance-prod-')]" --output json
+report "Project SQS queues" aws sqs list-queues --queue-name-prefix attendance- --region "$REGION" --output json
+report "Project SNS topics" aws sns list-topics --region "$REGION" \
+  --query "Topics[?contains(TopicArn, ':attendance-dev-alerts') || contains(TopicArn, ':attendance-prod-alerts')]" --output json
+report "Project EventBridge Scheduler groups" aws scheduler list-schedule-groups --region "$REGION" \
+  --query "ScheduleGroups[?starts_with(Name, 'attendance-')]" --output json
+for group in attendance-dev attendance-prod; do
+  report "Schedules in group $group" aws scheduler list-schedules --group-name "$group" --region "$REGION" --output json
+done
+report "Project Lambda log groups" aws logs describe-log-groups --log-group-name-prefix /aws/lambda/attendance- --region "$REGION" \
+  --query "logGroups[].logGroupName" --output json
+report "Project CloudWatch alarms" aws cloudwatch describe-alarms --region "$REGION" \
+  --query "MetricAlarms[?starts_with(AlarmName, 'attendance-')]" --output json
+report "Project IAM runtime roles" aws iam list-roles \
+  --query "Roles[?starts_with(RoleName, 'attendance-dev-') || starts_with(RoleName, 'attendance-prod-')]" --output json
+report "Project IAM managed policies" aws iam list-policies --scope Local \
+  --query "Policies[?starts_with(PolicyName, 'attendance-dev-') || starts_with(PolicyName, 'attendance-prod-')]" --output json
+report "Project AWS Budgets" aws budgets describe-budgets --account-id "$ACCOUNT_ID" \
+  --query "Budgets[?starts_with(BudgetName, 'attendance-')]" --output json
+report "Project CloudFront distributions" aws cloudfront list-distributions \
+  --query "DistributionList.Items[?starts_with(Comment, 'attendance-')].{Id:Id,Comment:Comment,DomainName:DomainName,Enabled:Enabled}" --output json
+
+echo
+echo "=== Check globally unique application bucket names (read-only) ==="
+for env in dev prod; do
+  for kind in raw reports web; do
+    candidate="attendance-$env-$kind-$ACCOUNT_ID"
+    error_file="$(mktemp)"
+    if aws s3api head-bucket --bucket "$candidate" 2>"$error_file"; then
+      echo "EXISTS in this account: $candidate"
+      report "Bucket location: $candidate" aws s3api get-bucket-location --bucket "$candidate" --output json
+      report "Bucket public access block: $candidate" aws s3api get-public-access-block --bucket "$candidate" --output json
+      report "Bucket ownership controls: $candidate" aws s3api get-bucket-ownership-controls --bucket "$candidate" --output json
+      report "Bucket versioning: $candidate" aws s3api get-bucket-versioning --bucket "$candidate" --output json
+      report "Bucket encryption: $candidate" aws s3api get-bucket-encryption --bucket "$candidate" --output json
+      report "Bucket policy: $candidate" aws s3api get-bucket-policy --bucket "$candidate" --output json
+    elif grep -Eq '\(404\)|Not Found|NoSuchBucket' "$error_file"; then
+      echo "NOT FOUND (candidate appears available): $candidate"
+    else
+      echo "NOT CONFIRMED (possible name collision or missing permission): $candidate"
+      cat "$error_file" >&2
+    fi
+    rm -f "$error_file"
+  done
+done
+
 BUCKET="${TF_STATE_BUCKET:-}"
 if [[ -z "$BUCKET" ]]; then
   echo
