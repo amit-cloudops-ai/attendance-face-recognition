@@ -26,7 +26,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T11 | Build prod plan-role policy | IN_PROGRESS | Read-only planning permissions, prod-only state/lock access, no resource mutation |
 | T12 | Build prod apply-role policy | IN_PROGRESS | Exact prod resource permissions, boundary enforcement and exact iam:PassRole scopes |
 | T13 | Review Terraform state bucket bootstrap specification | IN_PROGRESS | Versioning, public access block, SSE-S3, ownership controls, TLS-only bucket policy, state/lock object scope documented |
-| T14 | Audit GitHub OIDC trust and deployment workflow permissions | IN_PROGRESS | Exact audience/subjects, branch/environment gates, token permissions, role separation and no static credentials |
+| T14 | Audit GitHub OIDC trust and deployment workflow permissions | DONE | Exact audience/subjects, branch/environment gates, token permissions, role separation and no static credentials |
 | T15 | Audit encrypted Terraform plan artifact lifecycle | TODO | Plan provenance, exact commit/environment binding, encryption, one-day retention, artifact access and identity handling verified |
 | T16 | Reconcile GitHub environment variables, secrets and protection rules | TODO | Required names and scopes documented; private age identity is a protected secret; reviewer/branch restrictions verified |
 | T17 | Add or verify infrastructure template linting in CI | TODO | Determine whether CloudFormation templates exist; run cfn-lint only on actual templates and fail CI on violations |
