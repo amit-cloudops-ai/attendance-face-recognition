@@ -49,24 +49,6 @@
       "Resource": "*"
     },
     {
-      "Sid": "KmsAliasManage",
-      "Effect": "Allow",
-      "Action": [
-        "kms:CreateAlias",
-        "kms:UpdateAlias",
-        "kms:DeleteAlias"
-      ],
-      "Resource": [
-        "arn:aws:kms:us-east-1:${account_id}:alias/attendance-dev",
-        "arn:aws:kms:us-east-1:${account_id}:key/*"
-      ],
-      "Condition": {
-        "StringEquals": {
-          "aws:RequestTag/Project": "attendance"
-        }
-      }
-    },
-    {
       "Sid": "S3BucketLifecycle",
       "Effect": "Allow",
       "Action": [
@@ -88,17 +70,6 @@
         "s3:GetBucketObjectLockConfiguration",
         "s3:GetBucketPublicAccessBlock",
         "s3:GetBucketNotification",
-        "s3:PutBucketPolicy",
-        "s3:DeleteBucketPolicy",
-        "s3:PutBucketPublicAccessBlock",
-        "s3:PutEncryptionConfiguration",
-        "s3:DeleteBucketEncryption",
-        "s3:PutBucketCORS",
-        "s3:DeleteBucketCORS",
-        "s3:PutBucketVersioning",
-        "s3:PutLifecycleConfiguration",
-        "s3:DeleteBucketLifecycle",
-        "s3:PutBucketNotification",
         "s3:TagResource",
         "s3:UntagResource",
         "s3:ListTagsForResource"
@@ -113,7 +84,6 @@
       "Sid": "SnsTopicLifecycle",
       "Effect": "Allow",
       "Action": [
-        "sns:CreateTopic",
         "sns:GetTopicAttributes",
         "sns:SetTopicAttributes",
         "sns:DeleteTopic",
@@ -142,6 +112,95 @@
         "lambda:DeleteLayerVersion"
       ],
       "Resource": "arn:aws:lambda:us-east-1:${account_id}:layer:attendance-dev-common:*"
+    },
+    {
+      "Sid": "KmsAliasCreateUpdate",
+      "Effect": "Allow",
+      "Action": [
+        "kms:CreateAlias",
+        "kms:UpdateAlias"
+      ],
+      "Resource": [
+        "arn:aws:kms:us-east-1:${account_id}:alias/attendance-dev",
+        "arn:aws:kms:us-east-1:${account_id}:key/*"
+      ]
+    },
+    {
+      "Sid": "KmsAliasDelete",
+      "Effect": "Allow",
+      "Action": "kms:DeleteAlias",
+      "Resource": "arn:aws:kms:us-east-1:${account_id}:alias/attendance-dev"
+    },
+    {
+      "Sid": "S3BucketPublicAccess",
+      "Effect": "Allow",
+      "Action": "s3:PutBucketPublicAccessBlock",
+      "Resource": [
+        "arn:aws:s3:::attendance-dev-${account_id}-raw",
+        "arn:aws:s3:::attendance-dev-${account_id}-reports",
+        "arn:aws:s3:::attendance-dev-${account_id}-web"
+      ]
+    },
+    {
+      "Sid": "S3BucketEncryption",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutEncryptionConfiguration",
+        "s3:DeleteBucketEncryption"
+      ],
+      "Resource": [
+        "arn:aws:s3:::attendance-dev-${account_id}-raw",
+        "arn:aws:s3:::attendance-dev-${account_id}-reports",
+        "arn:aws:s3:::attendance-dev-${account_id}-web"
+      ]
+    },
+    {
+      "Sid": "S3RawBucketCors",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutBucketCORS",
+        "s3:DeleteBucketCORS"
+      ],
+      "Resource": "arn:aws:s3:::attendance-dev-${account_id}-raw"
+    },
+    {
+      "Sid": "S3ReportsVersioning",
+      "Effect": "Allow",
+      "Action": "s3:PutBucketVersioning",
+      "Resource": "arn:aws:s3:::attendance-dev-${account_id}-reports"
+    },
+    {
+      "Sid": "S3RawLifecycle",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutLifecycleConfiguration",
+        "s3:DeleteBucketLifecycle"
+      ],
+      "Resource": "arn:aws:s3:::attendance-dev-${account_id}-raw"
+    },
+    {
+      "Sid": "S3RawReportsBucketPolicy",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutBucketPolicy",
+        "s3:DeleteBucketPolicy"
+      ],
+      "Resource": [
+        "arn:aws:s3:::attendance-dev-${account_id}-raw",
+        "arn:aws:s3:::attendance-dev-${account_id}-reports"
+      ]
+    },
+    {
+      "Sid": "SnsTopicCreate",
+      "Effect": "Allow",
+      "Action": "sns:CreateTopic",
+      "Resource": "arn:aws:sns:us-east-1:${account_id}:attendance-dev-alerts",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "attendance",
+          "aws:RequestTag/Environment": "dev"
+        }
+      }
     }
   ]
 }
