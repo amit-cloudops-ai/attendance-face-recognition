@@ -84,8 +84,8 @@ locals {
     ]
     attendance_query = [
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:Query"]
+        Effect = "Allow"
+        Action = ["dynamodb:Query"]
         Resource = [
           aws_dynamodb_table.attendance.arn,
           "${aws_dynamodb_table.attendance.arn}/index/date-index"
@@ -104,8 +104,8 @@ locals {
         Resource = [aws_dynamodb_table.employees.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:Query"]
+        Effect = "Allow"
+        Action = ["dynamodb:Query"]
         Resource = [
           aws_dynamodb_table.attendance.arn,
           "${aws_dynamodb_table.attendance.arn}/index/date-index"
@@ -139,8 +139,8 @@ locals {
         Resource = [aws_dynamodb_table.employees.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:Query"]
+        Effect = "Allow"
+        Action = ["dynamodb:Query"]
         Resource = [
           aws_dynamodb_table.attendance.arn,
           "${aws_dynamodb_table.attendance.arn}/index/date-index"
