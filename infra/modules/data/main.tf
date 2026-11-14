@@ -77,8 +77,8 @@ locals {
   lambda_permissions = {
     employees = [
       {
-        Effect = "Allow"
-        Action = [
+        Effect   = "Allow"
+        Action   = [
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:UpdateItem",
@@ -87,124 +87,124 @@ locals {
         Resource = [aws_dynamodb_table.employees.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:PutItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
         Resource = [aws_dynamodb_table.audit.arn]
       }
     ]
     attendance_query = [
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Query"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
         Resource = [
           aws_dynamodb_table.attendance.arn,
           "${aws_dynamodb_table.attendance.arn}/index/date-index"
         ]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Scan"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Scan"]
         Resource = [aws_dynamodb_table.employees.arn]
       }
     ]
     daily_job = [
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Scan"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Scan"]
         Resource = [aws_dynamodb_table.employees.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Query"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
         Resource = [
           aws_dynamodb_table.attendance.arn,
           "${aws_dynamodb_table.attendance.arn}/index/date-index"
         ]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:PutItem", "dynamodb:UpdateItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem"]
         Resource = [aws_dynamodb_table.attendance.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem"]
         Resource = [aws_dynamodb_table.config.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["s3:PutObject"]
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
         Resource = ["${var.reports_bucket_arn}/reports/daily/*"]
       },
       {
-        Effect = "Allow"
-        Action = ["sns:Publish"]
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
         Resource = [var.alerts_topic_arn]
       }
     ]
     weekly_job = [
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Scan"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Scan"]
         Resource = [aws_dynamodb_table.employees.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Query"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
         Resource = [
           aws_dynamodb_table.attendance.arn,
           "${aws_dynamodb_table.attendance.arn}/index/date-index"
         ]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem"]
         Resource = [aws_dynamodb_table.config.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["s3:PutObject"]
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
         Resource = ["${var.reports_bucket_arn}/reports/weekly/*"]
       },
       {
-        Effect = "Allow"
-        Action = ["sns:Publish"]
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
         Resource = [var.alerts_topic_arn]
       }
     ]
     reports = [
       {
-        Effect = "Allow"
-        Action = ["s3:GetObject"]
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
         Resource = ["${var.reports_bucket_arn}/reports/*"]
       }
     ]
     override = [
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem"]
         Resource = [aws_dynamodb_table.employees.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem", "dynamodb:PutItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem"]
         Resource = [aws_dynamodb_table.attendance.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:PutItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
         Resource = [aws_dynamodb_table.audit.arn]
       }
     ]
     settings = [
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem", "dynamodb:PutItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem"]
         Resource = [aws_dynamodb_table.config.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:PutItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
         Resource = [aws_dynamodb_table.audit.arn]
       }
     ]
@@ -408,13 +408,13 @@ resource "aws_iam_role_policy" "lambda" {
     Version = "2012-10-17"
     Statement = concat(local.lambda_permissions[each.key], [
       {
-        Effect = "Allow"
-        Action = ["logs:CreateLogStream", "logs:PutLogEvents"]
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = ["${aws_cloudwatch_log_group.lambda[each.key].arn}:*"]
       },
       {
-        Effect = "Allow"
-        Action = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource = [var.kms_key_arn]
       }
     ])
@@ -467,8 +467,8 @@ resource "aws_iam_role_policy" "scheduler" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
-      Action = ["lambda:InvokeFunction"]
+      Effect   = "Allow"
+      Action   = ["lambda:InvokeFunction"]
       Resource = [aws_lambda_function.lambda[each.key].arn]
     }]
   })
