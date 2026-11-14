@@ -110,6 +110,21 @@ def record_scan(
         if remembered is not None:
             return remembered
 
+        # Rows created before request-level idempotency was introduced need
+        # their map initialized before a nested DynamoDB path can be updated.
+        if request_id is not None and current is not None and "scan_events" not in current:
+            try:
+                attendance.update_item(
+                    Key={"employee_id": employee_id, "date": business_date},
+                    UpdateExpression="SET scan_events=:empty",
+                    ConditionExpression="attribute_not_exists(scan_events)",
+                    ExpressionAttributeValues={":empty": {}},
+                )
+            except ClientError as exc:
+                if not _conditional_failure(exc):
+                    raise
+            continue
+
         if current is None:
             outcome = _result("clock_in", new_item)
             item = dict(new_item)
@@ -220,7 +235,7 @@ def record_scan(
                 Key={"employee_id": employee_id, "date": business_date},
                 UpdateExpression=update,
                 ConditionExpression=condition,
-                ExpressionAttributeNames=names or None,
+                ExpressionAttributeNames=names if names else {},
                 ExpressionAttributeValues=values,
                 ReturnValues="ALL_NEW",
             )
