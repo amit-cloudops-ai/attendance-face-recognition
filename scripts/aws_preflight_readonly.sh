@@ -23,6 +23,13 @@ echo "=== Canonical deployment region ==="
 echo "$REGION"
 
 echo
+echo
+echo "=== Account and service quota preflight (read-only) ==="
+report "Lambda concurrency limits and current usage" aws lambda get-account-settings --region "$REGION" \
+  --query "{ConcurrentExecutions:AccountLimit.ConcurrentExecutions,UnreservedConcurrentExecutions:AccountLimit.UnreservedConcurrentExecutions,FunctionCount:AccountUsage.FunctionCount}" --output json
+report "Amazon Rekognition service quotas" aws service-quotas list-service-quotas --service-code rekognition --region "$REGION" \
+  --query "Quotas[].{Name:QuotaName,Value:Value,Adjustable:Adjustable}" --output json
+
 echo "=== Authenticated AWS identity (read-only STS) ==="
 IDENTITY="$(aws sts get-caller-identity --output json)"
 printf '%s\n' "$IDENTITY"
