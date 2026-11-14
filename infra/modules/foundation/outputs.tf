@@ -51,8 +51,8 @@ output "collection_id" {
 output "common_env" {
   description = "Shared environment variables for Part A and Part B Lambda modules."
   value = {
-    TZ_NAME       = "Asia/Kolkata"
-    LOG_LEVEL     = "INFO"
+    TZ_NAME        = "Asia/Kolkata"
+    LOG_LEVEL      = "INFO"
     BUCKET_REPORTS = aws_s3_bucket.reports.bucket
   }
 }
