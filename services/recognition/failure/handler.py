@@ -41,7 +41,7 @@ def _request_payload(body: str) -> dict:
     if isinstance(payload, str):
         payload = json.loads(payload)
     if not isinstance(payload, dict):
-        raise ValueError("failure destination message has no requestPayload object")
+        raise TypeError("failure destination message has no requestPayload object")
     return payload
 
 
