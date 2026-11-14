@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      AWS_REGION: ap-south-1
+      AWS_REGION: us-east-1
       AWS_ROLE_ARN: ${{ inputs.environment == 'prod' && inputs.operation == 'apply' && vars.AWS_ROLE_ARN_PROD_APPLY || inputs.environment == 'prod' && vars.AWS_ROLE_ARN_PROD_PLAN || inputs.operation == 'apply' && vars.AWS_ROLE_ARN_DEV_APPLY || vars.AWS_ROLE_ARN_DEV_PLAN }}
       TF_ROOT: infra/envs/${{ inputs.environment }}
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
