@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
+from uuid import uuid4
 
 import boto3
 import pytest
@@ -135,3 +136,47 @@ def test_settings_defaults_are_filled_in(monkeypatch):
     assert settings["grace_minutes"] == 15 and settings["debounce_minutes"] == 10
     assert settings["weekend_days"] == [6, 7]
     config._reset_cache()
+
+
+
+def test_same_request_id_returns_original_clock_in_without_clocking_out(aws_tables):
+    _, table = aws_tables
+    request_id = str(uuid4())
+    stamp = datetime.fromisoformat("2026-11-14T09:00:00+05:30")
+    first = record_scan("EMP001", stamp, 98.5, request_id=request_id)
+    retried = record_scan("EMP001", stamp, 98.5, request_id=request_id)
+    item = table.get_item(Key={"employee_id": "EMP001", "date": "2026-11-14"})["Item"]
+    assert first == retried
+    assert first["action"] == "clock_in"
+    assert item["clock_out"] is None
+    assert item["scan_events"][request_id] == first
+
+
+def test_different_request_after_debounce_records_clock_out(aws_tables):
+    first_id, second_id = str(uuid4()), str(uuid4())
+    first = record_scan(
+        "EMP001", datetime.fromisoformat("2026-11-14T09:00:00+05:30"),
+        98.5, request_id=first_id,
+    )
+    second = record_scan(
+        "EMP001", datetime.fromisoformat("2026-11-14T09:10:00+05:30"),
+        98.5, request_id=second_id,
+    )
+    assert first["action"] == "clock_in"
+    assert second["action"] == "clock_out"
+    assert second["clock_out"] == "2026-11-14T09:10:00+05:30"
+
+
+def test_request_idempotency_initializes_existing_attendance_rows(aws_tables):
+    _, table = aws_tables
+    table.put_item(Item={
+        "employee_id": "EMP001", "date": "2026-11-14",
+        "clock_in": "2026-11-14T09:00:00+05:30", "status": "present",
+        "source": "face", "updated_at": "2026-11-14T09:00:00+05:30",
+    })
+    request_id = str(uuid4())
+    stamp = datetime.fromisoformat("2026-11-14T09:10:00+05:30")
+    first = record_scan("EMP001", stamp, 98.5, request_id=request_id)
+    retried = record_scan("EMP001", stamp, 98.5, request_id=request_id)
+    assert first == retried
+    assert first["action"] == "clock_out"
