@@ -114,7 +114,7 @@ jobs:
               "apigateway:POST", "apigateway:PUT", "apigateway:PATCH", "apigateway:DELETE",
               "sns:Publish", "dynamodb:Create", "dynamodb:Update", "dynamodb:Delete",
               "dynamodb:Put", "sqs:Create", "sqs:Set", "sqs:Delete", "sqs:Send",
-              "scheduler:Create", "scheduler:Update", "scheduler:Delete",
+              "scheduler:Create", "scheduler:Update", "scheduler:Delete", "scheduler:TagResource", "scheduler:UntagResource",
               "rekognition:Create", "rekognition:Index", "rekognition:Delete",
               "cloudwatch:Put", "cloudwatch:Delete", "logs:Create", "logs:Put",
               "logs:Delete", "budgets:Modify"
