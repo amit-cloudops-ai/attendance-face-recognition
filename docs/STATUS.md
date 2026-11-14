@@ -1,59 +1,39 @@
-## Current deployment preparation update (2026-11-14)
+## Current status — 14 November 2026
 
-- Target account: existing AWS account; target region: `us-east-1`.
-- Region migration is present in the solo workflow, dev/prod Terraform provider and backend settings, bootstrap guide, Cognito issuer/domain, CSP endpoints and frontend config. The older `main` branch has not been promoted and still contains the original `ap-south-1` README description; do not deploy from `main`.
-- Added the IAM action inventory and required pre-created permissions-boundary input. The inventory remains a draft: action/resource mapping and runtime boundary statements require verification before any policy is attached.
-- Runtime handler call-site review was added to `docs/IAM-LEAST-PRIVILEGE-INVENTORY.md`. The data and recognition modules now scope KMS permissions by handler: S3 writers receive `kms:GenerateDataKey`, S3 readers receive `kms:Decrypt`, and encrypted SQS producers/consumers receive the documented producer/consumer actions. The foundation key policy now includes a Lambda service-principal statement for encrypted async failure destinations, restricted by account and environment queue ARN pattern. These code changes are awaiting CI validation and a final review of KMS encryption-context conditions.
-- Fixed the Terraform formatting reported by CI on the previous latest commit. Formatting-only commits were applied to the dev/prod root files and data/recognition module files.
-- Python/Ruff has passed on the latest completed checks. Terraform formatting has been corrected iteratively using exact `terraform fmt -check -diff` output from GitHub Actions; latest formatting commits are `41080919` and `c6dcfa65`. The CI run for `c6dcfa65` was still in progress at the last check, so formatting and full module/root validation are not yet confirmed green. The local container has no Terraform CLI and cannot resolve external hosts; GitHub Actions is the authoritative formatter/validation environment.
-- The prior CI run at `c6dcfa65` passed both Python and Terraform jobs, including all four module and both environment-root validations. Subsequent per-handler KMS policy changes are under CI validation; do not treat the current branch head as validated until those runs complete.
-- No AWS resources, IAM roles, OIDC provider or state bucket have been created; no backend init, Terraform plan or apply has been run.
+### Working agreement and source of truth
 
-# Project Status (source of truth for "what is built")
+- Repository rules are defined in `AGENTS.md`; the task queue is `docs/TASKS.md`; reusable ChatGPT operating instructions are in `docs/CHATGPT_PROJECT_INSTRUCTIONS.md`.
+- Work is task-ID based and isolated on `ai/T##-short-description` branches. One task is active at a time. The owner prefers to continue in the current ChatGPT conversation until it becomes too long; do not force a new chat between tasks.
+- The implementation baseline for this task is `solo/amit-monday` at `92e9bf53066145949bd430dd8dcbc0e7850df46d`. The current governance task branch is `ai/T01-repository-governance`.
+- Do not commit to `main` or `develop`, alter teammate branches, or merge teammate PRs into solo work without explicit direction.
+- Target AWS account: the owner's existing account. Target region: `us-east-1`.
 
-**Update this file at the end of every work session (human or AI).** Newest entries at the top of the log.
+### T01 — repository governance restoration
 
-## Current execution decision (14 Nov 2026)
-- **Solo-first delivery is the governing plan.** `solo/amit-monday` is the working implementation and source of truth for completing the application independently. Do not merge teammate branches or PRs into this branch.
-- Complete Phase B security and deployment-readiness work on the solo branch. Do not deploy or provision AWS resources until the exact proposed resources, IAM permissions, and reviewed dev Terraform plan have been presented and explicitly approved.
-- `main`, `develop`, and teammate branches remain untouched by solo implementation work.
+- **Status:** in progress.
+- Restored `AGENTS.md`, `docs/TASKS.md`, and `docs/CHATGPT_PROJECT_INSTRUCTIONS.md`.
+- Created a 30-task queue. T01 is active; T02 is the next task and covers KMS key-policy validation for Lambda asynchronous failure destinations.
+- Updated CI push triggers to include `ai/**` so task branches receive the repository's existing Python and Terraform checks.
+- The CI workflow currently runs Ruff, pytest, browser JavaScript/CSP checks, Bash syntax, workflow YAML parsing, Terraform formatting, and Terraform module/environment-root validation. A `cfn-lint` step is not present in the checked workflow, and no `template.yaml` was found in the checked repository tree; T17 explicitly verifies whether a CloudFormation template exists before adding linting.
+- Latest validation of the pre-task implementation baseline: GitHub Actions run [43609932758](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43609932758), commit `92e9bf53066145949bd430dd8dcbc0e7850df46d`: `terraform-fmt` and `python` both completed successfully. This validates the baseline, not yet the T01 changes.
 
-## Phase B deployment readiness (in progress; no AWS provisioning)
+### Phase B — deployment readiness (not complete; no AWS provisioning)
 
-- Dev and prod use separate Terraform S3 state keys and native S3 lock files (`use_lockfile = true`); the state bucket remains a manual prerequisite.
-- The manual deployment workflow uses GitHub OIDC, distinct plan/apply role selection per environment, encrypted saved plan artifacts (`age`), exact commit/branch validation, and GitHub Environment gates. The workflow only permits dev from `develop` and prod from `main`.
-- The IAM inventory identifies Terraform resource families, candidate read/write action groups, state isolation, `iam:PassRole` scope and execution-role permissions-boundary intent. It is not an attachable policy.
-- All Lambda and Scheduler execution role resources in the application modules receive a required `execution_role_boundary_arn` input. The boundary policy documents themselves have not yet been finalized or created.
-- The latest CI failure remains `terraform fmt -check`; the Python job passed. The four environment/module files received an initial alignment pass, but CI still reports formatting differences in `infra/modules/data/main.tf` and `infra/modules/recognition/main.tf`. Terraform CLI 1.10.5 was not available in the local validation container and its download was blocked by DNS, so those files are not yet confirmed formatted. Do not call this branch CI-green.
-- No AWS resources, OIDC provider/roles, state bucket, remote backend initialization, Terraform plan or apply have been created/run.
+- Region migration and separate dev/prod Terraform state keys are present on the solo implementation branch. The state bucket remains a manual prerequisite.
+- The manual deployment workflow uses GitHub OIDC, separate plan/apply role variables, encrypted saved plans using age, commit/branch checks, and GitHub Environment gates. Its workflow logic still requires a dedicated least-privilege and protection review.
+- The IAM inventory is a candidate review document, not an attachable policy. Runtime KMS grants have been narrowed by handler in the data and recognition modules; exact key-policy conditions and remaining runtime IAM mappings are not yet fully verified.
+- Required execution-role boundary inputs exist, but dev/prod boundary policy documents and the four GitHub plan/apply policies are not finalized.
+- Remaining gates are tracked as T02–T18 in `docs/TASKS.md`; PR promotion, dev deployment, production deployment, and acceptance tasks follow as T19–T24.
+- CI validation on the implementation baseline is green as noted above. The new T01 branch must receive its own CI result before this task is closed.
 
-## Phase B remaining gates
+### Release acceptance
 
-1. Verify completion of the new CI runs and address any further failures.
-2. Reconcile the actual runtime Lambda policies against every handler, including Rekognition, S3, DynamoDB, SQS, KMS, SNS and CloudWatch operations.
-3. Build two environment-specific execution-role permissions-boundary policies, capped to the union of necessary runtime permissions. The boundary must not grant permissions itself and the GitHub apply roles must not be able to edit or delete it.
-4. Validate exact AWS IAM action names, resource-level support, condition keys and Terraform provider read/write calls for all four modules.
-5. Produce four attachable GitHub plan/apply policies, with dev/prod state key isolation and strict `iam:PassRole` scopes. Avoid wildcard actions except where AWS requires them.
-6. Validate the backend state bucket policy template: block public access, versioning, SSE-S3, bucket-owner-enforced ownership, TLS-only policy, and key/lock object permissions.
-7. Review the manual workflow for least-privilege GitHub token permissions, protected environment branch rules, artifact retention and saved-plan provenance.
-8. Reconcile GitHub variables/secrets and environment protections. Do not place private age identities in variables or repository files.
-9. Prepare a solo-only PR to `develop` after security and CI gates pass. Do not merge teammate PR #2 as part of this solo release.
-10. Present the exact bootstrap resource list and policies for approval. Only after separate approval may manual bootstrap be performed; then generate a dev plan, present the complete plan, and obtain explicit approval before apply.
+AWS integration, Rekognition accuracy, consent-gated end-to-end behavior, raw-image deletion evidence, 20-scan p95 latency, browser/device compatibility, budget alarms, dev acceptance and production readiness remain unverified.
 
-## Phase A reliability hardening
+### Safety boundary
 
-- Recognition retry/recovery, idempotent attendance writes, request-scoped enrollment recovery, SQS failure reconciliation, and safe audited offboarding are implemented locally.
-- Repository status records 91 passing Python tests, Ruff, frontend syntax/CSP, Bash, workflow YAML, Terraform formatting and Terraform validation across all modules and environment roots on an earlier commit. This historical validation is not a substitute for verifying the latest commit.
-- AWS integration, Rekognition accuracy, browser/device flows, raw-image deletion behaviour and end-to-end latency remain unverified.
-
-## Release acceptance still outstanding
-
-- Dev deployment and post-CloudFront Cognito/CORS configuration.
-- Dev integration tests and consent-gated end-to-end smoke test.
-- 20-scan p95 latency measurement and raw-image deletion evidence.
-- Browser/device checks on Chrome desktop/Android and Safari iOS.
-- Security, encryption, IAM and budget alarm evidence.
-- Production release only after dev acceptance and a separate production review.
+No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket or KMS keys have been created by this work. No remote Terraform backend initialization, Terraform plan or Terraform apply has been run. Any such operation requires an exact written plan and separate explicit owner approval before execution.
 
 ## Session log
-- 14 Nov: Resumed repository audit from the previous handoff. Confirmed the target region migration on `solo/amit-monday`, inspected IAM/Phase B docs, deployment workflow, bootstrap notes, Terraform roots and modules. Diagnosed latest CI failure as Terraform formatting only; Python checks passed. Applied formatting-only fixes to the four Terraform files. New CI runs were pending at the time of this update. No AWS resources provisioned.
+
+- 14 Nov 2026: Audited repository governance and found the three expected governance files absent from the solo implementation branch. Created `ai/T01-repository-governance` from the verified solo baseline, restored the governance files, created the task board, and added AI task-branch push CI coverage. T01 remains open pending CI validation and final review. No AWS changes.
