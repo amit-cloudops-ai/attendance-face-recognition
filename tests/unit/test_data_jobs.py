@@ -5,7 +5,6 @@ import pytest
 from attendance_common import config
 from moto import mock_aws
 
-from attendance_common import config
 from services.data.daily_job import handler as daily_job
 from services.data.reports import handler as reports_handler
 from services.data.weekly_job import handler as weekly_job
