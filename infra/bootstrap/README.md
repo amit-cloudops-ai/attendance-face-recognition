@@ -8,7 +8,7 @@ In the target AWS account, create `attendance-tfstate-<account_id>` in `ap-south
 
 - S3 Block Public Access fully enabled
 - Versioning enabled
-- Default encryption enabled
+- Default SSE-S3 (AES256) encryption enabled. If choosing SSE-KMS instead, configure the matching backend `kms_key_id` and KMS permissions in both environment roots and deployment roles.
 - TLS-only bucket policy
 - Object ownership set to bucket owner enforced
 - No public access or static website hosting
