@@ -117,7 +117,6 @@ upload_presigned() {
   upload_url="$(jq -er '.upload.url' <<<"$request")"
   request_id="$(jq -er '.request_id' <<<"$request")"
   raw_key="$(jq -er '.upload.fields.key' <<<"$request")"
-  RAW_KEYS+=("$raw_key")
   fields_file="$TMP_DIR/fields-$request_id.tsv"
   jq -r '.upload.fields | to_entries[] | [.key, .value] | @tsv' <<<"$request" > "$fields_file"
 
@@ -128,7 +127,7 @@ upload_presigned() {
   # The file part is intentionally last, as required by S3 presigned POST.
   form_args+=(--form "file=@$photo;type=image/jpeg")
   curl -fsS --max-time 30 -o /dev/null -X POST "$upload_url" "${form_args[@]}"
-  printf '%s\n' "$request_id"
+  printf '%s\\t%s\\n' "$request_id" "$raw_key"
 }
 
 verify_raw_deleted() {
@@ -209,10 +208,13 @@ CREATED=1
 api_post "$ADMIN_TOKEN" "/admin/employees" "$employee_body" > "$TMP_DIR/employee.json"
 
 for photo in "$ENROLL_PHOTO_1" "$ENROLL_PHOTO_2" "$ENROLL_PHOTO_3"; do
-  request_id="$(upload_presigned "$ADMIN_TOKEN" "/admin/employees/$EMPLOYEE_ID/enroll-url" "$photo")"
+  upload_result="$(upload_presigned "$ADMIN_TOKEN" "/admin/employees/$EMPLOYEE_ID/enroll-url" "$photo")"
+  request_id="$(cut -f1 <<<"$upload_result")"
+  raw_key="$(cut -f2- <<<"$upload_result")"
+  RAW_KEYS+=("$raw_key")
   outcome="$(poll_result "$ADMIN_TOKEN" "$request_id")"
   code="$(jq -r '.code' <<<"$outcome")"
-  verify_raw_deleted "enroll/$EMPLOYEE_ID/$request_id.jpg"
+  verify_raw_deleted "$raw_key"
   if [[ "$code" != "enrolled" ]]; then
     echo "Enrollment failed for request $request_id: $(jq -r '.message' <<<"$outcome")" >&2
     exit 1
@@ -237,10 +239,13 @@ echo "Running $RUNS kiosk scan cycles for $EMPLOYEE_ID on $TODAY_IST…"
 
 for ((index = 1; index <= RUNS; index += 1)); do
   start_ns="$(python3 -c 'import time; print(time.monotonic_ns())')"
-  request_id="$(upload_presigned "$KIOSK_TOKEN" "/kiosk/upload-url" "$SCAN_PHOTO")"
+  upload_result="$(upload_presigned "$KIOSK_TOKEN" "/kiosk/upload-url" "$SCAN_PHOTO")"
+  request_id="$(cut -f1 <<<"$upload_result")"
+  raw_key="$(cut -f2- <<<"$upload_result")"
+  RAW_KEYS+=("$raw_key")
   outcome="$(poll_result "$KIOSK_TOKEN" "$request_id")"
   end_ns="$(python3 -c 'import time; print(time.monotonic_ns())')"
-  verify_raw_deleted "captures/$request_id.jpg"
+  verify_raw_deleted "$raw_key"
   elapsed_ms="$(( (end_ns - start_ns) / 1000000 ))"
   LATENCIES+=("$elapsed_ms")
 
