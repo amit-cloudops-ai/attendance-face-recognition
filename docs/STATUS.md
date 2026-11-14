@@ -53,7 +53,7 @@
 - Confirmed the actions and ARNs for employees, attendance query, daily/weekly jobs, reports, override and settings. Override uses GetItem/PutItem, settings uses GetItem/PutItem; no UpdateItem grants are required for either.
 - Confirmed data KMS split: daily_job/weekly_job GenerateDataKey for SSE-KMS report writes; reports Decrypt for report reads; no direct KMS permission for DynamoDB encryption.
 - Confirmed per-function CloudWatch log writes are scoped to Terraform-managed log groups; Scheduler invoke policies target only their matching Lambda functions.
-- Found the Scheduler trust policy lacks source account/schedule ARN conditions. Added T32 to harden it separately.
+- Found the Scheduler trust policy lacked source account and schedule-group ARN conditions. T32 now creates environment-specific schedule groups and scopes each role to its group ARN and account.
 
 ### T05 — environment runtime permissions boundaries
 
