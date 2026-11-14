@@ -217,20 +217,24 @@ def _process_record(record: dict) -> None:
             MaxFaces=5,
             QualityFilter="AUTO",
         ).get("FaceMatches", [])
-        if any((match.get("Face") or {}).get("ExternalImageId") not in (None, employee_id)
-               for match in matches):
+        if any(
+            (match.get("Face") or {}).get("ExternalImageId", "").split("#", 1)[0]
+            not in ("", employee_id)
+            for match in matches
+        ):
             _release_employee_lock(employees, employee_id, request_id)
             _finish(s3, bucket, key, results, request_id, "duplicate_face",
                     "This face is already enrolled to another employee.")
             return
 
         known_face_ids = set(employee.get("face_ids") or [])
-        # If IndexFaces succeeded on an earlier invocation but the employee
-        # write did not, the untracked matching FaceId is recovered here.
+        # A request-specific ExternalImageId makes an IndexFaces operation
+        # recoverable even if the invocation stops before employee persistence.
+        request_external_id = f"{employee_id}#{request_id}"
         recovered = [
             (match.get("Face") or {}).get("FaceId")
             for match in matches
-            if (match.get("Face") or {}).get("ExternalImageId") == employee_id
+            if (match.get("Face") or {}).get("ExternalImageId") == request_external_id
             and (match.get("Face") or {}).get("FaceId") not in known_face_ids
         ]
         if recovered:
@@ -239,7 +243,7 @@ def _process_record(record: dict) -> None:
             indexed = rekognition.index_faces(
                 CollectionId=_required_env("COLLECTION_ID"),
                 Image=image,
-                ExternalImageId=employee_id,
+                ExternalImageId=request_external_id,
                 MaxFaces=1,
                 QualityFilter="AUTO",
             )
