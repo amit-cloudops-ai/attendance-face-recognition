@@ -478,6 +478,33 @@ jobs:
               raise SystemExit("Prod CreateGrant must be AWS-resource constrained")
           PY
 
+      - name: Validate S3 Terraform state backend configuration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          expected = {
+              "dev": "attendance/dev/terraform.tfstate",
+              "prod": "attendance/prod/terraform.tfstate",
+              "billing": "attendance/billing/terraform.tfstate",
+          }
+          for env, key in expected.items():
+              path = Path(f"infra/{'envs/' + env if env in ('dev', 'prod') else 'billing'}/versions.tf")
+              source = path.read_text(encoding="utf-8")
+              for required in ('backend "s3"', f'key          = "{key}"', 'region       = "us-east-1"',
+                               "encrypt      = true", "use_lockfile = true"):
+                  if required not in source:
+                      raise SystemExit(f"{path} missing backend requirement: {required}")
+          spec = Path("docs/STATE-BUCKET-BOOTSTRAP.md").read_text(encoding="utf-8")
+          for required in ("SSE-S3", "BucketOwnerEnforced", "BlockPublicAcls",
+                           "IgnorePublicAcls", "BlockPublicPolicy", "RestrictPublicBuckets",
+                           "aws:SecureTransport", "attendance/dev/terraform.tfstate",
+                           "attendance/prod/terraform.tfstate", "attendance/billing/terraform.tfstate",
+                           "No object lock", "No automatic state expiration"):
+              if required not in spec:
+                  raise SystemExit(f"State bucket bootstrap spec missing: {required}")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
