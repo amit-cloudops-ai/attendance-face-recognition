@@ -70,3 +70,6 @@ The production callback/logout URLs and allowed origins must be the final HTTPS 
 ## Approval boundary
 
 The four trust policies are templates only. OIDC provider creation, role creation, role permission attachments, GitHub environment creation/configuration, reviewer selection and branch protection changes remain manual, explicit approval gates. No AWS or GitHub environment configuration was changed by this task.
+
+
+See `docs/GITHUB-ENVIRONMENT-SETUP.md` for the exact four environment names, variables, secrets, deployment branch restrictions, reviewer requirements and the verification limitation for repository settings.
