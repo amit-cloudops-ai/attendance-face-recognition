@@ -602,6 +602,30 @@ jobs:
                   raise SystemExit(f"Plan artifact documentation missing: {item}")
           PY
 
+      - name: Validate GitHub environment setup documentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          docs = Path("docs/GITHUB-ENVIRONMENT-SETUP.md").read_text(encoding="utf-8")
+          for required in (
+              "dev-plan", "dev-apply", "prod-plan", "prod-apply",
+              "develop only", "main only", "AWS_ROLE_ARN", "AWS_ACCOUNT_ID",
+              "EXECUTION_ROLE_BOUNDARY_ARN", "TF_STATE_BUCKET",
+              "COGNITO_CALLBACK_URLS", "COGNITO_LOGOUT_URLS", "ALLOWED_ORIGINS",
+              "TF_PLAN_AGE_RECIPIENT", "TF_PLAN_AGE_IDENTITY",
+              "prevent self-review", "Require pull requests", "Python",
+              "terraform-fmt", "cannot be verified from this session",
+          ):
+              if required not in docs:
+                  raise SystemExit(f"GitHub environment setup guide missing: {required}")
+          workflow = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          environment_expr = "$" + "{{ inputs.environment }}"
+          operation_expr = "$" + "{{ inputs.operation }}"
+          if "name: " + environment_expr + "-" + operation_expr not in workflow:
+              raise SystemExit("Deployment workflow must bind OIDC subject to operation-specific environment")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
