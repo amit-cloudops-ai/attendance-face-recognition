@@ -4,7 +4,6 @@ import uuid
 
 import boto3
 import pytest
-
 from attendance_common import config
 from attendance_common.auth import get_username, require_group
 from moto import mock_aws
