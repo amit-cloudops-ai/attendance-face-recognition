@@ -33,7 +33,7 @@ def _body(event: dict) -> dict:
 def _validate_updates(body: dict) -> dict:
     unknown = set(body) - set(DEFAULT_SETTINGS)
     if unknown:
-        raise ValueError(f"unsupported setting: {sorted(unknown)[0]}")
+        raise ValueError(f"unsupported setting: {min(unknown)}")
     if not body:
         raise ValueError("provide at least one setting to update")
     validated = {}
