@@ -11,5 +11,6 @@ __pycache__/
 node_modules/
 dist/
 .env
+web/config.json
 *.zip
 .DS_Store
