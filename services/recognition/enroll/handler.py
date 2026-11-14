@@ -218,7 +218,7 @@ def _process_record(record: dict) -> None:
             QualityFilter="AUTO",
         ).get("FaceMatches", [])
         if any(
-            (match.get("Face") or {}).get("ExternalImageId", "").split("#", 1)[0]
+            ((match.get("Face") or {}).get("ExternalImageId") or "").split("#", 1)[0]
             not in ("", employee_id)
             for match in matches
         ):
@@ -235,6 +235,7 @@ def _process_record(record: dict) -> None:
             (match.get("Face") or {}).get("FaceId")
             for match in matches
             if (match.get("Face") or {}).get("ExternalImageId") == request_external_id
+            and (match.get("Face") or {}).get("FaceId")
             and (match.get("Face") or {}).get("FaceId") not in known_face_ids
         ]
         if recovered:
