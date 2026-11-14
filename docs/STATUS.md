@@ -2,7 +2,7 @@
 
 ## Executive status
 
-The solo implementation and Phase B deployment-security preparation have advanced substantially. T01–T15 and T17 are complete at the code/documentation/CI level. T16 and T18 are blocked on owner/repository-administrator actions. T37 (dedicated billing role policies) remains to be built.
+The solo implementation and Phase B deployment-security preparation have advanced substantially. T01–T15 and T17 are complete at the code/documentation/CI level. T16 and T18 are blocked on owner/repository-administrator actions. T37 (dedicated billing role policies) is in progress.
 
 **No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key, or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
 
@@ -13,7 +13,7 @@ Target region: us-east-1. Target account: the owner's existing AWS account; the 
 - Repository: amit-cloudops-ai/attendance-face-recognition.
 - Governance: AGENTS.md, docs/TASKS.md and docs/CHATGPT_PROJECT_INSTRUCTIONS.md.
 - Solo baseline: solo/amit-monday at 92e9bf53066145949bd430dd8dcbc0e7850df46d.
-- Current work branch: ai/T18-manual-bootstrap-plan.
+- Current work branch: ai/T37-billing-roles.
 - Task work is isolated in ai/T## branches and promoted through stacked PRs. Do not commit to main/develop, alter teammate branches or merge teammate PRs.
 - All task PRs are open and unmerged pending owner review. Teammate Part B PR #2 remains separate and untouched.
 
@@ -52,7 +52,7 @@ The GitHub connector cannot inspect or configure repository Actions environments
 
 <badge color="warning">Blocked</badge>
 
-PR #26 contains docs/MANUAL-AWS-BOOTSTRAP-PLAN.md. It enumerates the state bucket, OIDC provider, two runtime boundaries, four GitHub plan/apply roles, policy attachments, manual order, dev-first rollout, prod approval and rollback. CI run [43619095037](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43619095037), commit `f3aa1e85a6`: Python and Terraform jobs passed, including the bootstrap-plan inventory validator, all policy validators, lockfiles and environment roots.
+PR #26 contains docs/MANUAL-AWS-BOOTSTRAP-PLAN.md. It enumerates the state bucket, OIDC provider, two runtime boundaries, six GitHub plan/apply roles, policy attachments, manual order, dev-first rollout, prod approval and rollback. CI run [43619095037](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43619095037), commit `f3aa1e85a6`: Python and Terraform jobs passed, including the bootstrap-plan inventory validator, all policy validators, lockfiles and environment roots.
 
 The exact 12-digit account ID and globally unique state bucket suffix remain unknown. The bootstrap plan must be rendered with verified account values and presented to the owner before any write operation. T16 must also be resolved before role federation can be enabled.
 
@@ -60,7 +60,7 @@ The exact 12-digit account ID and globally unique state bucket suffix remain unk
 
 ### T37 — dedicated billing deployment roles
 
-The billing root and separate state key exist, but dedicated billing plan/apply policies and OIDC roles are not yet built. Normal dev/prod roles intentionally have no budgets:* or aws-portal:* permissions. Do not deploy infra/billing until T37 is complete.
+The billing root now has separate plan/apply budget and state policies plus exact billing-plan/billing-apply OIDC trust templates. The deployment workflow supports infra/billing on main and requires separate billing environments. CI validation is pending. Normal dev/prod roles continue to exclude budgets:* and aws-portal:* permissions.
 
 ## Deployment policy notes and residual scope
 
@@ -78,7 +78,7 @@ The billing root and separate state key exist, but dedicated billing plan/apply 
 1. Finish T17/T18 CI runs and open their PRs.
 2. Obtain repository-admin confirmation for T16.
 3. Obtain verified account ID and explicit bootstrap approval for T18.
-4. Build T37 billing plan/apply roles.
+4. Complete T37 billing workflow and policy validation; configure billing environments under T16.
 5. Open T19 solo-only readiness PR to develop after all security/CI gates pass.
 6. Only after separate approval, bootstrap state/OIDC/roles, run dev plan, present the exact plan and request apply approval.
 7. Complete dev smoke/integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
