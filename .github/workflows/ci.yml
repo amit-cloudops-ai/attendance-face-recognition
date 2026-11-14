@@ -142,6 +142,33 @@ jobs:
                   raise SystemExit("Dev state policy references production state")
           PY
 
+      - name: Validate environment-specific Scheduler trust
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          module = Path("infra/modules/data/main.tf").read_text(encoding="utf-8")
+          variables = Path("infra/modules/data/variables.tf").read_text(encoding="utf-8")
+          if 'resource "aws_scheduler_schedule_group" "attendance"' not in module:
+              raise SystemExit("Missing dedicated attendance Scheduler group")
+          if 'name = "attendance-${var.env}"' not in module:
+              raise SystemExit("Scheduler group name must be environment-specific")
+          if 'variable = "aws:SourceAccount"' not in module or "values   = [var.account_id]" not in module:
+              raise SystemExit("Scheduler trust must require the owning AWS account")
+          if 'variable = "aws:SourceArn"' not in module or "aws_scheduler_schedule_group.attendance.arn" not in module:
+              raise SystemExit("Scheduler trust must use the exact environment schedule-group ARN")
+          if "group_name                   = aws_scheduler_schedule_group.attendance.name" not in module:
+              raise SystemExit("Schedules must be assigned to the dedicated environment group")
+          if 'variable "account_id"' not in variables:
+              raise SystemExit("Data module must receive the verified account ID")
+          for env in ("dev", "prod"):
+              root = Path(f"infra/envs/{env}/main.tf").read_text(encoding="utf-8")
+              start = root.index('module "data"')
+              end = root.find('\n}', start)
+              if "account_id                  = var.account_id" not in root[start:end]:
+                  raise SystemExit(f"{env} data module must receive account_id")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
