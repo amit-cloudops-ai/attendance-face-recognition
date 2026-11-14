@@ -14,43 +14,6 @@
       }
     },
     {
-      "Sid": "DynamoDBTableCreate",
-      "Effect": "Allow",
-      "Action": "dynamodb:CreateTable",
-      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-dev-*",
-      "Condition": {
-        "StringEquals": {
-          "aws:RequestTag/Project": "attendance",
-          "aws:RequestTag/Environment": "dev"
-        }
-      }
-    },
-    {
-      "Sid": "DynamoDBTableLifecycle",
-      "Effect": "Allow",
-      "Action": [
-        "dynamodb:DescribeTable",
-        "dynamodb:UpdateTable",
-        "dynamodb:DeleteTable",
-        "dynamodb:DescribeTimeToLive",
-        "dynamodb:UpdateTimeToLive",
-        "dynamodb:DescribeContinuousBackups",
-        "dynamodb:UpdateContinuousBackups",
-        "dynamodb:ListTagsOfResource",
-        "dynamodb:TagResource",
-        "dynamodb:UntagResource"
-      ],
-      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-dev-*"
-    },
-    {
-      "Sid": "DynamoDBIndexRead",
-      "Effect": "Allow",
-      "Action": [
-        "dynamodb:DescribeTable"
-      ],
-      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-dev-*/index/*"
-    },
-    {
       "Sid": "CloudWatchLogGroups",
       "Effect": "Allow",
       "Action": [
@@ -83,75 +46,6 @@
         "cloudwatch:DeleteAlarms"
       ],
       "Resource": "arn:aws:cloudwatch:us-east-1:${account_id}:alarm:attendance-dev-*"
-    },
-    {
-      "Sid": "LambdaLifecycle",
-      "Effect": "Allow",
-      "Action": [
-        "lambda:CreateFunction",
-        "lambda:GetFunction",
-        "lambda:GetFunctionConfiguration",
-        "lambda:UpdateFunctionCode",
-        "lambda:UpdateFunctionConfiguration",
-        "lambda:DeleteFunction",
-        "lambda:PublishVersion",
-        "lambda:GetFunctionConcurrency",
-        "lambda:PutFunctionConcurrency",
-        "lambda:DeleteFunctionConcurrency",
-        "lambda:ListTags",
-        "lambda:TagResource",
-        "lambda:UntagResource"
-      ],
-      "Resource": "arn:aws:lambda:us-east-1:${account_id}:function:attendance-dev-*"
-    },
-    {
-      "Sid": "LambdaInvokeConfiguration",
-      "Effect": "Allow",
-      "Action": [
-        "lambda:PutFunctionEventInvokeConfig",
-        "lambda:GetFunctionEventInvokeConfig",
-        "lambda:DeleteFunctionEventInvokeConfig",
-        "lambda:AddPermission",
-        "lambda:GetPolicy",
-        "lambda:RemovePermission"
-      ],
-      "Resource": "arn:aws:lambda:us-east-1:${account_id}:function:attendance-dev-*"
-    },
-    {
-      "Sid": "LambdaEventSourceMappingCreate",
-      "Effect": "Allow",
-      "Action": [
-        "lambda:CreateEventSourceMapping"
-      ],
-      "Resource": "*",
-      "Condition": {
-        "StringEquals": {
-          "lambda:FunctionArn": "arn:aws:lambda:us-east-1:${account_id}:function:attendance-dev-failure"
-        }
-      }
-    },
-    {
-      "Sid": "LambdaEventSourceMappingManage",
-      "Effect": "Allow",
-      "Action": [
-        "lambda:GetEventSourceMapping",
-        "lambda:UpdateEventSourceMapping",
-        "lambda:DeleteEventSourceMapping"
-      ],
-      "Resource": "arn:aws:lambda:us-east-1:${account_id}:event-source-mapping:*",
-      "Condition": {
-        "StringEquals": {
-          "lambda:FunctionArn": "arn:aws:lambda:us-east-1:${account_id}:function:attendance-dev-failure"
-        }
-      }
-    },
-    {
-      "Sid": "LambdaCommonLayer",
-      "Effect": "Allow",
-      "Action": [
-        "lambda:GetLayerVersion"
-      ],
-      "Resource": "arn:aws:lambda:us-east-1:${account_id}:layer:attendance-dev-common:*"
     },
     {
       "Sid": "SchedulerGroup",
