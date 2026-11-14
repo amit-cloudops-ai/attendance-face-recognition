@@ -1,6 +1,6 @@
 # IAM least-privilege inventory — deployment and runtime roles
 
-**Implementation baseline:** `solo/amit-monday`; current task work is isolated on `ai/T04-data-runtime-iam`  
+**Application baseline:** `solo/amit-monday`; security tasks T01–T37 are consolidated on `release/phase-b-region-guard`.
 **Target region:** `us-east-1`  
 **Status:** candidate inventory only. This document is not an attachable policy and does not authorize AWS changes.
 
@@ -8,17 +8,20 @@
 
 | Role | Purpose | Required boundary |
 |---|---|---|
-| `attendance-github-plan-dev` | Refresh and plan dev root; access dev state/lock only | No application role permissions |
-| `attendance-github-apply-dev` | Apply reviewed dev plan | Must attach only dev execution boundary |
-| `attendance-github-plan-prod` | Refresh and plan prod root; access prod state/lock only | No application role permissions |
-| `attendance-github-apply-prod` | Apply reviewed prod plan | Must attach only prod execution boundary |
+| `attendance-github-dev-plan` | Read-only dev plan; dev state/lock only | No application role permissions |
+| `attendance-github-dev-apply` | Apply reviewed dev plan | Must attach only dev execution boundary |
+| `attendance-github-prod-plan` | Read-only prod plan; prod state/lock only | No application role permissions |
+| `attendance-github-prod-apply` | Apply reviewed prod plan | Must attach only prod execution boundary |
+| `attendance-github-billing-plan` | Read-only billing plan; billing state/lock only | No application role permissions |
+| `attendance-github-billing-apply` | Billing root apply only | No runtime role permissions |
 | Lambda and Scheduler roles | Runtime access per handler | Pre-created environment boundary is mandatory |
 
 OIDC requirements:
 - Audience: `sts.amazonaws.com`
-- Dev subject: `repo:amit-cloudops-ai/attendance-face-recognition:environment:dev`
-- Prod subject: `repo:amit-cloudops-ai/attendance-face-recognition:environment:prod`
-- Dev GitHub Environment is restricted to `develop`; prod is restricted to `main` with a required reviewer.
+- Dev subjects: `...:environment:dev-plan` and `...:environment:dev-apply`; both restricted to `develop`.
+- Prod subjects: `...:environment:prod-plan` and `...:environment:prod-apply`; both restricted to `main`.
+- Billing subjects: `...:environment:billing-plan` and `...:environment:billing-apply`; both restricted to `main`.
+- Apply environments require an independent reviewer and self-review prevention. See `docs/GITHUB-ENVIRONMENT-SETUP.md`.
 
 Plan roles must not have infrastructure mutation permissions. Prod plan/apply permissions must be separate from dev. Do not use static AWS credentials or wildcard OIDC subjects.
 
@@ -26,14 +29,14 @@ Plan roles must not have infrastructure mutation permissions. Prod plan/apply pe
 
 | Module | Resource families |
 |---|---|
-| Foundation | KMS keys/aliases; S3 buckets, access blocks, encryption, CORS, versioning, lifecycle, bucket policy; SNS topic/subscription; Lambda layer; AWS Budget |
+| Foundation | KMS keys/aliases; S3 buckets, access blocks, encryption, CORS, versioning, lifecycle, bucket policy; SNS topic/subscription; Lambda layer |
 | Data | DynamoDB tables/items; CloudWatch log groups/alarms; Lambda functions; IAM roles/inline policies; Scheduler schedules |
 | Recognition | Rekognition collection; SQS queues/redrive; CloudWatch logs/alarms; Lambda functions; IAM roles/inline policies; async invoke config; event source mapping; Lambda permissions; S3 bucket notification |
 | Access | Cognito pools/groups/domain/client; API Gateway v2 API/authorizer/integrations/routes/stage; Lambda permissions; CloudFront OAC/policies/function/distribution; web bucket policies and objects |
 
 ## 3. Runtime policy reconciliation
 
-The following is a reconciliation checklist based on the current Terraform policies. Each action needs confirmation against actual handler code and service authorization before boundary policies are finalized.
+The following is the completed static call-site reconciliation for the current handler code and policy maps. Live AWS authorization remains unverified until a separately approved dev deployment.
 
 | Runtime function group | Resource scope | Actions currently required or to verify |
 |---|---|---|
@@ -53,8 +56,8 @@ The following is a reconciliation checklist based on the current Terraform polic
 | Scheduler roles | Matching daily or weekly Lambda only | `lambda:InvokeFunction` on the exact target Lambda ARN |
 
 Important runtime review points:
-- The foundation module creates the KMS key and uses it for DynamoDB tables, raw/report/web buckets and SQS encryption. Verify whether application roles need `kms:Decrypt` and `kms:GenerateDataKey` for each resource's actual encryption context and the chosen AWS service integration. Do not assume a broad KMS grant is necessary.
-- The current Terraform adds KMS decrypt/data-key actions to every Lambda execution role. This is a candidate overgrant until the data paths and KMS key policy are validated. Narrow the grants to only handlers that actually call KMS or need direct KMS access.
+- The foundation module creates the KMS key used for DynamoDB, S3 and SQS encryption. Direct Lambda KMS grants are now scoped by handler and data path; no blanket KMS grant is intended.
+- S3/SQS KMS grants are limited to the functions that write/read those encrypted resources. DynamoDB encryption is performed by the service; runtime Lambda roles do not receive direct KMS grants for table access.
 - Data DynamoDB call sites are reconciled below. In particular, override uses GetItem/PutItem (not UpdateItem), and settings uses GetItem/PutItem plus audit PutItem.
 - SQS asynchronous destination producer and event-source consumer permissions are reconciled in the recognition review below; keep these distinct from data-handler policies.
 - Rekognition resource-level scope is verified in section 3B: DetectFaces requires `Resource: "*"`; collection actions are collection-ARN scoped.
@@ -90,26 +93,23 @@ The runtime policy code has now been changed to remove the blanket KMS grant fro
 | Recognition | failure | Decrypt | Reads raw objects and consumes encrypted SQS DLQs |
 | Other handlers | result, faces_delete, employees, attendance_query, override, settings | None | No direct S3/SQS KMS data operation identified |
 
-The foundation KMS key policy includes a Lambda service-principal statement for the two asynchronous failure destination queues only (`recognize-dlq` and `enroll-dlq`). It is constrained by `aws:SourceAccount` and exact `aws:SourceArn` values (`ArnEquals`). The separate failure-processor DLQ is not an asynchronous destination and is excluded from this statement. The corresponding function execution roles retain the SQS producer KMS permissions and `sqs:SendMessage` permissions required by Lambda asynchronous destinations.
+The foundation KMS key policy includes a Lambda service-principal statement for the two asynchronous failure destination queues only (`recognize-dlq` and `enroll-dlq`), constrained by `aws:SourceAccount` and exact `aws:SourceArn` values. T02 records this correction. The separate failure-processor DLQ is excluded. The corresponding function roles retain only the required encrypted-SQS producer permissions.
 
 AWS authorization references reviewed:
 - S3 SSE-KMS requires `kms:GenerateDataKey` for PutObject and `kms:Decrypt` for GetObject: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html
 - SQS SSE-KMS producers require `kms:GenerateDataKey` and `kms:Decrypt`; consumers require `kms:Decrypt`: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-key-management.html
 
-This is a code-call-site review, not a complete AWS authorization verification. The Lambda destination key-policy statement is scoped to the exact two destination queue ARNs and source account. No SQS encryption-context condition is added because the reviewed AWS SQS key-management guidance specifies source ARN/account confused-deputy controls but does not establish an encryption-context condition for this use case. S3 encryption-context details, Rekognition resource-level support and provider API actions remain open gates.
+This is a static code/policy review, not live AWS authorization proof. T02–T08 and T31–T36 record the completed policy/provider/region hardening. The remaining validation is IAM Access Analyzer plus approved dev deployment evidence; do not treat static CI as a substitute for live authorization.
 
 ## 4. Deployment policy construction
 
 Foundation module provider actions have been mapped against the exact AWS provider v6.73.0 source and AWS Service Authorization References in `docs/security/FOUNDATION-PROVIDER-IAM.md`. This mapping includes the S3 bucket read actions that the monolithic `aws_s3_bucket` provider resource calls even when split resources own configuration. It also identifies the account-wide `aws-portal:ModifyBilling` dependency introduced by the Budget resource.
 
-Remaining provider-action tasks:
-- Data and recognition module: T07 complete.
-- Access module: T08 complete.
-- Dev plan role: T09 in progress; templates are being split into service-read and backend-state policy documents.
+Provider-action mapping is complete for foundation, data, recognition and access modules (T06–T08). Dev/prod plan/apply policy sets are built and validated (T09–T12). The task-specific provider action maps are in `docs/security/`.
 
 Access module provider-source mapping is drafted in `docs/security/ACCESS-PROVIDER-IAM.md`, including Cognito pool-level IAM granularity, API Gateway v2 HTTP-verb action model, CloudFront global resource ARNs, web S3 object/bucket-policy operations, and API Gateway Lambda permission actions.
 
-Important deployment KMS dependency: the five DynamoDB tables use the foundation CMK. AWS requires the principal selecting a customer-managed key for a DynamoDB table to have `kms:Encrypt`, `kms:Decrypt`, `kms:ReEncryptFrom`, `kms:ReEncryptTo`, `kms:GenerateDataKey`, `kms:GenerateDataKeyWithoutPlaintext`, `kms:DescribeKey`, and `kms:CreateGrant` via DynamoDB. These are deployment-role permissions, not runtime Lambda permissions. The current foundation key policy lacks the DynamoDB service-principal direct metadata statement; T36 tracks the key-policy correction.
+Important deployment KMS dependency: DynamoDB customer-managed-key deployment permissions are isolated in the dev/prod apply-policy fragments. T36 adds the environment-scoped key-policy authorization using `kms:ViaService=dynamodb.us-east-1.amazonaws.com` and the required `kms:GrantIsForAWSResource=true` condition for CreateGrant. These are deployment-role permissions, not runtime Lambda permissions.
 - All deployment policies must use exact API action names, resource ARNs, resource tags and supported condition keys. Use `iam:PassRole` only for exact environment-specific execution role ARNs and condition it by `iam:PassedToService`.
 
 ## 5. Execution-role permissions boundaries
@@ -204,7 +204,7 @@ Logging:
 
 Scheduler:
 - Each Scheduler execution role has `lambda:InvokeFunction` on only its matching daily or weekly Lambda ARN.
-- The Scheduler trust policy currently trusts `scheduler.amazonaws.com` without source-account/source-schedule conditions. This is a confused-deputy hardening item tracked separately as T32; do not consider the trust policy finalized.
+- T32 completed Scheduler trust hardening: each environment's Scheduler role trust is restricted to the exact schedule-group ARN and source account.
 
 Conclusion: no missing data-handler API actions or unjustified data-handler KMS grants were found in the current policy map. This is static code/policy reconciliation; AWS live authorization remains unverified.
 
