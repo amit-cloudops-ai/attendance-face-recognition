@@ -1,6 +1,6 @@
 # IAM least-privilege inventory — deployment and runtime roles
 
-**Application baseline:** `solo/amit-monday`; security tasks T01–T37 are consolidated on `release/phase-b-region-guard`.
+**Application baseline:** `solo/amit-monday`; security tasks T01–T38 are consolidated on `solo/amit-monday`.
 **Target region:** `us-east-1`  
 **Status:** candidate inventory only. This document is not an attachable policy and does not authorize AWS changes.
 
@@ -21,7 +21,7 @@ OIDC requirements:
 - Dev subjects: `...:environment:dev-plan` and `...:environment:dev-apply`; both restricted to `develop`.
 - Prod subjects: `...:environment:prod-plan` and `...:environment:prod-apply`; both restricted to `main`.
 - Billing subjects: `...:environment:billing-plan` and `...:environment:billing-apply`; both restricted to `main`.
-- Apply environments require an independent reviewer and self-review prevention. See `docs/GITHUB-ENVIRONMENT-SETUP.md`.
+- Apply environments require the repository owner's manual approval checkpoint, with self-review allowed. This is not independent separation of duties. See `docs/GITHUB-ENVIRONMENT-SETUP.md`.
 
 Plan roles must not have infrastructure mutation permissions. Prod plan/apply permissions must be separate from dev. Do not use static AWS credentials or wildcard OIDC subjects.
 
