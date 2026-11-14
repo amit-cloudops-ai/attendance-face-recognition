@@ -54,8 +54,8 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 |---|---|
 | presign | `s3:PutObject` on raw `captures/*`; `dynamodb:PutItem` on scan-results |
 | result | `dynamodb:GetItem` on scan-results |
-| recognize | `rekognition:DetectFaces`; `rekognition:SearchFacesByImage` on the collection; `s3:GetObject`, `s3:DeleteObject` on raw `captures/*`; `dynamodb:GetItem` employees + config; `GetItem`/`PutItem`/`UpdateItem` attendance; `UpdateItem` scan-results; `sqs:SendMessage` on its DLQ |
-| enroll | `rekognition:DetectFaces`; `IndexFaces`, `SearchFacesByImage` on the collection; `s3:GetObject`, `s3:DeleteObject` on raw `enroll/*`; `dynamodb:GetItem`/`UpdateItem` employees; `GetItem` config; `UpdateItem` scan-results; DLQ send |
+| recognize | `rekognition:DetectFaces`; `rekognition:SearchFacesByImage` on the collection; `s3:GetObject`, `s3:DeleteObject` on raw `captures/*`; `dynamodb:GetItem` employees + config; `GetItem`/`PutItem`/`UpdateItem` attendance; `GetItem`/`UpdateItem` scan-results; `sqs:SendMessage` on its DLQ |
+| enroll | `rekognition:DetectFaces`; `IndexFaces`, `SearchFacesByImage` on the collection; `s3:GetObject`, `s3:DeleteObject` on raw `enroll/*`; `dynamodb:GetItem`/`UpdateItem` employees; `GetItem` config; `GetItem`/`UpdateItem` scan-results; DLQ send |
 | enroll-url | `s3:PutObject` on raw `enroll/*`; `dynamodb:GetItem` employees; `PutItem` scan-results |
 | faces-delete | `rekognition:DeleteFaces` on the collection; `dynamodb:GetItem`/`UpdateItem` employees; `PutItem` audit |
 | employees | `dynamodb:GetItem`/`PutItem`/`UpdateItem`/`Scan` employees; `PutItem` audit |
