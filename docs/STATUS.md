@@ -15,13 +15,13 @@
 ## Module status
 | Module | Owner | Status (not started / in progress / on dev / on prod) | Tests | Notes |
 |---|---|---|---|---|
-| bootstrap + foundation | Lead | not started | - | |
-| shared layer (tz, config, responses) | Lead | in progress | 16 tests passed; Ruff passed | Implemented IST helpers, cached config defaults/lookup, and API proxy responses on solo/amit-monday |
+| bootstrap + foundation | Amit (solo) | in progress | Terraform fmt + validate green | Foundation module defines KMS, private encrypted buckets, raw-image lifecycle/CORS, common layer, SNS alerts and USD 15 budget; dev root wired. No bootstrap or apply performed |
+| shared layer (tz, config, responses, auth) | Amit (solo) | in progress | Shared attendance tests included in 57 passing; Ruff passed | IST helpers, cached config, API responses, Cognito group/username helpers and conditional record_scan implementation on solo/amit-monday |
 | Part A: recognition | Amit (solo) | in progress | 22 recognition/enrollment tests; Terraform validate green | Six handlers and Terraform module implemented: Lambda packaging, IAM, Rekognition collection, S3 notifications, DLQs, logs and alarms |
 | Part B: data + automation | Amit (solo) | in progress | 19 data API/job tests; Terraform validate green | Employee CRUD, attendance query, daily/weekly jobs and report retrieval implemented; data module creates five encrypted/PITR tables, schedules, IAM and alarms |
 | shared record_scan | Part B interface / Amit solo implementation | in progress | 16 tests passed; Ruff passed | Implemented conditional clock-in, debounce, clock-out, IST date, absent-row promotion and out-of-order event protection on solo/amit-monday |
-| Part C: access + web | | not started | - | |
-| CI/CD | Lead | CI green; deploy workflow pending | 57 Python tests; Ruff; Terraform fmt + validate for recognition and data modules | No deploy workflow or AWS apply; validation is static/mocked only | |
+| Part C: access + web | Amit (solo) | in progress | Node module syntax + HTML CSP hygiene green; access/dev Terraform validate green; browser testing pending | Cognito groups and PKCE public client, JWT HTTP API routes, CloudFront private web origin/security headers, generated config.json, kiosk camera/scan flow, admin employee/enrollment/attendance/report UI |
+| CI/CD | Amit (solo) | CI green; deploy workflow pending | 57 Python tests; Ruff; Node syntax + CSP check; Terraform fmt + validate for recognition, data, foundation, access and dev root | No OIDC deployment workflow or AWS apply; validation is static/mocked only | |
 
 ## Acceptance evidence
 Paste links/screenshots per SPEC ID (F01-F13, N01-N11) as they pass.
@@ -33,7 +33,8 @@ Paste links/screenshots per SPEC ID (F01-F13, N01-N11) as they pass.
 ## Known issues
 - Part A is not complete: AWS deployment/integration, real Rekognition accuracy, IAM verification in-account, and end-to-end kiosk validation remain. The module has only been initialized and validated locally in CI; no apply has run.
 - AWS integration, biometric accuracy, in-account IAM, raw-image deletion behaviour and end-to-end latency are not verified; no AWS resources have been provisioned.
-- Part B optional override/settings handlers, foundation/root environment wiring, Part C access/API Gateway and frontend, and end-to-end deployment remain.
+- Part B SHOULD override/settings handlers remain unimplemented. Part C has not been browser-tested against a deployed stack. Bootstrap state bucket/OIDC role setup and automated deployment workflow remain.
+- After the first approved deployment, add the exact CloudFront site origin to the dev `allowed_origins`, `callback_urls` and `logout_urls` values and apply again; this enables production-domain S3 presigned POST CORS and Cognito redirects without introducing a Terraform dependency cycle.
 - Part B and Part C guides still mention SAM in places, while ARCHITECTURE.md and TEAM_BRIEF specify Terraform modules. Solo implementation follows the architecture/Team Brief; reconcile the stale guide wording before team integration.
 
 ## Decisions made after freeze
@@ -46,3 +47,4 @@ Paste links/screenshots per SPEC ID (F01-F13, N01-N11) as they pass.
 - 14 Nov: Part A enrollment batch added admin enrollment URL creation, S3-triggered face indexing with quality/duplicate/limit checks, and audited face-template deletion. GitHub Actions passed: Ruff, pytest (38 passed), and terraform fmt. AWS integration and real biometric accuracy remain unverified; no AWS resources provisioned.
 - 14 Nov: Recognition Terraform module added six Lambda packages, least-privilege per-function roles, Rekognition collection, S3 prefix notifications, encrypted SQS failure destinations, log groups and CloudWatch alarms. GitHub Actions passed Python tests (38), Ruff, Terraform fmt and Terraform validate. No Terraform apply or AWS resource provisioning performed.
 - 14 Nov: Part B core APIs and jobs added employee CRUD with consent/audit, indexed attendance queries with cursor pagination, idempotent daily absent finalization and missing-clock-out flags, weekly ISO analytics, and report JSON/CSV retrieval. Added the Terraform data module for five encrypted/PITR DynamoDB tables, five Lambdas, Asia/Kolkata schedules, least-privilege IAM and CloudWatch alarms. GitHub Actions passed 57 Python tests, Ruff, Terraform fmt, and Terraform validate for both modules. No AWS resources provisioned.
+- 14 Nov: Part C access and browser app added Cognito admin/kiosk groups, PKCE public client, JWT-protected HTTP API routes, CloudFront OAC private static origin, API no-cache routing, security headers, frontend S3 publishing and generated `config.json`. Added kiosk camera/upload/polling flow, admin employee creation/consent, 3–5 photo enrollment, offboarding, attendance filters/pagination and daily/weekly report views. Added `docs/FRONTEND.md`. GitHub Actions passed 57 Python tests, Ruff, Node module syntax and HTML CSP hygiene checks, Terraform formatting and validation for all modules plus the composed dev root. No AWS resources provisioned; no browser/device E2E test run.
