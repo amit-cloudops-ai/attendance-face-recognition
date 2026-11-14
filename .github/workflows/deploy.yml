@@ -111,7 +111,7 @@ jobs:
 
       - name: Initialize remote state
         run: |
-          terraform -chdir="$TF_ROOT" init -input=false \
+          terraform -chdir="$TF_ROOT" init -input=false -lockfile=readonly \
             -backend-config="bucket=$TF_STATE_BUCKET" \
             -backend-config="region=$AWS_REGION" \
             -backend-config="encrypt=true" \
