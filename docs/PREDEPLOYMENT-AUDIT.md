@@ -58,12 +58,15 @@ The previous recommendation to bypass OIDC and apply locally as the broad `Amit-
 14. **Supply-chain controls are incomplete.** CI installs unpinned Python test dependencies; Terraform CI uses the setup action's default version while deployment pins Terraform 1.10.5; GitHub Actions are tag-pinned rather than SHA-pinned. T28 remains open.
 
 ### P3 — product/operational decisions
+12a. **JWT revocation is delayed.** Cognito access tokens are valid for 60 minutes and API Gateway validates them statelessly. Disabling a kiosk/admin user prevents future authentication/refresh but an already-issued JWT can remain usable until expiry. Document the incident response and decide whether shorter access-token validity or a server-side revocation mechanism is required before production.
+
 
 15. Holiday records are read from the config table, but no admin holiday-management API/UI was found; document the manual configuration procedure or build a supported workflow.
 16. Still-photo matching can be spoofed with a printed/displayed image. This is documented as a v1 limitation; require supervised kiosk operation and explicit risk acceptance before production, or scope Face Liveness.
 17. The browser verification matrix is blank. Test supported Chrome/Android/Safari/iOS devices, camera permissions, responsive layout, accessibility and poor-network behaviour.
-18. The repository default branch `main` is still scaffold-only. The integrated application is on the solo branch; do not represent the default branch as the completed release until the approved promotion.
-19. There are 26 open PRs. PR #29 is the active solo audit PR; PR #2 is the separate teammate Part B PR; #4–#27 are historical chained task PRs. Do not merge these into the solo release. Close historical PRs only after confirming their work is represented in the consolidated branch.
+18. Consent capture currently stores a boolean and timestamp. Before production, record the exact notice/purpose version shown to the employee, the data controller, retention/deletion terms and the withdrawal process; obtain the required privacy/legal approval for employee face data and processing in the selected `us-east-1` region.
+19. The repository default branch `main` is still scaffold-only. The integrated application is on the solo branch; do not represent the default branch as the completed release until the approved promotion.
+20. There are 26 open PRs. PR #29 is the active solo audit PR; PR #2 is the separate teammate Part B PR; #4–#27 are historical chained task PRs. Do not merge these into the solo release. Close historical PRs only after confirming their work is represented in the consolidated branch.
 
 ## 4. Four-part remediation plan
 
