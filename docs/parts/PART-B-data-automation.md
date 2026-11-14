@@ -1,5 +1,7 @@
 # Part B — Data and Attendance (Sushmita)
 
+> **Historical contributor guide:** this Part A/B/C assignment is retained for technical context only. The active release is owned and integrated on `solo/amit-monday`; do not follow old contributor ownership, teammate or branch instructions for current work.
+
 **Owner:** Sushmita. **Integration target:** `develop`. Suggested branch: `team/sushmita-part-b`.
 **Deadline:** Sunday 15 November 2026, 18:00 IST for a reviewable PR.
 **Read first:** `docs/contracts.md` sections 1, 3, 5, 7 and 8; `docs/FINISH_LINE.md`.
