@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f4f6f2"><title>Attendance admin</title><link rel="stylesheet" href="/shared/styles.css"></head>
 <body><main class="shell">
-<header class="topbar"><div><div class="brand">Attendance / Administration</div><div class="muted" style="font-size:13px">People, attendance and reporting</div></div><div class="actions"><a href="/" style="color:#176b4b;font-weight:650">Kiosk</a><button id="sign-out" class="secondary">Sign out</button></div></header>
+<header class="topbar"><div><div class="brand">Attendance / Administration</div><div class="muted tiny">People, attendance and reporting</div></div><div class="actions"><a href="/" class="text-link">Kiosk</a><button id="sign-out" class="secondary">Sign out</button></div></header>
 <section><span class="eyebrow">Operations overview</span><h1>Attendance, clearly.</h1><p class="muted">Manage employee records, enroll face photos with consent, review attendance and download reports.</p><p id="message" class="status" role="status" aria-live="polite">Loading administration…</p></section>
-<section class="panel section"><div class="row" style="justify-content:space-between"><h2>Employees</h2><button id="refresh-employees" class="secondary">Refresh</button></div>
+<section class="panel section"><div class="row row-between"><h2>Employees</h2><button id="refresh-employees" class="secondary">Refresh</button></div>
 <form id="employee-form" class="grid">
 <div class="field"><label for="employee-id">Employee ID</label><input id="employee-id" name="employee_id" pattern="[A-Z0-9_-]{3,20}" required maxlength="20" placeholder="EMP001"></div>
 <div class="field"><label for="employee-name">Full name</label><input id="employee-name" name="name" required maxlength="120"></div>
@@ -11,7 +11,7 @@
 <div class="field"><label for="department">Department</label><input id="department" name="department" required></div>
 <div class="field"><label for="shift-start">Shift start (IST)</label><input id="shift-start" name="shift_start" type="time" value="09:00" required></div>
 <div class="field"><label for="shift-end">Shift end (IST)</label><input id="shift-end" name="shift_end" type="time" value="18:00" required></div>
-<label class="consent" style="grid-column:1/-1"><input id="consent" type="checkbox" required><span>I confirm that the employee has been informed about face-based attendance and has explicitly consented to biometric processing.</span></label>
+<label class="consent" class="span-all"><input id="consent" type="checkbox" required><span>I confirm that the employee has been informed about face-based attendance and has explicitly consented to biometric processing.</span></label>
 <div class="actions" style="grid-column:1/-1"><button type="submit">Add employee</button></div>
 </form>
 <div class="table-wrap section"><table><thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Shift</th><th>Status</th><th>Face photos</th><th>Actions</th></tr></thead><tbody id="employees-body"><tr><td colspan="7" class="muted">No employees loaded.</td></tr></tbody></table></div>
@@ -23,5 +23,5 @@
 <div class="field"><label for="filter-to">To date</label><input id="filter-to" type="date"></div>
 <div class="actions" style="grid-column:1/-1"><button type="submit">Apply filters</button><button type="button" id="next-page" class="secondary" disabled>Next page</button></div>
 </form><div class="table-wrap section"><table><thead><tr><th>Date</th><th>Employee</th><th>Name</th><th>Clock in</th><th>Clock out</th><th>Status</th><th>Flags</th></tr></thead><tbody id="attendance-body"><tr><td colspan="7" class="muted">Choose an employee or date range to load records.</td></tr></tbody></table></div></section>
-<section class="panel section"><h2>Reports</h2><form id="report-form" class="row"><div class="field"><label for="report-type">Report</label><select id="report-type"><option value="daily">Daily</option><option value="weekly">Weekly</option></select></div><div class="field"><label for="report-period">Period</label><input id="report-period" required placeholder="YYYY-MM-DD"></div><button type="submit">Load report</button></form><pre id="report-output" class="status" style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:14px">Select a period to view a report.</pre><a id="csv-download" class="hidden" style="color:#176b4b;font-weight:700" target="_blank" rel="noopener">Download CSV</a></section>
+<section class="panel section"><h2>Reports</h2><form id="report-form" class="row"><div class="field"><label for="report-type">Report</label><select id="report-type"><option value="daily">Daily</option><option value="weekly">Weekly</option></select></div><div class="field"><label for="report-period">Period</label><input id="report-period" required placeholder="YYYY-MM-DD"></div><button type="submit">Load report</button></form><pre id="report-output" class="status report-json">Select a period to view a report.</pre><a id="csv-download" class="hidden download-link" target="_blank" rel="noopener">Download CSV</a></section>
 </main><script type="module" src="/admin.js"></script></body></html>
