@@ -13,6 +13,11 @@ variable "account_id" {
   type        = string
 }
 
+variable "raw_bucket_name" {
+  description = "Private raw biometric bucket name used by browser upload configuration."
+  type        = string
+}
+
 variable "web_bucket_name" {
   description = "Private static web bucket name."
   type        = string
