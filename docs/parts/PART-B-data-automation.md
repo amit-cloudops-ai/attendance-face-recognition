@@ -5,7 +5,7 @@
 **Read first:** `docs/contracts.md` sections 1, 3, 5, 7 and 8; `docs/FINISH_LINE.md`.
 
 ## Mission
-Implement data and attendance behavior: employee records, clock-in/out rules, attendance query, daily absence processing, weekly analytics and report retrieval. Frozen contracts define all external interfaces. Monday sprint infrastructure is SAM, not Terraform.
+Implement data and attendance behavior: employee records, clock-in/out rules, attendance query, daily absence processing, weekly analytics and report retrieval. Frozen contracts define all external interfaces. Infrastructure wiring is the Terraform module `infra/modules/data`, composed by `infra/envs/{dev,prod}`.
 
 ## Files you own
 - `shared/python/attendance_common/record_scan.py`
@@ -17,7 +17,7 @@ Implement data and attendance behavior: employee records, clock-in/out rules, at
 - `services/data/override/**` and `services/data/settings/**` only after core scope passes
 - Focused Part B tests under `tests/unit/`
 
-Coordinate shared Python imports with Amit. Do not edit recognition code, frontend, SAM template, frozen contracts, contract tests or another owner's paths.
+Coordinate shared Python imports with Amit. Do not edit recognition code, frontend, Terraform data module, frozen contracts, contract tests or another owner's paths.
 
 ## Required implementation
 1. **record_scan:** derive business date in Asia/Kolkata; first scan creates clock-in; late status uses shift_start + grace; rapid scan inside debounce returns duplicate_ignored; later scan updates clock_out; conditional writes prevent concurrent duplicate clock-ins; handle an existing absent row safely. Return the exact contract shape.
@@ -40,4 +40,4 @@ Use mocks/local fixtures; no live AWS. Run `pytest -q` and `ruff check .`.
 - No AWS provisioning, credentials, account IDs or real biometric images.
 
 ## Out of scope
-Recognition/Rekognition handlers, API Gateway/SAM, frontend, route/schema redesign, contract edits and contract-test edits. Ask Amit with exact contract section and evidence if blocked.
+Recognition/Rekognition handlers, API Gateway/access module, frontend, route/schema redesign, contract edits and contract-test edits. Ask Amit with exact contract section and evidence if blocked.
