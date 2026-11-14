@@ -1,7 +1,7 @@
 # Foundation module — Terraform provider IAM action inventory
 
 **Task:** T06  
-**Target:** AWS provider v6.73.0, region `us-east-1`  
+**Target:** AWS provider v6.73.0; canonical region is `config/deployment.json` (`us-east-1`)  
 **Status:** static provider-source/API mapping; no AWS authorization test performed.
 
 ## Provider version evidence
@@ -73,7 +73,7 @@ This is materially broader than the rest of the foundation module. The budget re
 ## Additional blockers discovered
 
 - **T33 — Provider reproducibility:** root constraints allow AWS provider `>=5,<7` and no lockfile is committed. Pin the reviewed provider version and commit dev/prod lockfiles before finalizing IAM policies.
-- **T34 — Budget isolation:** implemented in `infra/billing`; CI validates the root. Dedicated billing plan/apply policy and role wiring remain a separate deployment gate.
+- **T34/T37 — Budget isolation:** implemented in `infra/billing` with separate billing state, plan/apply policy templates and exact billing OIDC subjects. Live role creation remains approval-gated.
 - **T35 — CloudFront KMS scope:** foundation key policy currently permits CloudFront OAC decrypt for any distribution in the account. Move the grant to a point where the exact distribution ARN is available, or otherwise constrain it to the single project distribution before bootstrap.
 
 ## AWS authorization references
