@@ -48,7 +48,7 @@ Configure these repository/environment variables:
 - `TF_STATE_BUCKET`, `AWS_ACCOUNT_ID`, `ALERT_EMAIL`
 - `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS`, `ALLOWED_ORIGINS` (each a non-empty JSON array of strings)
 
-The manual workflow is `.github/workflows/deploy.yml`. Trigger it from `develop` for dev or `main` for prod, choose `plan` first, review the uploaded plan artifact, then explicitly trigger `apply` when approved. Production runs are gated by the `prod` environment reviewer. The workflow uses GitHub OIDC and short-lived credentials; never store AWS access keys.
+The manual workflow is `.github/workflows/deploy.yml`. Trigger it from `develop` for dev or `main` for prod, choose `plan` first, review the uploaded plan artifact, then trigger `apply` and supply the successful plan run ID. Apply downloads and uses that exact saved plan; stale plans fail safely. Production runs are gated by the `prod` environment reviewer. The workflow uses GitHub OIDC and short-lived credentials; never store AWS access keys.
 
 ## Safety gate
 
