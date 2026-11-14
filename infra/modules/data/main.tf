@@ -74,6 +74,24 @@ locals {
     ALERTS_TOPIC_ARN   = var.alerts_topic_arn
   })
 
+  lambda_kms_permissions = {
+    daily_job = [{
+      Effect   = "Allow"
+      Action   = ["kms:GenerateDataKey"]
+      Resource = [var.kms_key_arn]
+    }]
+    weekly_job = [{
+      Effect   = "Allow"
+      Action   = ["kms:GenerateDataKey"]
+      Resource = [var.kms_key_arn]
+    }]
+    reports = [{
+      Effect   = "Allow"
+      Action   = ["kms:Decrypt"]
+      Resource = [var.kms_key_arn]
+    }]
+  }
+
   lambda_permissions = {
     employees = [
       {
@@ -406,17 +424,12 @@ resource "aws_iam_role_policy" "lambda" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = concat(local.lambda_permissions[each.key], [
+    Statement = concat(local.lambda_permissions[each.key], lookup(local.lambda_kms_permissions, each.key, []), [
       {
         Effect   = "Allow"
         Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = ["${aws_cloudwatch_log_group.lambda[each.key].arn}:*"]
       },
-      {
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
-        Resource = [var.kms_key_arn]
-      }
     ])
   })
 }
