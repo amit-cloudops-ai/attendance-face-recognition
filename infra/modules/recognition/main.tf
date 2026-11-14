@@ -63,37 +63,37 @@ locals {
   lambda_permissions = {
     presign = [
       {
-        Effect   = "Allow"
-        Action   = ["s3:PutObject"]
+        Effect = "Allow"
+        Action = ["s3:PutObject"]
         Resource = ["${var.raw_bucket_arn}/captures/*"]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:PutItem"]
         Resource = [var.tables.scan_results.arn]
       }
     ]
     result = [
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
         Resource = [var.tables.scan_results.arn]
       }
     ]
     recognize = [
       {
-        Effect   = "Allow"
-        Action   = ["rekognition:DetectFaces"]
+        Effect = "Allow"
+        Action = ["rekognition:DetectFaces"]
         Resource = ["*"]
       },
       {
-        Effect   = "Allow"
-        Action   = ["rekognition:SearchFacesByImage"]
+        Effect = "Allow"
+        Action = ["rekognition:SearchFacesByImage"]
         Resource = [aws_rekognition_collection.faces.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:DeleteObject"]
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:DeleteObject"]
         Resource = ["${var.raw_bucket_arn}/captures/*"]
       },
       {
@@ -106,8 +106,8 @@ locals {
         Resource = [var.tables.attendance.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
         Resource = [
           var.tables.employees.arn,
           var.tables.config.arn,
@@ -115,20 +115,20 @@ locals {
         ]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:UpdateItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:UpdateItem"]
         Resource = [var.tables.scan_results.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["sqs:SendMessage"]
+        Effect = "Allow"
+        Action = ["sqs:SendMessage"]
         Resource = [aws_sqs_queue.dlq["recognize"].arn]
       }
     ]
     enroll = [
       {
-        Effect   = "Allow"
-        Action   = ["rekognition:DetectFaces"]
+        Effect = "Allow"
+        Action = ["rekognition:DetectFaces"]
         Resource = ["*"]
       },
       {
@@ -141,92 +141,92 @@ locals {
         Resource = [aws_rekognition_collection.faces.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:DeleteObject"]
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:DeleteObject"]
         Resource = ["${var.raw_bucket_arn}/enroll/*"]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
         Resource = [var.tables.employees.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
         Resource = [var.tables.config.arn, var.tables.scan_results.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:UpdateItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:UpdateItem"]
         Resource = [var.tables.scan_results.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["sqs:SendMessage"]
+        Effect = "Allow"
+        Action = ["sqs:SendMessage"]
         Resource = [aws_sqs_queue.dlq["enroll"].arn]
       }
     ]
     enroll_url = [
       {
-        Effect   = "Allow"
-        Action   = ["s3:PutObject"]
+        Effect = "Allow"
+        Action = ["s3:PutObject"]
         Resource = ["${var.raw_bucket_arn}/enroll/*"]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
         Resource = [var.tables.employees.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:PutItem"]
         Resource = [var.tables.scan_results.arn]
       }
     ]
     faces_delete = [
       {
-        Effect   = "Allow"
-        Action   = ["rekognition:DeleteFaces"]
+        Effect = "Allow"
+        Action = ["rekognition:DeleteFaces"]
         Resource = [aws_rekognition_collection.faces.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
         Resource = [var.tables.employees.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:PutItem"]
         Resource = [var.tables.audit.arn]
       }
     ]
     failure = [
       {
-        Effect   = "Allow"
-        Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"]
+        Effect = "Allow"
+        Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"]
         Resource = [for queue in aws_sqs_queue.dlq : queue.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
         Resource = [var.tables.scan_results.arn, var.tables.employees.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:Query"]
+        Effect = "Allow"
+        Action = ["dynamodb:Query"]
         Resource = [
           var.tables.attendance.arn,
           "${var.tables.attendance.arn}/index/date-index"
         ]
       },
       {
-        Effect   = "Allow"
-        Action   = ["rekognition:SearchFacesByImage", "rekognition:DeleteFaces"]
+        Effect = "Allow"
+        Action = ["rekognition:SearchFacesByImage", "rekognition:DeleteFaces"]
         Resource = [aws_rekognition_collection.faces.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:DeleteObject"]
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:DeleteObject"]
         Resource = [
           "${var.raw_bucket_arn}/captures/*",
           "${var.raw_bucket_arn}/enroll/*"
@@ -321,16 +321,16 @@ resource "aws_iam_role_policy" "lambda" {
   role = aws_iam_role.lambda[each.key].id
 
   policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = concat(local.lambda_permissions[each.key], [
       {
-        Effect   = "Allow"
-        Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+        Effect = "Allow"
+        Action = ["logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = ["${aws_cloudwatch_log_group.lambda[each.key].arn}:*"]
       },
       {
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Effect = "Allow"
+        Action = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource = [var.kms_key_arn]
       }
     ])
