@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Apply consistent PR/status-check protection to the release branches.
+# Apply solo-owner PR/status-check protection to the release branches.
 # Dry-run by default. Requires gh CLI authenticated as a repository administrator.
 set -euo pipefail
 
@@ -13,11 +13,14 @@ Usage:
   bash scripts/configure_branch_protection.sh --apply
 
 Dry-run is the default. --apply protects main, develop and solo/amit-monday:
-- PR required, one independent approval, stale approvals dismissed
-- approval required after the latest push
+- pull requests required, but zero independent approvals (solo-owner model)
+- stale approvals dismissed if any optional reviews are present
 - python and terraform-fmt checks required and branch must be up to date
 - conversations resolved, admin enforcement enabled
 - force pushes and branch deletion disabled
+
+This does not create separation of duties. The owner must inspect their own PR
+and consciously merge it after CI passes.
 USAGE
 }
 
@@ -48,8 +51,8 @@ payload="$(jq -cn '{
   required_pull_request_reviews: {
     dismiss_stale_reviews: true,
     require_code_owner_reviews: false,
-    required_approving_review_count: 1,
-    require_last_push_approval: true
+    required_approving_review_count: 0,
+    require_last_push_approval: false
   },
   restrictions: null,
   required_conversation_resolution: {
@@ -63,9 +66,10 @@ for branch in main develop solo/amit-monday; do
   encoded_branch="$(jq -rn --arg value "$branch" '$value | @uri')"
   endpoint="repos/$REPO/branches/$encoded_branch/protection"
   echo "Branch: $branch"
+  echo "  Pull request required: yes"
+  echo "  Independent approval count: 0 (solo-owner model)"
+  echo "  Latest-push approval: not required"
   echo "  Required checks: python, terraform-fmt"
-  echo "  Required independent approvals: 1"
-  echo "  Latest-push approval: required"
   echo "  Admin bypass: disabled"
   echo "  Force pushes/deletion: disabled"
   if [[ "$APPLY" == true ]]; then
