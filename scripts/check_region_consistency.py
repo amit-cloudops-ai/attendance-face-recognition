@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Fail CI when repository configuration drifts from its canonical AWS region."""
 from __future__ import annotations
 
