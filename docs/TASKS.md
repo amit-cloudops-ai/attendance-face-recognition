@@ -50,6 +50,8 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T36 | Add DynamoDB customer-managed KMS authorization | DONE | Customer-managed key policy and dev/prod apply fragments use exact DynamoDB ViaService and environment alias; CreateGrant is AWS-resource constrained |
 | T37 | Build dedicated billing plan/apply policies and OIDC roles | DONE | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
 
+| T38 | Establish canonical AWS region manifest and CI drift prevention | IN_PROGRESS | Terraform providers, backend initialization, Lambda SDKs, contracts, frontend config, IAM regional ARNs and documentation resolve to config/deployment.json; CI fails on any conflicting region or legacy region reference |
+
 ## Phase C — release and operations
 
 | ID | Task | Status | Acceptance criteria |
@@ -73,6 +75,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T16 GitHub environment setup: PR #24; documentation is ready, but actual GitHub environment settings cannot be inspected or configured by the current connector. Repository-admin action is required.
 - T17 template linting: PR #25; CI run 43619026006 passed. No CloudFormation/SAM templates exist; Terraform and JSON policy templates are validated in CI.
 - T18 manual bootstrap plan: PR #26; plan is documented and CI run 43619095037 passed. Exact account ID, globally unique bucket suffix and owner approval remain required.
-- T37 is complete: billing plan/apply policy and OIDC trust templates, isolated billing workflow path and six-environment documentation are validated by CI run 43620012088. PR #27.
+- T37 implementation is complete: billing plan/apply policy and OIDC trust templates, isolated billing workflow path and six-environment documentation are validated by CI run 43620012088. PR #27.
+- T38 is in progress on release/phase-b-region-guard: canonical region manifest, Terraform provider loading, backend wrapper/workflow export, contract/example updates, Moto fixture alignment and CI drift guard. Mark DONE only after this branch's complete CI passes.
 - All task PRs remain unmerged pending owner review. PR #27 contains the dedicated billing roles/workflow. Do not merge teammate PRs or promote to main/develop without explicit direction.
 - No AWS resources, OIDC provider, IAM roles, boundaries, state bucket or KMS keys have been created. No remote backend init, Terraform plan or apply has been run.
