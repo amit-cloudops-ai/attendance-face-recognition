@@ -9,7 +9,7 @@ from datetime import date, timedelta
 
 import boto3
 from attendance_common.config import get_settings
-from attendance_common.tz import now_ist, today_ist, to_iso
+from attendance_common.tz import now_ist, to_iso, today_ist
 from boto3.dynamodb.conditions import Key
 
 LOGGER = logging.getLogger()
@@ -96,7 +96,7 @@ def _alert_failure(exc):
             Subject="Attendance weekly job failed",
             Message=f"Weekly attendance job failed ({type(exc).__name__}). Check CloudWatch logs.",
         )
-    except Exception:  # noqa: BLE001 - failure alerts must never mask the original job error
+    except Exception:
         LOGGER.exception("Unable to publish weekly job failure alert")
 
 
@@ -185,7 +185,7 @@ def lambda_handler(event, context):
             report,
         )
         return {"statusCode": 200, "body": json.dumps({"week": week, "totals": totals})}
-    except Exception as exc:  # noqa: BLE001 - scheduled job boundary alerts and re-raises failures
+    except Exception as exc:
         LOGGER.error("Weekly job failed (%s)", type(exc).__name__)
         _alert_failure(exc)
         raise
