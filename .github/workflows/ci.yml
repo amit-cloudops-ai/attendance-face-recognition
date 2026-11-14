@@ -135,7 +135,7 @@ jobs:
               "scheduler:Create", "scheduler:Update", "scheduler:Delete", "scheduler:TagResource", "scheduler:UntagResource",
               "rekognition:Create", "rekognition:Index", "rekognition:Delete",
               "cloudwatch:Put", "cloudwatch:Delete", "logs:Create", "logs:Put",
-              "logs:Delete", "budgets:Modify"
+              "logs:Delete", "budgets:", "aws-portal:"
           )
           for statement in core_edge:
               actions = statement.get("Action", [])
