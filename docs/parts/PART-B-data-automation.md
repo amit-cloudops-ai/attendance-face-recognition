@@ -1,11 +1,11 @@
 # Part B — Data and Attendance (Sushmita)
 
-**Sprint owner:** Sushmita. **Team integration target:** `develop`. Suggested branch: `team/sushmita-part-b`.
-**Sprint deadline:** Sunday 15 November 2026, 18:00 IST for a reviewable PR.
-**Read first:** `docs/contracts.md` sections 1, 3, 5, 7, 8 and `docs/FINISH_LINE.md`.
+**Owner:** Sushmita. **Integration target:** `develop`. Suggested branch: `team/sushmita-part-b`.
+**Deadline:** Sunday 15 November 2026, 18:00 IST for a reviewable PR.
+**Read first:** `docs/contracts.md` sections 1, 3, 5, 7 and 8; `docs/FINISH_LINE.md`.
 
 ## Mission
-Implement the business-data layer: attendance rules, employee records, attendance query, daily absence processing, weekly analytics and report retrieval. The frozen contracts define the external interface. This sprint's deployment is SAM, not Terraform; do not build Terraform modules.
+Implement data and attendance behavior: employee records, clock-in/out rules, attendance query, daily absence processing, weekly analytics and report retrieval. Frozen contracts define all external interfaces. Monday sprint infrastructure is SAM, not Terraform.
 
 ## Files you own
 - `shared/python/attendance_common/record_scan.py`
@@ -14,48 +14,30 @@ Implement the business-data layer: attendance rules, employee records, attendanc
 - `services/data/daily_job/**`
 - `services/data/weekly_job/**`
 - `services/data/reports/**`
-- `services/data/override/**` and `settings/**` only after core tasks pass
-- focused Part B tests under `tests/unit/`
+- `services/data/override/**` and `services/data/settings/**` only after core scope passes
+- Focused Part B tests under `tests/unit/`
 
-Coordinate the shared library imports with Amit before changing other shared modules. Do not edit recognition code, frontend, SAM template, frozen contracts or contract tests.
+Coordinate shared Python imports with Amit. Do not edit recognition code, frontend, SAM template, frozen contracts, contract tests or another owner's paths.
 
 ## Required implementation
-### 1. record_scan
-Implement exactly the contract behavior:
-- Derive business date from the supplied timestamp in Asia/Kolkata.
-- First scan creates clock-in. Status is late only when scan time is later than shift_start + configured grace; otherwise present.
-- A scan within debounce is duplicate_ignored and must not change clock-in/out.
-- A later scan at or beyond debounce updates clock_out (last scan wins).
-- Use DynamoDB conditional writes to handle concurrent first scans; never allow two simultaneous clock-ins.
-- Handle an existing absent row by converting it to a clock-in without losing idempotency.
-- Return the specified shape: action, status, date, clock_in, clock_out.
-
-### 2. Employee handlers
-Implement list/get/create/deactivate routes in contracts.md. Validate employee_id format and HH:MM shift fields. Require consent=true at creation and persist consent_at. Deactivation sets active=false, preserves history, and writes the specified audit event.
-
-### 3. Attendance query
-Support employee_id, from, to, status, limit and cursor. Use the employee partition key when employee is selected; otherwise query the date-index GSI. Paginate correctly (DynamoDB Limit applies before FilterExpression). Convert Decimal safely before JSON serialization and enrich names from employees.
-
-### 4. Daily job
-Input {} or {"date":"YYYY-MM-DD"}. Use IST. Skip weekends and configured holidays. For each active employee without an attendance row, create an absent row using a conditional put; never overwrite a prior record. Add missing_clock_out where specified. Generate the daily JSON schema exactly. CSV is secondary if time permits. Re-runs must be idempotent.
-
-### 5. Weekly job
-Input {} or {"week":"YYYY-Www"}. Default to previous ISO week. Compute Monday-Sunday range, working days excluding weekends/holidays, and the exact percentages in contracts.md (one decimal). Guard zero working days. JSON is primary; CSV secondary.
-
-### 6. Reports handler
-Read requested daily/weekly JSON from reports bucket and return the defined summary plus a time-limited CSV URL only when CSV exists. Return the contract's 404 response for missing reports.
-
-### 7. Optional endpoints
-Only after the above are tested: override with mandatory reason + audit trail; settings GET/PUT with type/range validation + audit.
+1. **record_scan:** derive business date in Asia/Kolkata; first scan creates clock-in; late status uses shift_start + grace; rapid scan inside debounce returns duplicate_ignored; later scan updates clock_out; conditional writes prevent concurrent duplicate clock-ins; handle an existing absent row safely. Return the exact contract shape.
+2. **Employees:** list/get/create/deactivate. Validate employee ID and HH:MM fields. Require consent=true, persist consent_at, preserve attendance history on deactivation, and write required audit events.
+3. **Attendance query:** employee/date/status filters, limit/cursor pagination, employee partition key or date-index GSI as appropriate. Handle DynamoDB pagination and Decimal serialization.
+4. **Daily job:** input {} or {"date":"YYYY-MM-DD"}; IST dates; skip weekends/holidays; idempotently add absent rows only for active employees without a record; set missing_clock_out where required; write contract-compliant daily JSON. CSV is secondary.
+5. **Weekly job:** input {} or {"week":"YYYY-Www"}; default previous ISO week; calculate Mon-Sun, working days and percentages exactly as contracts.md defines; guard zero working days; JSON first, CSV secondary.
+6. **Reports:** read the requested daily/weekly JSON and return the specified summary and a short-lived CSV URL when available; correct not-found response.
+7. **Optional only after core:** override with mandatory reason and audit; settings GET/PUT with range validation and audit.
 
 ## Tests and proof
-Add focused tests for on-time, late, debounce, clock-out, IST midnight, concurrent first scan, absent-row conversion, inactive employee, employee consent validation, query filters/pagination, daily weekend/holiday skip, daily idempotency, missing clock-out flag, weekly ISO boundaries, percentages and zero-day week. Tests use mocks/local fixtures; no live AWS needed.
+Cover on-time/late, debounce, clock-out, IST midnight, concurrent first scan, absent-row conversion, inactive employee, employee consent, query filters/pagination, daily holiday/weekend skip and idempotency, missing clock-out, weekly ISO boundaries, hand-calculated percentages and zero working days.
+
+Use mocks/local fixtures; no live AWS. Run `pytest -q` and `ruff check .`.
 
 ## Deliverables
-1. Working code in the owned paths.
-2. Unit tests and actual output of `pytest -q` and `ruff check .`.
-3. PR into develop with changed-files list, contract mappings, test output, redacted event samples, manual checklist and known gaps.
-4. Update docs/STATUS.md only for behavior genuinely implemented and verified.
+- Working code in owned paths and focused tests.
+- PR into develop with one-line-per-file summary, contract mapping, actual test output, redacted sample events, manual verification checklist and known gaps.
+- Update docs/STATUS.md only for behavior actually implemented and verified.
+- No AWS provisioning, credentials, account IDs or real biometric images.
 
-## Not allowed
-No AWS resources, no credentials/account IDs, no real biometric photos, no schema/route renames, no edits to tests to make code pass. If a contract ambiguity blocks you, ask Amit with exact section and evidence.
+## Out of scope
+Recognition/Rekognition handlers, API Gateway/SAM, frontend, route/schema redesign, contract edits and contract-test edits. Ask Amit with exact contract section and evidence if blocked.
