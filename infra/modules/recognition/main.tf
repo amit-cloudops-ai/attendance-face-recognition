@@ -70,8 +70,8 @@ locals {
     ]
     result = [
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem"]
         Resource = [var.tables.scan_results.arn]
       }
     ]
@@ -101,8 +101,8 @@ locals {
         Resource = [var.tables.attendance.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
         Resource = [
           var.tables.employees.arn,
           var.tables.config.arn,
@@ -337,7 +337,7 @@ resource "aws_s3_bucket_notification" "raw" {
 
   lambda_function {
     lambda_function_arn = aws_lambda_function.lambda["enroll"].arn
-    events               = ["s3:ObjectCreated:*"]
+    events              = ["s3:ObjectCreated:*"]
     filter_prefix       = "enroll/"
   }
 
