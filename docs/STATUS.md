@@ -22,7 +22,7 @@
 - The manual deployment workflow uses GitHub OIDC, distinct plan/apply role selection per environment, encrypted saved plan artifacts (`age`), exact commit/branch validation, and GitHub Environment gates. The workflow only permits dev from `develop` and prod from `main`.
 - The IAM inventory identifies Terraform resource families, candidate read/write action groups, state isolation, `iam:PassRole` scope and execution-role permissions-boundary intent. It is not an attachable policy.
 - All Lambda and Scheduler execution role resources in the application modules receive a required `execution_role_boundary_arn` input. The boundary policy documents themselves have not yet been finalized or created.
-- The latest CI failure was isolated to `terraform fmt -check`; the Python job passed. Four affected files were formatted on the solo branch. The resulting GitHub Actions runs must complete successfully before this branch is called CI-green.
+- The latest CI failure remains `terraform fmt -check`; the Python job passed. The four environment/module files received an initial alignment pass, but CI still reports formatting differences in `infra/modules/data/main.tf` and `infra/modules/recognition/main.tf`. Terraform CLI 1.10.5 was not available in the local validation container and its download was blocked by DNS, so those files are not yet confirmed formatted. Do not call this branch CI-green.
 - No AWS resources, OIDC provider/roles, state bucket, remote backend initialization, Terraform plan or apply have been created/run.
 
 ## Phase B remaining gates
