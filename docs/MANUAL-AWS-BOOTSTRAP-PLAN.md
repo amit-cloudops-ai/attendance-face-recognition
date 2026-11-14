@@ -37,6 +37,8 @@ The policy set counts are:
 - Billing plan/apply: one budget policy and one state policy each (4 managed policies total).
 - Runtime boundaries: one dev and one prod managed policy.
 
+This is 26 environment/billing managed policy documents in total, plus the two runtime permissions-boundary policies.
+
 Each policy template has CI checks for JSON validity, 6,144-character size, environment isolation and the service-specific constraints documented in infra/policies/README.md.
 
 ## Explicitly separate billing permissions
