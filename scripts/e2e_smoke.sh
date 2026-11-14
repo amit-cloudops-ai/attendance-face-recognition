@@ -145,6 +145,12 @@ if (( photo_count != 3 )); then
 fi
 
 TODAY_IST="$(python3 -c 'from datetime import datetime; from zoneinfo import ZoneInfo; print(datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat())')"
+debounce="$(api_get "$ADMIN_TOKEN" "/admin/settings" | jq -r ".debounce_minutes")"
+if [[ ! "$debounce" =~ ^[0-9]+$ ]] || (( debounce < 10 )); then
+  echo "Set debounce_minutes to at least 10 for this repeated-scan smoke test." >&2
+  exit 2
+fi
+
 echo "Running $RUNS kiosk scan cycles for $EMPLOYEE_ID on $TODAY_IST…"
 
 for ((index = 1; index <= RUNS; index += 1)); do
