@@ -757,7 +757,7 @@ jobs:
               raise SystemExit("Deployment workflow must support the separate billing root")
           if "inputs.environment == 'billing'" not in workflow or "github.ref == 'refs/heads/main'" not in workflow:
               raise SystemExit("Billing deployment must be gated to main")
-          if "inputs.environment != 'billing'" not in workflow:
+          if '!= "billing"' not in workflow:
               raise SystemExit("Billing root must not require Cognito/runtime boundary variables")
           billing_docs = Path("docs/BILLING-DEPLOYMENT.md").read_text(encoding="utf-8")
           for required in ("attendance-dev-monthly-cost", "attendance-prod-monthly-cost",
