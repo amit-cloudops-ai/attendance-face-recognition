@@ -19,7 +19,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T04 | Reconcile data Lambda runtime IAM permissions | DONE | Every SDK call mapped to exact action/resource; no unused permissions or unjustified KMS grants |
 | T05 | Finalize dev/prod execution-role permissions boundaries | DONE | Two environment-specific boundary documents, least-privilege union, explicit deny/guardrails, no self-management path |
 | T06 | Verify Terraform provider IAM actions for foundation module | DONE | Create/read/update/delete/tag operations mapped to exact IAM actions and resource scopes |
-| T07 | Verify Terraform provider IAM actions for data and recognition modules | TODO | All provider operations mapped, including Lambda, IAM, DynamoDB, Scheduler, SQS, Rekognition and CloudWatch |
+| T07 | Verify Terraform provider IAM actions for data and recognition modules | IN_PROGRESS | All provider operations mapped, including Lambda, IAM, DynamoDB, Scheduler, SQS, Rekognition and CloudWatch |
 | T08 | Verify Terraform provider IAM actions for access module | TODO | Cognito, API Gateway v2, CloudFront, S3 and Lambda permission operations mapped |
 | T09 | Build dev plan-role policy | TODO | Read-only planning permissions, dev-only state/lock access, no resource mutation |
 | T10 | Build dev apply-role policy | TODO | Exact dev resource permissions, boundary enforcement and exact iam:PassRole scopes |
@@ -57,6 +57,8 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T33 | Pin Terraform AWS provider and commit environment lockfiles | TODO | Exact provider version tested in CI is pinned; dev/prod lockfiles committed with runner platform checks |
 | T34 | Isolate AWS Budgets from normal deployment roles | TODO | Budget resources move to a separate root and dedicated role; normal apply roles do not need aws-portal:ModifyBilling |
 | T35 | Scope CloudFront KMS key policy to the exact distribution | TODO | KMS key policy authorizes only the project CloudFront distribution ARN; no distribution wildcard remains |
+
+| T36 | Add DynamoDB customer-managed-key service access and deployment KMS permissions | TODO | KMS key policy supports DynamoDB direct key metadata access; dev/prod apply policies grant required KMS operations only via DynamoDB and only for the matching key |
 
 ## Phase C — release and operations
 
