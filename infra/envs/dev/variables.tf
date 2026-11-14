@@ -41,3 +41,13 @@ variable "allowed_origins" {
   type        = list(string)
   default     = ["http://localhost:8000"]
 }
+
+variable "execution_role_boundary_arn" {
+  description = "Pre-created us-east-1 customer-managed IAM permissions boundary ARN for dev execution roles."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:iam::\\d{12}:policy/attendance-dev-execution-boundary$", var.execution_role_boundary_arn))
+    error_message = "execution_role_boundary_arn must be the pre-created attendance-dev-execution-boundary policy in this AWS account."
+  }
+}
