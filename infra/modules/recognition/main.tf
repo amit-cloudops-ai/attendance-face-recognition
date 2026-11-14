@@ -106,8 +106,8 @@ locals {
         Resource = [var.tables.attendance.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem"]
         Resource = [
           var.tables.employees.arn,
           var.tables.config.arn,
@@ -212,8 +212,8 @@ locals {
         Resource = [var.tables.scan_results.arn, var.tables.employees.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:Query"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
         Resource = [
           var.tables.attendance.arn,
           "${var.tables.attendance.arn}/index/date-index"
@@ -225,8 +225,8 @@ locals {
         Resource = [aws_rekognition_collection.faces.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["s3:GetObject", "s3:DeleteObject"]
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:DeleteObject"]
         Resource = [
           "${var.raw_bucket_arn}/captures/*",
           "${var.raw_bucket_arn}/enroll/*"
@@ -303,8 +303,8 @@ resource "aws_cloudwatch_log_group" "lambda" {
 resource "aws_iam_role" "lambda" {
   for_each = local.function_specs
 
-  name               = "attendance-${var.env}-${replace(each.key, "_", "-")}"
-  assume_role_policy  = data.aws_iam_policy_document.lambda_assume_role.json
+  name                 = "attendance-${var.env}-${replace(each.key, "_", "-")}"
+  assume_role_policy   = data.aws_iam_policy_document.lambda_assume_role.json
   permissions_boundary = var.execution_role_boundary_arn
 
   tags = {
@@ -321,7 +321,7 @@ resource "aws_iam_role_policy" "lambda" {
   role = aws_iam_role.lambda[each.key].id
 
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = concat(local.lambda_permissions[each.key], [
       {
         Effect   = "Allow"
