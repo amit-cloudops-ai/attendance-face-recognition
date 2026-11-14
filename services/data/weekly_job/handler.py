@@ -141,13 +141,17 @@ def lambda_handler(event, context):
             and not _is_holiday(config_table, day)
         ]
         working_days = len(working_dates)
+        working_date_keys = {day.isoformat() for day in working_dates}
         active = _active_employees(employees_table)
         rows = []
         totals_present = totals_late = totals_absent = 0
         for employee in active:
-            records = _attendance_for_employee(
-                attendance_table, employee["employee_id"], start, end
-            )
+            records = [
+                record for record in _attendance_for_employee(
+                    attendance_table, employee["employee_id"], start, end
+                )
+                if record.get("date") in working_date_keys
+            ]
             present_days = sum(bool(record.get("clock_in")) for record in records)
             late_days = sum(record.get("status") == "late" for record in records)
             absent_days = sum(record.get("status") == "absent" for record in records)
