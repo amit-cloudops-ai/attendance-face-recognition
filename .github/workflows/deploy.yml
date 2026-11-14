@@ -10,6 +10,7 @@ on:
         options:
           - dev
           - prod
+          - billing
       operation:
         description: Create a plan, or apply a previously reviewed plan artifact
         required: true
@@ -35,7 +36,7 @@ concurrency:
 jobs:
   terraform:
     name: ${{ inputs.operation }} ${{ inputs.environment }}
-    if: ${{ (inputs.environment == 'dev' && github.ref == 'refs/heads/develop') || (inputs.environment == 'prod' && github.ref == 'refs/heads/main') }}
+    if: ${{ (inputs.environment == 'dev' && github.ref == 'refs/heads/develop') || ((inputs.environment == 'prod' || inputs.environment == 'billing') && github.ref == 'refs/heads/main') }}
     environment:
       name: ${{ inputs.environment }}-${{ inputs.operation }}
     runs-on: ubuntu-latest
@@ -43,7 +44,7 @@ jobs:
     env:
       AWS_REGION: us-east-1
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
-      TF_ROOT: infra/envs/${{ inputs.environment }}
+      TF_ROOT: ${{ inputs.environment == 'billing' && 'infra/billing' || format('infra/envs/{0}', inputs.environment) }}
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       TF_PLAN_AGE_RECIPIENT: ${{ vars.TF_PLAN_AGE_RECIPIENT }}
       TF_IN_AUTOMATION: "true"
@@ -64,21 +65,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in AWS_ROLE_ARN TF_STATE_BUCKET TF_VAR_account_id TF_VAR_execution_role_boundary_arn TF_VAR_alert_email TF_VAR_callback_urls TF_VAR_logout_urls TF_VAR_allowed_origins; do
+          for name in AWS_ROLE_ARN TF_STATE_BUCKET TF_VAR_account_id TF_VAR_alert_email; do
             if [[ -z "${!name}" ]]; then
               echo "Missing GitHub repository/environment variable for ${name}."
               exit 1
             fi
           done
-          if [[ "${{ inputs.operation }}" == "plan" && -z "$TF_PLAN_AGE_RECIPIENT" ]]; then
-            echo "Missing TF_PLAN_AGE_RECIPIENT environment/repository variable."
-            exit 1
-          fi
-          if [[ "${{ inputs.operation }}" == "apply" && ! "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "Apply requires the numeric run ID of a successful plan workflow."
-            exit 1
-          fi
-          python - <<'PY'
+          if "${{ inputs.environment }}" != "billing"; then
+            for name in TF_VAR_execution_role_boundary_arn TF_VAR_callback_urls TF_VAR_logout_urls TF_VAR_allowed_origins; do
+              if [[ -z "${!name}" ]]; then
+                echo "Missing environment-specific configuration for ${name}."
+                exit 1
+              fi
+            done
+            python - <<'PY'
           import json
           import os
 
@@ -87,6 +87,15 @@ jobs:
               if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
                   raise SystemExit(f"{name} must be a non-empty JSON array of strings")
           PY
+          fi
+          if [[ "${{ inputs.operation }}" == "plan" && -z "$TF_PLAN_AGE_RECIPIENT" ]]; then
+            echo "Missing TF_PLAN_AGE_RECIPIENT environment/repository variable."
+            exit 1
+          fi
+          if [[ "${{ inputs.operation }}" == "apply" && ! "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "Apply requires the numeric run ID of a successful plan workflow."
+            exit 1
+          fi
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -131,7 +140,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: attendance-${{ inputs.environment }}-terraform-plan-${{ github.run_id }}-${{ github.run_attempt }}
-          path: infra/envs/${{ inputs.environment }}/tfplan.age
+          path: ${{ env.TF_ROOT }}/tfplan.age
           retention-days: 1
           if-no-files-found: error
 
@@ -149,7 +158,7 @@ jobs:
           plan_event="$(jq -r '.event' <<<"$plan_run")"
           plan_path="$(jq -r '.path' <<<"$plan_run")"
           plan_attempt="$(jq -r '.run_attempt' <<<"$plan_run")"
-          expected_branch="${{ inputs.environment == 'prod' && 'main' || 'develop' }}"
+          expected_branch="${{ inputs.environment == 'dev' && 'develop' || 'main' }}"
           if [[ "$plan_sha" != "$GITHUB_SHA" || "$plan_branch" != "$expected_branch" || "$plan_result" != "success" || "$plan_event" != "workflow_dispatch" || "$plan_path" != ".github/workflows/deploy.yml" || ! "$plan_attempt" =~ ^[0-9]+$ ]]; then
             echo "Plan must be a successful run of the deployment workflow for this exact commit, attempt and environment branch."
             exit 1
@@ -193,5 +202,5 @@ jobs:
         run: rm -f "$TF_ROOT/tfplan"
 
       - name: Print deployed site URL
-        if: ${{ inputs.operation == 'apply' }}
+        if: ${{ inputs.operation == 'apply' && inputs.environment != 'billing' }}
         run: terraform -chdir="$TF_ROOT" output -raw site_url
