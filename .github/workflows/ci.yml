@@ -318,6 +318,9 @@ jobs:
               raise SystemExit("Dev tfvars example is missing the required execution boundary ARN")
           if "attendance-prod-execution-boundary" not in prod_vars:
               raise SystemExit("Prod tfvars example is missing the required execution boundary ARN")
+          billing_vars = Path("infra/billing/terraform.tfvars.example").read_text(encoding="utf-8")
+          if 'account_id  = "123456789012"' not in billing_vars:
+              raise SystemExit("Billing tfvars example is missing the expected account ID")
           PY
 
       - name: Validate encrypted SNS notification KMS permissions
