@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REGION_FILE = ROOT / "config" / "deployment.json"
 LEGACY_REGION = "ap-" + "south-1"
 EXPECTED_REGION = "us-east-1"
-AWS_REGION_TOKEN = re.compile(r"\\b(?:af|ap|ca|cn|eu|il|me|mx|sa|us|eusc|us-gov|us-iso|us-isob)-[a-z]+(?:-[a-z]+)?-\\d\\b")
+AWS_REGION_TOKEN = re.compile(r"\b(?:af|ap|ca|cn|eu|il|me|mx|sa|us|eusc|us-gov|us-iso|us-isob)-[a-z]+(?:-[a-z]+)?-\d\b")
 REGIONAL_ARN = re.compile(r"arn:aws:[^:\s\"']+:([a-z]{2}(?:-[a-z0-9]+)+-\d):")
 REGIONAL_ENDPOINT = re.compile(
     r"\b[a-z0-9-]+\.([a-z]{2}(?:-[a-z0-9]+)+-\d)\.(?:amazonaws|amazoncognito)\.com\b"
