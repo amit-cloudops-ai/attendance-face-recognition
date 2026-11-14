@@ -91,6 +91,13 @@
 - Identified the DynamoDB customer-managed-key deployment dependency. T36 tracks the corresponding key-policy and apply-role permission work.
 - CI run [43614059591](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43614059591), commit `6421a667c10c`: Python and Terraform jobs passed.
 
+### T08 — access Terraform provider IAM mapping
+
+- **Status:** static mapping drafted; CI validation pending.
+- Mapped Cognito user pool/client/domain/groups, API Gateway v2 API/authorizer/integrations/routes/stage, CloudFront distribution/OAC/cache/origin-request/response-header policies/function, S3 web bucket policy and frontend objects, and Lambda API permissions.
+- API Gateway v2 uses `apigateway:GET/POST/PATCH/PUT/DELETE` HTTP-verb actions; policy resources use `/apis` and its exact API subresource paths. CloudFront global ARNs omit region. Cognito IAM resource granularity is user-pool level, not individual app client/group/domain.
+- Full provider-source and action/resource matrix: `docs/security/ACCESS-PROVIDER-IAM.md`.
+
 ### Phase B — deployment readiness (not complete; no AWS provisioning)
 
 - T31 is next because runtime region mismatch blocks any us-east-1 deployment. T04 follows.
