@@ -269,3 +269,12 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - Added `docs/INFRASTRUCTURE-TEMPLATE-LINTING.md` documenting the current source inventory and existing Terraform/YAML/JSON CI coverage.
 - CI now renders and parses every `infra/policies/*.json.tftpl`, checks IAM policy structure and 6,144-character size, and fails if a CloudFormation/SAM template is added without a matching cfn-lint/SAM validation step.
 - No unnecessary cfn-lint or SAM CLI dependency added because no such source exists.
+
+
+### T18 — manual AWS bootstrap plan
+
+- **Status:** bootstrap plan drafted; CI validation pending.
+- Added `docs/MANUAL-AWS-BOOTSTRAP-PLAN.md` with exact resource inventory, role names, boundary names, policy attachments, S3 state bucket setup, OIDC provider/trust policy sequence, GitHub environment requirements, dev-first deployment and separate prod approval.
+- Explicitly identifies missing verified account ID, globally unique state bucket suffix, existing-resource checks, and the still-missing dedicated billing plan/apply role policies.
+- Defines the mandatory approval request: account/region, final bucket, existing OIDC provider state, exact IAM resource/permission documents, GitHub environment settings and first remote backend/plan scope.
+- No AWS resources, roles or policies created; no remote backend init, Terraform plan or apply.
