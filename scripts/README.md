@@ -2,11 +2,13 @@
 
 ## Canonical region and safe Terraform wrapper
 
-`config/deployment.json` is the single region source. Run local Terraform commands through `bash scripts/terraform.sh`; the wrapper loads the canonical region, rejects conflicting `AWS_REGION`/`AWS_DEFAULT_REGION` values and exports the same value to Terraform's S3 backend. CI validates the region manifest and all regional ARN/endpoint references with `scripts/check_region_consistency.py`.
+`config/deployment.json` is the single region source. Run local Terraform commands through `bash scripts/terraform.sh`; the wrapper loads the canonical region, rejects conflicting `AWS_REGION`/`AWS_DEFAULT_REGION` values, and checks STS identity against `EXPECTED_AWS_ACCOUNT_ID` before remote `init`, `plan`, `apply`, `destroy` or state-changing commands. The dev/prod AWS providers also restrict operations to `var.account_id`. CI validates the region manifest and all regional ARN/endpoint references with `scripts/check_region_consistency.py`.
 
-Example (only after the owner approves remote backend initialization):
+Example (only after the owner approves remote backend initialization). Export the expected account first:
 
 ```bash
+export AWS_PROFILE=default
+export EXPECTED_AWS_ACCOUNT_ID=924422830139
 bash scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-config=backend.hcl
 ```
 
@@ -34,7 +36,7 @@ Run the dry-run first and inspect the exact changes. Apply mode requires GitHub 
 
 ## Read-only AWS bootstrap inventory
 
-`scripts/aws_preflight_readonly.sh` verifies STS identity and inventories the GitHub OIDC provider, runtime boundaries, six deployment roles, project-prefixed IAM/Lambda/DynamoDB/KMS/Rekognition/Cognito/API Gateway/SQS/SNS/Scheduler/CloudWatch/Budgets/CloudFront resources, exact application bucket-name collisions, and state-bucket controls. It contains no create/update/delete/attach operations. Access-denied results are reported as unknown, not as proof that a resource is absent. The first run on 14 November 2026 used profile `default` and verified account `924422830139` in `us-east-1`; that earlier script version checked bootstrap resources only. The expanded application-resource inventory has not yet been run. No AWS resources or policies were changed.
+`scripts/aws_preflight_readonly.sh` verifies STS identity, Lambda concurrency and Rekognition service quotas, then inventories the GitHub OIDC provider, runtime boundaries, six deployment roles, project-prefixed IAM/Lambda/DynamoDB/KMS/Rekognition/Cognito/API Gateway/SQS/SNS/Scheduler/CloudWatch/Budgets/CloudFront resources, exact application bucket-name collisions, and state-bucket controls. It contains no create/update/delete/attach operations. Access-denied results are reported as unknown, not as proof that a resource is absent. The first run on 14 November 2026 used profile `default` and verified account `924422830139` in `us-east-1`; that earlier script version checked bootstrap resources only. The expanded application-resource inventory has not yet been run. No AWS resources or policies were changed.
 
 Run it only with an intentionally selected AWS profile and read-only permissions:
 
@@ -45,7 +47,7 @@ TF_STATE_BUCKET=<known-candidate-bucket> AWS_PROFILE=<approved-profile> bash scr
 
 ## E2E smoke test
 
-`e2e_smoke.sh` exercises a deployed dev stack without creating infrastructure. It verifies the AWS account identity, creates one consented test employee, enrolls three JPEG photos, performs at least 20 kiosk upload/recognition cycles, verifies duplicate-scan debounce, checks every uploaded raw object is deleted within 10 minutes, confirms both raw prefixes are empty, and queries the resulting attendance record. Its cleanup trap deactivates the test employee and deletes indexed face templates; the attendance/audit history remains.
+`e2e_smoke.sh` exercises a deployed dev stack without creating infrastructure. It verifies the AWS account identity, creates one consented test employee, enrolls three JPEG photos, performs at least 20 kiosk upload/recognition cycles, verifies duplicate-scan debounce, checks every uploaded raw object is deleted within 10 minutes, confirms both raw prefixes are empty, and queries the resulting attendance record. Its cleanup trap deactivates the test employee, deletes indexed face templates, and removes only the exact raw objects uploaded by that test if application cleanup failed; the attendance/audit history remains.
 
 ## Safety requirements
 
