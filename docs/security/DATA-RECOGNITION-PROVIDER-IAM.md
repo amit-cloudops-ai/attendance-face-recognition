@@ -1,7 +1,7 @@
 # Data and recognition modules — Terraform provider IAM action inventory
 
 **Task:** T07  
-**Target:** AWS provider v6.73.0, region `us-east-1`  
+**Target:** AWS provider v6.73.0; canonical region is `config/deployment.json` (`us-east-1`)  
 **Status:** static provider-source/API mapping; no AWS authorization test performed.
 
 ## Provider source reviewed
