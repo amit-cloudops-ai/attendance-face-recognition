@@ -51,6 +51,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T37 | Build dedicated billing plan/apply policies and OIDC roles | DONE | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
 
 | T38 | Establish canonical AWS region manifest and CI drift prevention | DONE | Terraform providers, backend initialization, Lambda SDKs, contracts, frontend config, IAM regional ARNs and documentation resolve to config/deployment.json; CI fails on any conflicting region or legacy region reference |
+| T39 | Complete full solo pre-deployment audit and close static blockers | IN_PROGRESS | KMS policy placement, region source, Python 3 tooling, STS account guard, JSON logging, route-contract checks, raw-image cleanup verification, deployment docs and expanded read-only resource inventory reviewed; CI green |
 
 ## Phase C — release and operations
 
@@ -79,3 +80,5 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T38 is complete and merged into `solo/amit-monday`: canonical region manifest, Terraform provider loading, backend wrapper/workflow export, contract/example updates, Moto fixture alignment and repository-wide region drift guard. Consolidated CI run 43622637663 passed all 27 Python/security steps and all 21 Terraform formatting/validation steps on head commit `8bae76d788074e9c0d47d886fe355fddbcff709f`.
 - Consolidation PR #28 was merged into `solo/amit-monday` at merge commit `a43adea001009004597e19e1c04c14079205865a`. It contains the T01–T38 security and region-guard work. The individual task PRs remain historical and may remain open; do not merge teammate PRs or promote to `main`/`develop` without the required T16/T18 gates and owner direction.
 - No AWS resources, OIDC provider, IAM roles, boundaries, state bucket or KMS keys have been created. No remote backend init, Terraform plan or apply has been run. PR #28 merge did not provision AWS resources.
+
+- T39 pre-deployment audit is in progress on PR #29. It corrects the DynamoDB KMS key-policy attachment, Python 3 command usage, deploy-time STS account assertion, Lambda JSON logging, solo-owner governance, route-contract coverage and dev raw-image cleanup verification. The expanded read-only AWS inventory has not yet been run. Do not treat T39 as DONE until CI passes and the owner has completed the required local checks.
