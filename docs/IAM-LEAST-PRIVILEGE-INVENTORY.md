@@ -100,20 +100,12 @@ This is a code-call-site review, not a complete AWS authorization verification. 
 
 ## 4. Deployment policy construction
 
-Candidate service families to verify against provider read/write requests:
-- S3 bucket configuration, policy, notification and object operations.
-- KMS describe/key policy/tag/key/alias lifecycle actions.
-- SNS topic/subscription operations.
-- Lambda function/layer/invoke permission/event-source mapping/async invoke configuration.
-- DynamoDB table, item, TTL, PITR and tag operations.
-- IAM role, inline policy, permissions boundary and pass-role operations.
-- CloudWatch log groups/alarms and EventBridge Scheduler schedule operations.
-- Rekognition collection, SQS queue/redrive policies.
-- Cognito, API Gateway v2 and CloudFront resources/policies/functions/distribution.
-- AWS Budgets resources and notifications.
-- S3 remote state and native lock object operations.
+Foundation module provider actions have been mapped against the exact AWS provider v6.73.0 source and AWS Service Authorization References in `docs/security/FOUNDATION-PROVIDER-IAM.md`. This mapping includes the S3 bucket read actions that the monolithic `aws_s3_bucket` provider resource calls even when split resources own configuration. It also identifies the account-wide `aws-portal:ModifyBilling` dependency introduced by the Budget resource.
 
-The earlier candidate action inventory must be expanded to exact IAM action names (not service wildcards), exact ARNs, resource tags and supported condition keys. Use `iam:PassRole` only for exact environment-specific execution role ARNs and condition it by `iam:PassedToService`.
+Remaining provider-action tasks:
+- Data and recognition module: T07.
+- Access module: T08.
+- All deployment policies must use exact API action names, resource ARNs, resource tags and supported condition keys. Use `iam:PassRole` only for exact environment-specific execution role ARNs and condition it by `iam:PassedToService`.
 
 ## 5. Execution-role permissions boundaries
 
