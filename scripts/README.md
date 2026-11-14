@@ -18,7 +18,7 @@ Run it only with an intentionally selected AWS profile and read-only permissions
 
 ```bash
 AWS_PROFILE=<approved-profile> bash scripts/aws_preflight_readonly.sh
-TF_STATE_BUCKET=<candidate-bucket> AWS_PROFILE=<approved-profile> bash scripts/aws_preflight_readonly.sh
+TF_STATE_BUCKET=<known-candidate-bucket> AWS_PROFILE=<approved-profile> bash scripts/aws_preflight_readonly.sh
 ```
 
 ## E2E smoke test
