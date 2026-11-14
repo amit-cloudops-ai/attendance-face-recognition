@@ -323,7 +323,9 @@ jobs:
           if state_object["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012/attendance/dev/terraform.tfstate":
               raise SystemExit("Dev apply state object must be exact")
           lock = next(s for s in state if s["Sid"] == "DevLockfileLifecycle")
-          if not all(resource.endswith(".tflock") for resource in lock["Resource"]):
+          lock_resources = lock["Resource"]
+          lock_resources = [lock_resources] if isinstance(lock_resources, str) else lock_resources
+          if not all(resource.endswith(".tflock") for resource in lock_resources):
               raise SystemExit("State lock mutations must be limited to the dev .tflock object")
 
           data = policies["github-apply-dev-data.json.tftpl"]["Statement"]
