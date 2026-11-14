@@ -79,3 +79,28 @@ The data module creates all five tables with the foundation customer-managed key
 - Deployment identities still need matching IAM permissions. `infra/policies/github-apply-dev-dynamodb-kms.json.tftpl` and the prod equivalent scope cryptographic actions to the environment alias and DynamoDB ViaService. `kms:CreateGrant` is separate and requires `kms:GrantIsForAWSResource=true`.
 
 AWS source: [DynamoDB encryption at rest usage notes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/encryption.usagenotes.html). These are policy templates only; they have not been attached to any AWS identity.
+
+
+## Dev Terraform apply-role policy set (T10)
+
+The dev apply role is intentionally split into multiple customer-managed policies so each remains below the IAM managed-policy size ceiling:
+
+- `github-apply-dev-core.json.tftpl` — SQS queues, Scheduler group/schedules, CloudWatch log groups/alarms, and raw-bucket notification configuration.
+- `github-apply-dev-data.json.tftpl` — exact five DynamoDB table ARNs and the attendance date GSI.
+- `github-apply-dev-lambda.json.tftpl` — exact 14 Lambda function ARNs, Lambda invoke configuration/permissions, failure-processor event-source mapping, and the versioned common layer.
+- `github-apply-dev-iam.json.tftpl` — exact 14 Lambda role ARNs plus the two Scheduler role ARNs; role creation requires the exact dev execution boundary; PassRole is separated by Lambda and Scheduler service.
+- `github-apply-dev-foundation.json.tftpl` — KMS key/alias lifecycle, S3 bucket configuration, SNS topic/subscription and Lambda layer publish.
+- `github-apply-dev-access.json.tftpl` — Cognito, API Gateway v2, CloudFront, web bucket policy and frontend objects.
+- `github-apply-dev-state.json.tftpl` — dev state read/write and dev lockfile lifecycle only.
+- `github-apply-dev-dynamodb-kms.json.tftpl` — DynamoDB customer-managed-key crypto and grant permissions via DynamoDB.
+
+All templates use `account_id` and the state policy uses `state_bucket`. Each rendered policy is checked against the 6,144-character IAM managed-policy limit. CI rejects production ARNs/state paths and account billing permissions in the dev apply set.
+
+**Least-privilege caveats requiring explicit bootstrap review:**
+
+- `logs:DescribeLogGroups`, Rekognition `CreateCollection`, Lambda `CreateEventSourceMapping`, CloudFront create APIs, Cognito `CreateUserPool`, and some API Gateway create operations require `Resource: "*"` or service-defined collection paths. These are narrowed with request/resource tag or function-ARN conditions where the AWS service supports them.
+- API Gateway v2 child-resource APIs do not expose independent resource tags in this configuration. The dev apply policy can manage API Gateway v2 API paths in `us-east-1`; after the first API is created, replace the API ID wildcard with the generated dev API ID if AWS authorization semantics allow it.
+- CloudFront OAC/cache/origin-request/response-header policy create actions have no resource ARN at creation. Their subsequent read/update/delete operations are restricted to the corresponding CloudFront resource families.
+- KMS key ARN IDs are service-generated; key operations use the project alias condition. The DynamoDB key permissions are separately scoped to the matching environment alias and `kms:ViaService`.
+
+These are policy templates for review, not attached roles. No AWS resources or IAM policies have been created. The dev apply role still requires a separately reviewed GitHub OIDC trust, a pre-created permissions boundary, and the manual bootstrap gate.
