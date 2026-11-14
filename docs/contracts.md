@@ -74,7 +74,7 @@ Only the recognition module defines `aws_s3_bucket_notification` for the raw buc
 **Scan** (`kind=scan`): `pending`, `matched` (with `action`), `no_match`, `no_face`, `multiple_faces`, `low_quality`, `inactive`, `error`.
 **Enroll** (`kind=enroll`): `pending`, `enrolled`, `no_face`, `multiple_faces`, `low_quality`, `unknown_employee`, `limit_reached`, `duplicate_face`, `error`.
 
-Unexpected infrastructure failures remain `pending` while Lambda's configured automatic retries run. Only the failure-destination consumer sets `error` after retries are exhausted, then removes the retained raw image. The failure consumer's own poison messages are moved to `attendance-{env}-failure-processor-dlq` after five receives and trigger an alarm.
+Unexpected infrastructure failures remain `pending` while Lambda's configured automatic retries run. Only the failure-destination consumer sets `error` after retries are exhausted, then removes the retained raw image. Before declaring a request failed, the failure consumer reconciles committed side effects: it looks up `attendance.scan_events[request_id]` and repairs a committed scan to `matched`; it checks the employee's `enrollment_{request_id}` marker and repairs a committed enrollment to `enrolled`; if no enrollment commit exists, it removes any Rekognition FaceId tagged with that exact request ID. It then deletes the raw image. The consumer's own poison messages are moved to `attendance-{env}-failure-processor-dlq` after five receives and trigger an alarm.
 
 ## 7. HTTP API
 Base path `/api` on the same CloudFront domain as the web apps (no CORS needed for the API). Auth: `Authorization: Bearer <Cognito access token>`. Group `kiosk` or `admin` as noted. Pre-signed POST to S3 is the only cross-origin call.
