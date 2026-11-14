@@ -28,7 +28,7 @@ Reuse the provider if it already exists in the account.
 
 ## 3. Deployment roles
 
-Create two roles only after the deployment workflow and its exact permissions policy have been reviewed:
+Create four roles only after the deployment workflow and its exact permissions policy have been reviewed:
 
 Create separate plan and apply roles for each environment:
 
