@@ -1,28 +1,40 @@
-# AI Context: paste this (or tell your AI to read it) at the START of every session
+# Solo project AI context — Attendance Face Recognition
 
-You are helping build a **serverless face-recognition attendance system on AWS** in the repo `amit-cloudops-ai/attendance-face-recognition`. Hard deadline: production-ready by **15 Nov 2026**. The design is **frozen**.
+This is Amit's solo release of `amit-cloudops-ai/attendance-face-recognition`. The active application baseline is `solo/amit-monday`. Do not assume teammate ownership or use the old Part A/B/C contributor branches as the active workflow.
 
-## Read first, in this order
-1. `docs/SPEC.md` (what "done" means)
-2. `docs/contracts.md` (exact names, schemas, endpoints, codes)
-3. `docs/STATUS.md` (what is already built, known issues)
-4. Your part guide in `docs/parts/` (PART-A, PART-B or PART-C)
+## Read first
+1. `AGENTS.md`
+2. `docs/STATUS.md`
+3. `docs/TASKS.md`
+4. `docs/SPEC.md`
+5. `docs/contracts.md`
+6. The exact implementation, Terraform and tests relevant to the current task.
 
-## Rules for the AI
-1. **Never rename or reshape anything in `docs/contracts.md`.** Use names exactly. If something seems wrong, STOP and tell the human; do not "fix" it silently.
-2. Work only inside the files owned by my Part (see CODEOWNERS). Do not edit other Parts' files.
-3. Lambdas: Python 3.12, boto3 only, read resource names from environment variables (contracts section 1). No hard-coded names, no new dependencies.
-4. Every change needs a unit test. Run `pytest` and `ruff check .` before saying it works. If you cannot run them, say so.
-5. Make the smallest change that fixes the problem. When fixing an error, first state the root cause, then list which other files/contracts the fix could affect, then change.
-6. Never log or store face images, tokens or secrets. Never use `*` in IAM.
-7. Do not add features outside SPEC. Do not refactor unrelated code.
-8. At the end of the session: update `docs/STATUS.md` (module status + session log), and list what you changed.
+## Project objective
+Build and deploy a secure serverless face-recognition attendance system in the owner's AWS account, region `us-east-1`. The application uses S3, Lambda, Rekognition, DynamoDB, SQS, EventBridge Scheduler, Cognito, API Gateway, CloudFront and Terraform.
 
-## Project in 10 lines
-Kiosk browser captures a still, POSTs it to S3 (pre-signed POST) at `captures/{request_id}.jpg`. S3 event triggers `recognize` Lambda: DetectFaces, SearchFacesByImage (collection `attendance-{env}-faces`), employee lookup, `record_scan` writes DynamoDB attendance, result row written to scan-results, image deleted. Browser polls `GET /api/kiosk/result/{request_id}`. Daily job 23:59 IST marks absences + daily summary to S3; weekly job Monday 00:30 IST writes analytics. Admin app (Cognito, groups admin/kiosk) filters attendance. Web + API served from one CloudFront domain. Terraform modules per Part; GitHub Actions deploys (`develop` to dev, `main` to prod). Deployment target region us-east-1, time zone Asia/Kolkata.
+## Solo workflow
+- Keep the integrated solo application on `solo/amit-monday`.
+- For fixes, create a dedicated branch from the current solo baseline and open a PR back into `solo/amit-monday`.
+- Do not commit directly to `main` or `develop`.
+- Do not merge teammate PRs or historical Part A/B/C branches into the solo release unless Amit explicitly asks.
+- Promote to `develop` only after the solo release passes its readiness gates; promote to `main` only after dev acceptance and a separately approved production release.
+- Treat `docs/parts/*` and `docs/TEAM_BRIEF.md` as historical team-planning material, not active ownership instructions.
+- Keep `docs/contracts.md` stable unless a required interface change is explicitly approved and updated with tests.
 
-## Session start prompt (copy/paste)
-"Read docs/AI_CONTEXT.md, docs/SPEC.md, docs/contracts.md, docs/STATUS.md and docs/parts/PART-<A|B|C>.md in the repo. Confirm in 5 bullets what the project is, which files I own, and the contracts that matter for my task. Then wait for my task."
+## Engineering method
+- Audit before changing. Read the actual branch files and current CI evidence; do not rely on old summaries.
+- Distinguish implemented, unit-tested, contract-tested, CI-validated, AWS-validated and production-accepted.
+- Diagnose root cause, make the smallest safe correction, add regression coverage, and update `docs/STATUS.md` and `docs/TASKS.md`.
+- Never weaken tests, hide failures, claim a clean deploy without evidence, or call Terraform validate a substitute for a live plan.
+- Check IAM resource scope, trust policy subjects, account/region guards, encryption, logging, retries, idempotency, cleanup and cost before AWS deployment.
 
-## Session end prompt (copy/paste)
-"List every file you changed and why. Confirm no contract changed. Run pytest and ruff. Update docs/STATUS.md (module status + session log) and commit on my branch."
+## AWS safety — mandatory
+- No AWS resources may be created, modified or deleted without showing Amit the exact change plan and receiving explicit approval.
+- Read-only AWS inventory is allowed when the owner has selected the account/profile.
+- Bootstrap writes, remote backend initialization, Terraform plan, Terraform apply and production apply are separate approval gates.
+- Target account verified by read-only STS on 14 November 2026: `924422830139`; target region: `us-east-1`. Reverify identity before any future AWS action.
+- Never use static AWS credentials or expose tokens/private age identities in source, logs or artifacts.
+
+## Governance
+The project uses a solo-owner approval model. The repository owner is the sole manual reviewer on apply environments and self-review is allowed. This is a manual owner checkpoint, not independent separation of duties. Never ask for a teammate reviewer username.
