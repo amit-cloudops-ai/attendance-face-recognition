@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [solo/amit-monday, develop, main]
   push:
-    branches: [solo/amit-monday, develop, main]
+    branches: [solo/amit-monday, develop, main, "ai/**"]
 
 jobs:
   python:
