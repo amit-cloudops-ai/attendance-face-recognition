@@ -18,7 +18,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T03 | Reconcile recognition Lambda runtime IAM permissions | DONE | Every SDK call mapped to exact action/resource; Rekognition, S3, DynamoDB, SQS, KMS and logs checked |
 | T04 | Reconcile data Lambda runtime IAM permissions | DONE | Every SDK call mapped to exact action/resource; no unused permissions or unjustified KMS grants |
 | T05 | Finalize dev/prod execution-role permissions boundaries | DONE | Two environment-specific boundary documents, least-privilege union, explicit deny/guardrails, no self-management path |
-| T06 | Verify Terraform provider IAM actions for foundation module | IN_PROGRESS | Create/read/update/delete/tag operations mapped to exact IAM actions and resource scopes |
+| T06 | Verify Terraform provider IAM actions for foundation module | DONE | Create/read/update/delete/tag operations mapped to exact IAM actions and resource scopes |
 | T07 | Verify Terraform provider IAM actions for data and recognition modules | TODO | All provider operations mapped, including Lambda, IAM, DynamoDB, Scheduler, SQS, Rekognition and CloudWatch |
 | T08 | Verify Terraform provider IAM actions for access module | TODO | Cognito, API Gateway v2, CloudFront, S3 and Lambda permission operations mapped |
 | T09 | Build dev plan-role policy | TODO | Read-only planning permissions, dev-only state/lock access, no resource mutation |
