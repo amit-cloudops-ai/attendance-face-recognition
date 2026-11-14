@@ -154,3 +154,12 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - CI previously resolved AWS provider `6.73.0` and archive provider `2.8.1`, while dev/prod roots still allowed broad ranges (`>= 5.0, < 7.0` and `>= 2.4, < 3.0`) and no lockfiles were committed.
 - Objective: pin the exact provider versions verified by the current CI baseline, generate `linux_amd64` and `windows_amd64` checksums for both environment roots, commit the lockfiles, and make CI fail if the lockfiles need modification.
 - No backend initialization against AWS, plan, apply, or resource provisioning is part of this task.
+
+
+### T34 — AWS Budget isolation
+
+- **Status:** implementation drafted; CI validation pending.
+- Removed `aws_budgets_budget.monthly` from the shared foundation module. Normal dev/prod Terraform roots no longer create or update account-level budgets.
+- Added independent `infra/billing` Terraform root with its own backend state key `attendance/billing/terraform.tfstate`; it manages the dev and prod USD 15 monthly budgets and their 80%/100% actual-cost notifications.
+- Removed `budgets:ViewBudget` and `aws-portal:ViewBilling` from the dev environment plan-role core policy. Billing access belongs only to a dedicated billing plan/apply role; no such role or policy is attached/created here.
+- This isolates the privileged account-level `aws-portal:ModifyBilling` permission from standard environment deployment roles. Bootstrap, billing role trust and billing plan/apply policy remain separate manual review items.
