@@ -110,11 +110,11 @@ jobs:
               if statement["Sid"] == "SchedulerGroupRead"
           )
           if scheduler_read["Resource"] != (
-              "arn:aws:scheduler:us-east-1:${account_id}:schedule/attendance-dev/attendance-dev-*"
+              "arn:aws:scheduler:us-east-1:123456789012:schedule/attendance-dev/attendance-dev-*"
           ):
               raise SystemExit("Dev plan schedule read must use the dedicated dev schedule group")
           if scheduler_group_read["Resource"] != (
-              "arn:aws:scheduler:us-east-1:${account_id}:schedule-group/attendance-dev"
+              "arn:aws:scheduler:us-east-1:123456789012:schedule-group/attendance-dev"
           ):
               raise SystemExit("Dev plan schedule-group read must be environment-scoped")
           forbidden_prefixes = (
