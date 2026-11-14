@@ -229,3 +229,14 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - Documented state and lockfile keys for dev, prod and the isolated billing root. Plan/apply state permissions are environment-specific; billing state remains separate and is not included in normal environment roles.
 - CI checks all three Terraform S3 backend blocks for exact state keys, region, encryption and native lockfiles, and checks required bucket security controls in the bootstrap spec.
 - No AWS bucket or resources created; no remote backend init, plan or apply.
+
+
+### T14 — GitHub OIDC trust and deployment workflow hardening
+
+- **Status:** implementation drafted; CI validation pending.
+- Updated deploy workflow to use four operation-specific GitHub environments (`dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`) and one environment-scoped `AWS_ROLE_ARN` variable. This makes the OIDC subject distinguish plan and apply roles.
+- Added four trust policy templates with exact repository/environment subjects and `aud=sts.amazonaws.com`; no wildcard subjects.
+- Documented exact role names, environment branch restrictions, required apply reviewers/self-review prevention, branch protection/CODEOWNERS, environment variables and age recipient/identity separation in `docs/GITHUB-OIDC-DEPLOYMENT.md`.
+- Workflow retains minimal permissions (`actions:read`, `contents:read`, `id-token:write`), dev/develop and prod/main branch gates, manual dispatch, exact plan run/commit/branch provenance checks and no static AWS credentials.
+- CI validates all four trust templates, exact audience/subject, OIDC provider ARN, workflow environment/role selector, branch gates, token permissions and absence of static AWS credentials.
+- No OIDC provider, IAM role or GitHub environment was created/configured. No AWS resource or remote backend operation was performed.
