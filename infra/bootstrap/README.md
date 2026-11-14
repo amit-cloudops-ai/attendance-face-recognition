@@ -4,7 +4,7 @@ This folder documents manual prerequisites only. No bootstrap resources are prov
 
 ## 1. Terraform state bucket
 
-In the target AWS account, create `attendance-tfstate-<account_id>` in `ap-south-1` with:
+In the target AWS account, create `attendance-tfstate-<account_id>` in `us-east-1` with:
 
 - S3 Block Public Access fully enabled
 - Versioning enabled
