@@ -14,12 +14,15 @@ terraform {
 
   backend "s3" {
     key          = "attendance/dev/terraform.tfstate"
-    region       = "us-east-1"
     encrypt      = true
     use_lockfile = true
   }
 }
 
+locals {
+  deployment_region = jsondecode(file("${path.module}/../../../config/deployment.json")).aws_region
+}
+
 provider "aws" {
-  region = "us-east-1"
+  region = local.deployment_region
 }
