@@ -65,7 +65,7 @@ cleanup() {
       "$API_BASE/admin/employees/$EMPLOYEE_ID/faces" || cleanup_failed=1
   fi
   # Remove only raw objects uploaded by this smoke test if application cleanup failed.
-  for key in "\${RAW_KEYS[@]}"; do
+  for key in "${RAW_KEYS[@]}"; do
     aws s3api delete-object --bucket "$RAW_BUCKET" --key "$key" \
       --region "$DEPLOY_REGION" >/dev/null || cleanup_failed=1
   done
