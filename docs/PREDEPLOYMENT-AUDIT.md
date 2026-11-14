@@ -2,7 +2,8 @@
 
 **Audit branch:** `fix/solo-owner-governance`  
 **Target integration branch:** `solo/amit-monday`  
-**Audited commit:** `31bb951c9c6dcffe3ddd95e9aa9b2d9df4808d75`  
+**Code audit baseline:** `31bb951c9c6dcffe3ddd95e9aa9b2d9df4808d75`  
+**Follow-up fixes:** Part 2 static corrections are now added to PR #29; their latest CI result is pending.  
 **CI:** [Run 43628880020 — passed](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43628880020)  
 **AWS target:** account `924422830139`, region `us-east-1`  
 **Deployment status:** NOT READY — no AWS resources have been provisioned by this deployment work.
@@ -27,9 +28,9 @@ Static review also confirmed the shared Lambda layer source layout (`shared/pyth
 | Dev execution boundary must exist before the dev root can plan/apply | **Correct.** The boundary template exists; the live policy was not returned by the read-only preflight and is not confirmed present. |
 | State bucket and local `backend.hcl` are required | **Correct.** No matching project state bucket was found. Dev/prod backend examples exist; the actual local backend file is intentionally ignored and cannot be verified from GitHub. There is no executable Terraform bootstrap root. |
 | Deployment workflow cannot run from the solo branch | **Correct.** Dev is restricted to `develop`; prod/billing to `main`. Those branches are still scaffold-only. The solo release must be promoted by reviewed PR after readiness gates. |
-| Dev callback URL example is wrong | **Correct.** The example points to `/auth/callback/`; the app callback page is `/callback.html`. |
+| Dev callback URL example is wrong | **Found and corrected on PR #29.** The example now points to `/callback.html`. |
 | Two applies are needed | **Correct.** First create CloudFront with localhost callback/logout and origin values; then use the deployed CloudFront HTTPS origin in the Cognito callback/logout URLs and raw-bucket CORS settings, followed by a second reviewed plan/apply. |
-| Local `web/config.json` can collide with Terraform upload | **Correct.** The frontend fileset currently includes `config.json` if it exists, while Terraform also creates that object. Local browser testing can therefore produce two Terraform resources for the same S3 key. |
+| Local `web/config.json` can collide with Terraform upload | **Found and corrected on PR #29.** The generic frontend fileset now excludes root `config.json`, leaving the dedicated Terraform resource as its sole owner. |
 | Reserved Lambda concurrency may exceed a quota of 10 | **Partly correct.** The stack reserves 19 concurrent executions in total. The common regional Lambda default quota is 1,000, not 10; the actual account's available unreserved concurrency and existing reservations still need a read-only check. Do not remove concurrency limits without evidence. |
 
 The previous recommendation to bypass OIDC and apply locally as the broad `Amit-admin` user is **not accepted as the default path**. The local Terraform wrapper has no STS account guard, the tfvars examples omit a required boundary ARN, and the proposed shortcut weakens the least-privilege deployment model. Any local apply would need its own exact plan and explicit approval.
@@ -38,11 +39,11 @@ The previous recommendation to bypass OIDC and apply locally as the broad `Amit-
 
 ### P1 — resolve before the first AWS build
 
-1. **Encrypted SNS alert path is incomplete.** The alerts topic uses the customer-managed KMS key. The key policy allows `sns.amazonaws.com`, but does not grant the CloudWatch service principal the required key access for alarm actions. The `daily_job` and `weekly_job` roles have `kms:GenerateDataKey` but not `kms:Decrypt` for encrypted SNS publishing, and the runtime boundary permits KMS use through S3/SQS but not SNS. Lambda and CloudWatch alarms can therefore execute while email notifications fail.
-2. **Local Terraform inputs are incomplete.** Dev/prod `terraform.tfvars.example` files omit required `execution_role_boundary_arn`; the dev example also has the wrong callback URL. The local wrapper does not compare STS account identity with the configured account ID.
-3. **Generated frontend config can collide.** Exclude `web/config.json` from the generic `fileset` upload; let the dedicated Terraform resource own that key.
+1. **Encrypted SNS alert path was incomplete; static correction is now in PR #29.** The branch adds a CloudWatch service-principal statement to the alerts KMS key policy, grants `kms:Decrypt` and `kms:GenerateDataKey*` to the daily/weekly publisher roles, and adds SNS to the runtime boundary's `kms:ViaService` allowlist. Latest CI must validate these changes, and actual encrypted SNS/CloudWatch email delivery still requires a dev deployment test.
+2. **Local Terraform input/account safety defects were corrected on PR #29.** Dev/prod examples now include the matching execution-boundary ARN, dev callback uses `/callback.html`, boundary ARN validation is tied to `account_id`, dev/prod providers restrict allowed account IDs, and the local wrapper checks STS before remote init/plan/apply. Exact local WSL execution is still pending.
+3. **Generated frontend config collision is corrected on PR #29.** Root `config.json` is excluded from the generic `fileset` upload.
 4. **Bootstrap is not executable yet.** `infra/bootstrap` contains documentation, not a Terraform root or a deterministic create/attach script. The exact account-specific state bucket, OIDC trust, boundaries, six roles and 26 managed policy documents still need rendering and review before any write.
-5. **Live AWS inventory is incomplete.** The first preflight verified STS account `924422830139` and checked bootstrap resources only. The expanded application-resource inventory and account/service-quota checks have not been run.
+5. **Live AWS inventory is incomplete.** The first preflight verified STS account `924422830139` and checked bootstrap resources only. The expanded application-resource inventory and the newly added Lambda/Rekognition quota checks have not yet been run.
 
 ### P2 — resolve before dev acceptance or production
 
@@ -79,12 +80,12 @@ The previous recommendation to bypass OIDC and apply locally as the broad `Amit-
 
 ### Part 2 — Terraform, IAM and AWS configuration correctness
 
-- Fix SNS/KMS permissions for Lambda publishers and CloudWatch alarm actions; add policy regression checks.
-- Correct dev/prod tfvars examples and validate boundary ARN account matches `account_id`.
-- Exclude generated `config.json` from generic frontend upload.
-- Add a local STS account guard to the Terraform wrapper and make local docs consistently use it.
+- Verify CI for the SNS/KMS static correction, then test encrypted Lambda/CloudWatch alarm delivery in dev.
+- Run local WSL Terraform formatting/validation and verify the new boundary/account guards.
+- Confirm CI enforces generated `config.json` ownership.
+- Run the local wrapper against the verified profile in read-only/validate mode; do not initialize the remote backend until separately approved.
 - Pin Terraform CI to the deployment version.
-- Add Lambda concurrency and relevant Rekognition service-quota checks to the read-only preflight.
+- Run the expanded read-only preflight, including Lambda concurrency and Rekognition service quotas.
 - Complete the account-specific rendered bootstrap plan; do not create anything yet.
 
 ### Part 3 — GitHub release and deployment governance
