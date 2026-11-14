@@ -34,7 +34,7 @@ Code must read names/ARNs only from these variables. Never hard-code a resource 
 
 ## 3. DynamoDB schemas (all on-demand, KMS-encrypted, PITR on)
 **employees**: PK `employee_id` (S)
-`name` S, `email` S, `department` S, `shift_start` S "HH:MM", `shift_end` S "HH:MM", `active` BOOL, `face_ids` L of S, `photo_count` N, `consent_at` S (ISO), `created_at` S, `updated_at` S. Internal retry metadata: `enrollment_{request_id}` S (FaceId committed for that request), `enrollment_lock_request` S and `enrollment_lock_until` N (short per-employee lease).
+`name` S, `email` S, `department` S, `shift_start` S "HH:MM", `shift_end` S "HH:MM", `active` BOOL, `face_ids` L of S, `photo_count` N, `consent_at` S (ISO), `created_at` S, `updated_at` S. Internal retry metadata: `enrollment_{request_id}` S (FaceId committed for that request), `enrollment_lock_request` S and `enrollment_lock_until` N (short per-employee lease), and `last_faces_delete_audit_id` S (deterministic offboarding audit marker).
 
 **attendance**: PK `employee_id` (S), SK `date` (S)
 `clock_in` S (ISO, absent for `absent` rows), `clock_out` S (ISO, optional), `status` S one of `present` | `late` | `absent`, `flags` SS (optional, value `missing_clock_out`), `confidence` N (optional), `source` S one of `face` | `admin` | `system`, `updated_at` S, `updated_by` S (optional). Internal retry metadata: `scan_events` M keyed by `request_id`, storing the exact outcome of each accepted scan request so retries cannot create a second attendance transition.
