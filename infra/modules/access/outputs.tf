@@ -17,7 +17,7 @@ output "user_pool_client_id" {
 }
 
 output "user_pool_issuer" {
-  value = "https://cognito-idp.us-east-1.amazonaws.com/${aws_cognito_user_pool.main.id}"
+  value = "https://cognito-idp.${local.region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
 }
 
 output "cognito_domain" {
