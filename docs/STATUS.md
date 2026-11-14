@@ -240,3 +240,14 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 - Workflow retains minimal permissions (`actions:read`, `contents:read`, `id-token:write`), dev/develop and prod/main branch gates, manual dispatch, exact plan run/commit/branch provenance checks and no static AWS credentials.
 - CI validates all four trust templates, exact audience/subject, OIDC provider ARN, workflow environment/role selector, branch gates, token permissions and absence of static AWS credentials.
 - No OIDC provider, IAM role or GitHub environment was created/configured. No AWS resource or remote backend operation was performed.
+
+
+### T15 — encrypted Terraform plan artifact lifecycle
+
+- **Status:** workflow hardening drafted; CI validation pending.
+- Plan artifact names now include environment, workflow run ID and run attempt. Apply verifies successful manual workflow_dispatch run, exact workflow path, expected release branch, exact same commit SHA and numeric run attempt before download.
+- Apply downloads only from the referenced run ID and artifact name including the verified attempt. This closes the prior gap where another workflow_dispatch run on the same branch/commit could potentially satisfy the SHA/branch/event checks.
+- Added EXIT cleanup for plaintext plan after encryption; artifact upload includes only tfplan.age and retention-days=1. Apply uses a protected age identity secret, umask 077, ephemeral identity file cleanup, removes encrypted artifact after decryption and removes decrypted plan in an always()-guarded cleanup step.
+- Added `docs/TERRAFORM-PLAN-ARTIFACT.md` with lifecycle, access, retention, provenance, rotation and residual trust requirements.
+- CI validates workflow path/run-attempt binding, encrypted-only upload path, one-day retention, age identity cleanup and no static AWS credentials.
+- No plan artifact generated; no AWS role assumption, remote backend init, plan or apply.
