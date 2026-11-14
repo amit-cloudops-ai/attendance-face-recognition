@@ -273,6 +273,12 @@ data "archive_file" "lambda" {
 
 resource "aws_rekognition_collection" "faces" {
   collection_id = "attendance-${var.env}-faces"
+
+  tags = {
+    Project     = "attendance"
+    Environment = var.env
+    Component   = "recognition"
+  }
 }
 
 resource "aws_sqs_queue" "failure_processor_dlq" {
