@@ -48,9 +48,33 @@ OIDC_ARN="arn:aws:iam::$ACCOUNT_ID:oidc-provider/token.actions.githubusercontent
 report "GitHub OIDC provider" aws iam get-open-id-connect-provider \
   --open-id-connect-provider-arn "$OIDC_ARN" --output json
 
+inspect_managed_policy() {
+  local policy_arn="$1"
+  local version_id
+  echo
+  echo "=== Managed policy document: $policy_arn ==="
+  if version_id="$(aws iam get-policy --policy-arn "$policy_arn" --query 'Policy.DefaultVersionId' --output text)"; then
+    report "Default policy version: $policy_arn" aws iam get-policy-version \
+      --policy-arn "$policy_arn" --version-id "$version_id" \
+      --query PolicyVersion.Document --output json
+  else
+    echo "NOT CONFIRMED: unable to read managed policy metadata."
+  fi
+}
+
 for policy in attendance-dev-execution-boundary attendance-prod-execution-boundary; do
-  report "Managed policy: $policy" aws iam list-policies --scope Local \
-    --query "Policies[?PolicyName=='$policy'].[PolicyName,Arn,DefaultVersionId]" --output table
+  echo
+  echo "=== Runtime permissions boundary: $policy ==="
+  if policy_arn="$(aws iam list-policies --scope Local \
+      --query "Policies[?PolicyName=='$policy']|[0].Arn" --output text)"; then
+    if [[ -n "$policy_arn" && "$policy_arn" != "None" ]]; then
+      inspect_managed_policy "$policy_arn"
+    else
+      echo "NOT CONFIRMED: no matching policy was returned."
+    fi
+  else
+    echo "NOT CONFIRMED: caller may lack IAM read permission."
+  fi
 done
 
 for role in \
@@ -60,10 +84,23 @@ for role in \
   echo
   echo "=== IAM role: $role ==="
   if aws iam get-role --role-name "$role" --output json; then
-    report "Attached managed policies: $role" aws iam list-attached-role-policies \
-      --role-name "$role" --output table
-    report "Inline policy names: $role" aws iam list-role-policies \
-      --role-name "$role" --output table
+    if attached_arns="$(aws iam list-attached-role-policies --role-name "$role" \
+        --query 'AttachedPolicies[].PolicyArn' --output text)"; then
+      for policy_arn in $attached_arns; do
+        [[ "$policy_arn" == "None" ]] || inspect_managed_policy "$policy_arn"
+      done
+    else
+      echo "NOT CONFIRMED: unable to list attached managed policies."
+    fi
+    if inline_names="$(aws iam list-role-policies --role-name "$role" \
+        --query 'PolicyNames' --output text)"; then
+      for policy_name in $inline_names; do
+        [[ "$policy_name" == "None" ]] || report "Inline policy document: $role/$policy_name" \
+          aws iam get-role-policy --role-name "$role" --policy-name "$policy_name" --output json
+      done
+    else
+      echo "NOT CONFIRMED: unable to list inline policy names."
+    fi
   else
     echo "NOT CONFIRMED: role may be absent or caller may lack read permission."
   fi
