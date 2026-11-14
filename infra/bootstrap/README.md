@@ -75,7 +75,15 @@ For each key pair:
 The plan artifact remains encrypted in GitHub Actions and expires after one day. Only the matching environment's apply job receives the private identity secret, and only in the decryption step. To review the full plan locally, download the encrypted artifact from the successful plan run, then decrypt it using the matching private identity file:
 
 ```bash
-age --decrypt --identity attendance-dev-plan-identity.txt --output tfplan attendance-dev-plan/tfplan.age
+PLAN_RUN_ID=123456789
+gh run download "$PLAN_RUN_ID" \
+  --repo amit-cloudops-ai/attendance-face-recognition \
+  --name "attendance-dev-terraform-plan-$PLAN_RUN_ID" \
+  --dir ./attendance-dev-plan
+age --decrypt \
+  --identity attendance-dev-plan-identity.txt \
+  --output tfplan \
+  ./attendance-dev-plan/tfplan.age
 terraform show -no-color tfplan
 ```
 
