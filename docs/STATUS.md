@@ -72,7 +72,7 @@ The plan enumerates:
 - Six matching GitHub environments and the required variables/secrets.
 - Read-only existence checks, bootstrap order, rollback and approval gates.
 
-The exact 12-digit AWS account ID, final bucket suffix and current resource inventory are not known. No live AWS read-only preflight has been performed in this session. The bootstrap plan must be rendered with verified account values and presented to the owner before any write operation.
+The exact 12-digit AWS account ID, final bucket suffix and current resource inventory are not known. A read-only inventory script now exists at `scripts/aws_preflight_readonly.sh`, but it has not been run against the owner's account. The bootstrap plan must be rendered with verified account values and presented to the owner before any write operation.
 
 **Owner action:** provide/confirm the account ID and final bucket suffix, run or authorize read-only inventory, then review and explicitly approve the exact resource and policy inventory. Approval for bootstrap writes and approval for Terraform plan/apply remain separate.
 
