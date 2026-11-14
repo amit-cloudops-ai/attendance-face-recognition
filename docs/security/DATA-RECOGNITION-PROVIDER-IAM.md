@@ -92,7 +92,7 @@ The five DynamoDB tables are configured with the foundation customer-managed KMS
 - `kms:DescribeKey`
 - `kms:CreateGrant`
 
-These are deployment-role permissions for the DynamoDB table provisioning path, not runtime Lambda permissions. Constrain the cryptographic actions to the exact environment key ARN, `kms:ViaService=dynamodb.us-east-1.amazonaws.com`, and the environment alias. Constrain `kms:CreateGrant` with `kms:GrantIsForAWSResource=true` and the DynamoDB ViaService condition. The KMS key policy must also allow DynamoDB's service principal to perform the documented direct key-metadata operations. The current foundation key policy has no DynamoDB service-principal statement; T36 tracks that required correction before bootstrap.
+These are deployment-role permissions for the DynamoDB table provisioning path, not runtime Lambda permissions. Constrain the cryptographic actions to the exact environment key ARN, `kms:ViaService=dynamodb.us-east-1.amazonaws.com`, and the environment alias. Constrain `kms:CreateGrant` with `kms:GrantIsForAWSResource=true` and the DynamoDB ViaService condition. The customer-managed-key policy uses the AWS-documented `kms:ViaService` authorization model for DynamoDB. AWS's direct `dynamodb.amazonaws.com` key-metadata statement is part of the AWS-managed-key example and is not required by the customer-managed-key policy example.
 
 The runtime boundary templates in T05 intentionally do not include DynamoDB KMS operations because Lambda handlers do not directly call KMS for DynamoDB encryption. GitHub apply roles are not subject to those runtime boundaries.
 

@@ -81,7 +81,7 @@
 - Mapped DynamoDB table TTL/PITR/tag APIs; CloudWatch Logs and metric alarms; IAM roles/inline policies; Lambda functions, permissions, event source mappings and async invoke config; Scheduler schedules; SQS queues/redrive allow policies; Rekognition collections; and S3 bucket notifications. Full matrix: `docs/security/DATA-RECOGNITION-PROVIDER-IAM.md`.
 - Exact `iam:PassRole` scopes are required for Lambda execution roles and Scheduler target roles, with `iam:PassedToService` conditions.
 - Critical KMS dependency: all five DynamoDB tables use the customer-managed KMS key. AWS requires the principal selecting the CMK to have Encrypt, Decrypt, ReEncrypt, GenerateDataKey, DescribeKey and CreateGrant permissions via DynamoDB. These belong in deployment-role policies, not Lambda runtime boundaries.
-- The foundation key policy currently has no DynamoDB service-principal statement for direct key metadata access. Added T36 to fix the key policy and deployment KMS policy before bootstrap.
+- T36 adds the customer-managed-key ViaService authorization and exact deployment-role KMS permissions before bootstrap. The direct DynamoDB metadata statement is not part of the customer-managed-key example.
 
 ### T07 — data and recognition Terraform provider IAM mapping
 
@@ -158,7 +158,9 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T34 — AWS Budget isolation
 
-- **Status:** implementation drafted; CI validation pending.
+- **Status:** complete on `ai/T35-cloudfront-kms-scope`.
+- The final key policy is owned by the access module and installed only after the CloudFront distribution is created. Its OAC decrypt grant requires exact `aws:SourceAccount` and `ArnEquals aws:SourceArn = aws_cloudfront_distribution.site.arn`; no distribution wildcard remains.
+- CI on descendant branch run [43617044959](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43617044959), commit `fdd6513176`: Python and Terraform jobs passed, validating the exact KMS policy source and both environment roots.
 - Removed `aws_budgets_budget.monthly` from the shared foundation module. Normal dev/prod Terraform roots no longer create or update account-level budgets.
 - Added independent `infra/billing` Terraform root with its own backend state key `attendance/billing/terraform.tfstate`; it manages the dev and prod USD 15 monthly budgets and their 80%/100% actual-cost notifications.
 - Removed `budgets:ViewBudget` and `aws-portal:ViewBilling` from the dev environment plan-role core policy. Billing access belongs only to a dedicated billing plan/apply role; no such role or policy is attached/created here.
@@ -167,9 +169,22 @@ No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket
 
 ### T35 — exact CloudFront KMS scope
 
-- **Status:** implementation drafted; CI validation pending.
+- **Status:** complete on `ai/T36-dynamodb-kms-access`.
+- The access-module KMS policy includes the AWS-documented customer-managed-key path: account principal, `kms:CallerAccount`, exact `kms:ViaService=dynamodb.us-east-1.amazonaws.com`, and required crypto/grant/describe actions. The AWS-managed-key-only direct metadata statement is intentionally omitted.
+- Added separate dev/prod apply-policy fragments scoped to the matching KMS alias and DynamoDB ViaService. `kms:CreateGrant` is separately constrained by `kms:GrantIsForAWSResource=true`.
+- CI run [43617044959](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43617044959), commit `fdd6513176`: Python and Terraform jobs passed, including the new KMS policy validator, formatting, module validation and both environment roots.
+- AWS reference: [DynamoDB encryption at rest usage notes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/encryption.usagenotes.html).
 - Removed the CloudFront service statement from the foundation key policy. Foundation now creates the KMS key with the default account-root policy; it no longer needs the distribution ID before that resource exists.
 - Added `kms_key_id` output from foundation and input to access. The access module now owns `aws_kms_key_policy.attendance` and installs the complete key policy after creating the CloudFront distribution.
 - CloudFront's `kms:Decrypt` grant uses `aws:SourceAccount` plus `ArnEquals aws:SourceArn = aws_cloudfront_distribution.site.arn`; the former `distribution/*` wildcard is removed. SNS alert and Lambda async DLQ service statements and account-root administration remain in the final policy.
 - Added the `kms:GetKeyPolicy`/`kms:PutKeyPolicy` provider action mapping for the access-module policy resource.
 - Also corrected a latent T31 omission: `user_pool_issuer` output was still hard-coded to `ap-south-1`; it now emits the `us-east-1` issuer used by the deployed Cognito pool.
+
+
+### T36 — DynamoDB customer-managed KMS authorization
+
+- **Status:** implementation drafted; CI validation pending.
+- The final key policy in the access module now has a DynamoDB customer-managed-key statement for account principals using the key only through `dynamodb.us-east-1.amazonaws.com`, with `kms:CallerAccount` constrained to this account. This allows only `Encrypt`, `Decrypt`, `ReEncrypt*`, `GenerateDataKey*`, `CreateGrant` and `DescribeKey` through DynamoDB. The separate DynamoDB service-principal metadata statement was removed after reviewing AWS documentation: that direct metadata statement appears in the AWS-managed-key example, while the customer-managed-key example authorizes the table-creating principal through `kms:ViaService`.
+- Added environment-specific dev/prod apply-policy fragments for the exact `alias/attendance-dev` or `alias/attendance-prod` key. The crypto actions and `kms:CreateGrant` are separate statements; CreateGrant alone requires `kms:GrantIsForAWSResource=true`. Both are constrained to the DynamoDB ViaService and environment alias.
+- CI validates exact service principal statements, action sets, account/region conditions, environment aliases, CreateGrant condition and policy size.
+- AWS reference: [DynamoDB encryption at rest usage notes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/encryption.usagenotes.html) explains the minimum customer-managed-key actions, the `kms:ViaService` model and DynamoDB grant lifecycle.

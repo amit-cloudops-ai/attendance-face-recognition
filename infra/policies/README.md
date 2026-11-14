@@ -68,3 +68,14 @@ The plan policies intentionally include `s3:ListBucket` on the three dev applica
 Cognito pool IDs and CloudFront distribution IDs are service-generated. The templates use service-supported resource ARN patterns and tag conditions where available. Some CloudFront policy families do not support resource tags; their read actions are restricted to the corresponding CloudFront resource family and remain read-only. API Gateway v2 IDs are also service-generated, and the provider configuration does not tag each authorizer/integration/route/stage child independently. The dev plan policy therefore grants only the `apigateway:GET` verb over the `/apis` resource family; this is read-only but can expose metadata for other APIs in the account/region. A post-bootstrap tightening task should replace the wildcard API ID with the generated dev API ID where operationally practical.
 
 The templates are policy source, not an AWS deployment. CI renders them with a dummy account/bucket, validates JSON, checks the 6,144-character managed-policy limit, rejects infrastructure mutation actions from core/edge policies, and ensures dev state permissions cannot reach prod keys. The exact account and state bucket values must be reviewed before bootstrap.
+
+
+## DynamoDB customer-managed KMS key deployment permissions
+
+The data module creates all five tables with the foundation customer-managed key. The final key policy therefore includes the AWS-documented DynamoDB model:
+
+- Account principals can use the key for DynamoDB only when `kms:CallerAccount` matches the account and `kms:ViaService` is `dynamodb.us-east-1.amazonaws.com`. The statement grants `kms:Encrypt`, `kms:Decrypt`, `kms:ReEncrypt*`, `kms:GenerateDataKey*`, `kms:CreateGrant` and `kms:DescribeKey`.
+- The direct `dynamodb.amazonaws.com` metadata statement is intentionally omitted because AWS documents it in the AWS-managed-key example, not the customer-managed-key policy example.
+- Deployment identities still need matching IAM permissions. `infra/policies/github-apply-dev-dynamodb-kms.json.tftpl` and the prod equivalent scope cryptographic actions to the environment alias and DynamoDB ViaService. `kms:CreateGrant` is separate and requires `kms:GrantIsForAWSResource=true`.
+
+AWS source: [DynamoDB encryption at rest usage notes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/encryption.usagenotes.html). These are policy templates only; they have not been attached to any AWS identity.

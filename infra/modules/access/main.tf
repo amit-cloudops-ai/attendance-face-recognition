@@ -414,6 +414,38 @@ resource "aws_cloudfront_distribution" "site" {
 
 data "aws_iam_policy_document" "web_bucket" {
   statement {
+    sid    = "AllowDynamoDBUseOfKeyThroughService"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:CreateGrant",
+      "kms:DescribeKey"
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:CallerAccount"
+      values   = [var.account_id]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["dynamodb.us-east-1.amazonaws.com"]
+    }
+  }
+
+  statement {
     sid    = "AllowCloudFrontOACRead"
     effect = "Allow"
 

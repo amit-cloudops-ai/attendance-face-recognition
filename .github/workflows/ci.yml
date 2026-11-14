@@ -219,6 +219,46 @@ jobs:
               raise SystemExit("Cognito issuer output must match us-east-1")
           PY
 
+      - name: Validate DynamoDB customer-managed KMS policies
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          required_service_actions = {
+              "kms:Encrypt", "kms:Decrypt", "kms:ReEncryptFrom", "kms:ReEncryptTo",
+              "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext", "kms:CreateGrant",
+              "kms:DescribeKey",
+          }
+          if "AllowDynamoDBUseOfKeyThroughService" not in access:
+              raise SystemExit("Missing DynamoDB KMS ViaService statement")
+          if "dynamodb.us-east-1.amazonaws.com" not in access or "kms:CallerAccount" not in access:
+              raise SystemExit("DynamoDB KMS service statement must be account and region constrained")
+
+          for env in ("dev", "prod"):
+              path = Path(f"infra/policies/github-apply-{env}-dynamodb-kms.json.tftpl")
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              if "${account_id}" in rendered:
+                  raise SystemExit(f"Unresolved account placeholder in {path}")
+              policy = json.loads(rendered)
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy size exceeded: {path}")
+              crypto = next(s for s in policy["Statement"] if s["Sid"] == "DynamoDBCustomerKeyCrypto")
+              grant = next(s for s in policy["Statement"] if s["Sid"] == "DynamoDBCustomerKeyGrant")
+              actions = set(crypto["Action"])
+              if actions != required_service_actions - {"kms:CreateGrant"}:
+                  raise SystemExit(f"Unexpected DynamoDB crypto action set: {path}")
+              if crypto["Condition"]["StringEquals"]["kms:ViaService"] != "dynamodb.us-east-1.amazonaws.com":
+                  raise SystemExit(f"Wrong DynamoDB ViaService condition: {path}")
+              if crypto["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != f"alias/attendance-{env}":
+                  raise SystemExit(f"Wrong environment KMS alias scope: {path}")
+              if grant["Action"] != "kms:CreateGrant" or grant["Condition"]["Bool"]["kms:GrantIsForAWSResource"] != "true":
+                  raise SystemExit(f"CreateGrant must be AWS-resource constrained: {path}")
+              if grant["Condition"]["StringEquals"]["kms:ViaService"] != "dynamodb.us-east-1.amazonaws.com":
+                  raise SystemExit(f"CreateGrant must be ViaService constrained: {path}")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-latest
     steps:
