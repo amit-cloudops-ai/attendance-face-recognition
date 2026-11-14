@@ -238,6 +238,7 @@ resource "aws_sqs_queue" "failure_processor_dlq" {
   name                      = "attendance-${var.env}-failure-processor-dlq"
   kms_master_key_id         = var.kms_key_arn
   message_retention_seconds = 1209600
+  visibility_timeout_seconds = 60
 
   tags = {
     Project     = "attendance"
@@ -252,6 +253,7 @@ resource "aws_sqs_queue" "dlq" {
   name                      = "attendance-${var.env}-${each.key}-dlq"
   kms_master_key_id         = var.kms_key_arn
   message_retention_seconds = 1209600
+  visibility_timeout_seconds = 60
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.failure_processor_dlq.arn
     maxReceiveCount     = 5
