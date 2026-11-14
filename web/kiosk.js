@@ -1,5 +1,5 @@
 import { getConfig } from "./shared/config.js";
-import { accessToken, hasGroup, login, logout, requireGroup } from "./shared/auth.js";
+import { accessToken, login, logout, requireGroup } from "./shared/auth.js";
 import { api, uploadPresigned } from "./shared/api.js";
 
 const video = document.querySelector("#camera");
