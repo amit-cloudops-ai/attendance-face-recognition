@@ -147,9 +147,6 @@ def setup_worker(monkeypatch, scans, employees, rekognition, s3, record=None):
         "min_brightness": 40, "min_sharpness": 40, "face_match_threshold": 95})
     if record is not None:
         monkeypatch.setattr(recognize, "record_scan", record)
-    from datetime import datetime
-    monkeypatch.setattr(recognize, "now_ist", lambda:
-        datetime.fromisoformat("2026-11-14T09:15:00+05:30"))
 
 
 def test_recognize_matched_records_attendance_and_deletes_image(aws_env, monkeypatch):
@@ -160,16 +157,18 @@ def test_recognize_matched_records_attendance_and_deletes_image(aws_env, monkeyp
     fake_s3, fake_rekognition = FakeS3(), FakeRekognition()
     called = {}
 
-    def record(employee_id, scanned_at, confidence):
-        called.update(employee_id=employee_id, confidence=confidence)
+    def record(employee_id, scanned_at, confidence, request_id=None):
+        called.update(employee_id=employee_id, confidence=confidence,
+                      scanned_at=scanned_at.isoformat(), request_id=request_id)
         return {"action": "clock_in", "status": "present",
-            "clock_in": "2026-11-14T09:15:00+05:30", "clock_out": None}
+            "clock_in": "2026-11-14T09:00:00+05:30", "clock_out": None}
 
     setup_worker(monkeypatch, scans, employees, fake_rekognition, fake_s3, record)
     recognize.lambda_handler(s3_event(request_id), None)
     item = scans.get_item(Key={"request_id": request_id})["Item"]
     assert item["code"] == "matched" and item["action"] == "clock_in"
-    assert called == {"employee_id": "EMP001", "confidence": 98.7}
+    assert called == {"employee_id": "EMP001", "confidence": 98.7,
+        "scanned_at": "2026-11-14T09:00:00+05:30", "request_id": request_id}
     assert fake_s3.deleted == [f"captures/{request_id}.jpg"]
 
 
@@ -220,7 +219,7 @@ def test_duplicate_event_is_noop_and_warmup_avoids_clients(aws_env, monkeypatch)
     assert recognize.lambda_handler({"warmup": True}, None) == {"statusCode": 200, "body": "warm"}
 
 
-def test_recognize_exception_marks_error_and_still_deletes(aws_env, monkeypatch):
+def test_recognize_retryable_exception_preserves_pending_result_and_image(aws_env, monkeypatch):
     scans, employees = aws_env
     request_id = str(uuid.uuid4())
     seed_pending(scans, request_id)
@@ -233,5 +232,5 @@ def test_recognize_exception_marks_error_and_still_deletes(aws_env, monkeypatch)
     setup_worker(monkeypatch, scans, employees, BrokenRekognition(), fake_s3)
     with pytest.raises(RuntimeError):
         recognize.lambda_handler(s3_event(request_id), None)
-    assert scans.get_item(Key={"request_id": request_id})["Item"]["code"] == "error"
-    assert fake_s3.deleted == [f"captures/{request_id}.jpg"]
+    assert scans.get_item(Key={"request_id": request_id})["Item"]["code"] == "pending"
+    assert fake_s3.deleted == []
