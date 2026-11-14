@@ -4,7 +4,7 @@
 
 The solo application and the T01–T37 deployment-security task chain have been consolidated on the release-preparation branch. The T01–T15, T17 and T31–T37 implementation tasks are complete at the code/documentation level with historical CI evidence recorded in their task PRs. T16 and T18 remain blocked on repository-administrator and owner-controlled AWS-account information/actions.
 
-A new region-consistency change is in progress on this branch: `config/deployment.json` is the canonical AWS region manifest; Terraform provider roots read it; the deployment workflow and local Terraform wrapper export it for the S3 backend; Lambda clients use the Lambda-reserved `AWS_REGION`; contracts and examples are being aligned; CI will reject the superseded region and mismatched regional settings. This branch's new CI run is the acceptance gate for this work.
+The region-consistency implementation is complete on this branch: `config/deployment.json` is the canonical AWS region manifest; Terraform provider roots read it; the deployment workflow and local Terraform wrapper export it for the S3 backend; Lambda clients use the Lambda-reserved `AWS_REGION`; contracts and examples are aligned; CI rejects any noncanonical AWS region literal, regional ARN or regional endpoint. The full consolidated CI run 43622495235 passed on commit `65f82c6597bd9705c334b5cb2f6b3bfc528c946d` (27 Python/security steps and 21 Terraform formatting/validation steps).
 
 **No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
 
@@ -17,7 +17,7 @@ Target region: `us-east-1`, sourced from `config/deployment.json`. Target accoun
 - Application baseline: `solo/amit-monday`.
 - Security task chain: `ai/T01-repository-governance` through `ai/T37-billing-roles`, including T31–T36 cross-cutting tasks.
 - Current consolidation branch: `release/phase-b-region-guard`, created from `ai/T37-billing-roles`. It contains the stacked task work and the new region-consistency changes.
-- The task PRs remain open and unmerged. This branch is intended to produce one reviewed consolidation PR into `solo/amit-monday`; it does not promote anything to `develop` or `main`.
+- Draft consolidation PR #28 is open from `release/phase-b-region-guard` into `solo/amit-monday`: https://github.com/amit-cloudops-ai/attendance-face-recognition/pull/28. It is mergeable and not merged. The task PRs remain open and unmerged; PR #28 is the single consolidation path. Nothing is promoted to `develop` or `main`.
 - Teammate Part B PR #2 remains separate and untouched. Do not merge teammate work into the solo release.
 
 ## Completed security implementation
@@ -32,7 +32,7 @@ Target region: `us-east-1`, sourced from `config/deployment.json`. Target accoun
 | T32–T36 | Scheduler trust isolation, provider lockfiles, billing isolation, CloudFront KMS scope and DynamoDB KMS authorization | PRs #13–#17; CI runs 43616332197, 43616787686, 43617044959, 43617191177 |
 | T37 | Dedicated billing plan/apply policy and OIDC roles, isolated billing state root | PR #27; CI run 43620012088 |
 
-The task PR CI runs are historical evidence for their respective commits. The new consolidation branch must pass its own complete CI before it can be considered validated. IAM templates have not been attached to AWS roles. IAM Access Analyzer and live AWS authorization tests have not been performed.
+The task PR CI runs are historical evidence for their respective commits. The consolidated branch has now passed its own full CI on commit `65f82c6`; the final documentation/status-only commits are being rechecked. IAM templates have not been attached to AWS roles. IAM Access Analyzer and live AWS authorization tests have not been performed.
 
 ## Region-consistency implementation
 
@@ -43,7 +43,8 @@ The task PR CI runs are historical evidence for their respective commits. The ne
 - Contracts are amended to v1.1 for the region-only change. SPEC is amended to v1.1; functional scope and acceptance criteria are unchanged.
 - Frontend runtime examples, Cognito domain examples, raw-bucket endpoints, architecture decision log and cost assumptions are aligned.
 - Moto test fixtures are aligned to the target region.
-- CI runs `scripts/check_region_consistency.py`, which checks the manifest, Terraform roots, backend configuration, documentation and absence of the superseded region. This branch's CI result is pending.
+- CI runs `scripts/check_region_consistency.py`, which checks the manifest, Terraform roots, backend configuration, all repository text for noncanonical region tokens, regional ARNs/endpoints and Lambda region selection. The local Terraform wrapper and GitHub deployment workflow also run the full gate before proceeding.
+- Full CI run 43622495235 passed on commit `65f82c6`.
 
 No system can guarantee that a future contributor never writes an incorrect region, but the new automated gate is designed to fail every pull request/push that reintroduces a conflicting region into tracked project files.
 
@@ -98,14 +99,14 @@ The exact role trust documents, managed policy JSON, account IDs and bucket name
 
 ## Next sequence
 
-1. Finish the region-consistency CI gate and validate the full consolidation branch.
-2. Reconcile any remaining IAM policy/runtime call-site gaps found by the final CI/static audit.
-3. Obtain repository-admin confirmation for T16.
-4. Verify the AWS account ID and existing resource inventory using read-only AWS calls; select the state bucket suffix.
-5. Present the exact bootstrap plan and obtain explicit approval before any AWS write.
-6. After T16/T18 are resolved, open/review the solo-only deployment-readiness PR. Keep teammate PR #2 separate.
-7. Only after separate approval, bootstrap the state bucket/OIDC/roles, run a dev plan, present the complete plan and request apply approval.
-8. Complete dev integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
+1. Owner-review draft PR #28 and merge it into `solo/amit-monday` when approved. Do not promote to `develop` or `main` yet.
+2. Complete T16: configure and verify the six GitHub environments, variables, secrets, branch restrictions and independent reviewers.
+3. Complete T18 read-only verification: run `bash scripts/aws_preflight_readonly.sh` with an approved read-only AWS profile; verify the account ID and existing resource inventory; choose the state bucket suffix.
+4. Render the exact account-specific bootstrap plan and all trust/policy documents; present them and obtain explicit approval before any AWS write.
+5. Only after separate approval, bootstrap the approved state bucket/OIDC/roles/boundaries/policies. Verify the result using read-only calls.
+6. Initialize the dev backend only after its separate approval, generate a dev plan, present the complete plan and obtain explicit apply approval.
+7. Complete dev integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
+8. Keep teammate PR #2 separate throughout.
 
 T19–T24 and T25–T30 remain release, deployment and operational acceptance work. Phase B is not fully closed until the repository-admin and owner-controlled blockers are resolved.
 
