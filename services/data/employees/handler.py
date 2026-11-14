@@ -37,7 +37,7 @@ def _body(event: dict) -> dict:
     raw = event.get("body") or "{}"
     value = json.loads(raw) if isinstance(raw, str) else raw
     if not isinstance(value, dict):
-        raise ValueError("request body must be a JSON object")
+        raise TypeError("request body must be a JSON object")
     return value
 
 
@@ -175,8 +175,8 @@ def lambda_handler(event, context):
             return ok(_public_employee(old))
 
         return error(405, "method_not_allowed", "The requested method is not supported.")
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         return error(400, "invalid_request", str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - API boundary returns a sanitized 500 response
         LOGGER.error("Employee handler failed (%s)", type(exc).__name__)
         return error(500, "internal_error", "Unable to process the employee request.")
