@@ -392,20 +392,8 @@ resource "aws_cloudfront_distribution" "site" {
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 
-  custom_error_response {
-    error_code            = 403
-    response_code         = 404
-    response_page_path    = "/404.html"
-    error_caching_min_ttl = 0
-  }
-
-  custom_error_response {
-    error_code            = 404
-    response_code         = 404
-    response_page_path    = "/404.html"
-    error_caching_min_ttl = 0
-  }
-
+  # Keep API 403/404 JSON responses intact; global CloudFront custom errors
+  # would rewrite API authorization and not-found responses into static HTML.
   restrictions {
     geo_restriction {
       restriction_type = "none"
