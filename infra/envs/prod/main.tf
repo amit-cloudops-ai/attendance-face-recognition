@@ -21,6 +21,7 @@ module "data" {
   layer_arn                   = module.foundation.layer_arn
   alerts_topic_arn            = module.foundation.alerts_topic_arn
   common_env                  = module.foundation.common_env
+  depends_on = [module.foundation]
 }
 
 module "recognition" {
@@ -36,6 +37,7 @@ module "recognition" {
   layer_arn                   = module.foundation.layer_arn
   alerts_topic_arn            = module.foundation.alerts_topic_arn
   common_env                  = module.foundation.common_env
+  depends_on = [module.foundation]
 }
 
 module "access" {
