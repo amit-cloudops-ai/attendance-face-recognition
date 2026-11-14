@@ -42,7 +42,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 
 | ID | Task | Status | Acceptance criteria |
 |---|---|---|---|
-| T31 | Align all Lambda runtime AWS SDK clients with the us-east-1 deployment region | TODO | Every explicit region override/default is aligned to the deployed region; no runtime client targets ap-south-1; CI and unit tests pass |
+| T31 | Align all Lambda runtime AWS SDK clients with the us-east-1 deployment region | DONE | Every explicit region override/default is aligned to the deployed region; no runtime client targets ap-south-1; CI and unit tests pass |
 
 ## Phase C — release and operations
 

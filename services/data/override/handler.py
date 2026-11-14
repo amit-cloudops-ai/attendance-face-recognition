@@ -14,7 +14,8 @@ from attendance_common.tz import now_ist, to_iso
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = "ap-south-1"
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 IST = ZoneInfo("Asia/Kolkata")
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
 _STATUSES = {"present", "late", "absent"}
@@ -72,7 +73,7 @@ def lambda_handler(event, context):
         reason = body.get("reason")
         if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 500:
             return error(400, "reason_required", "A reason of 1 to 500 characters is required.")
-        db = boto3.resource("dynamodb", region_name=REGION)
+        db = boto3.resource("dynamodb", region_name=_region())
         employees = db.Table(_required_env("TABLE_EMPLOYEES"))
         attendance = db.Table(_required_env("TABLE_ATTENDANCE"))
         audit = db.Table(_required_env("TABLE_AUDIT"))

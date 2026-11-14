@@ -18,7 +18,7 @@ def _table(env_name: str) -> Any:
     name = os.getenv(env_name)
     if not name:
         raise RuntimeError(f"required environment variable {env_name} is not set")
-    return boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "ap-south-1")).Table(name)
+    return boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "us-east-1")).Table(name)
 
 
 def _conditional_failure(exc: ClientError) -> bool:

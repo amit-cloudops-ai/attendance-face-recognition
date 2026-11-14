@@ -12,7 +12,8 @@ from botocore.config import Config
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = "ap-south-1"
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 MAX_IMAGE_BYTES = 1_048_576
 MIN_IMAGE_BYTES = 1_024
 POST_EXPIRY_SECONDS = 60
@@ -40,7 +41,7 @@ def lambda_handler(event, context):
     try:
         request_id = str(uuid.uuid4())
         bucket = _required_env("BUCKET_RAW")
-        table = boto3.resource("dynamodb", region_name=REGION).Table(
+        table = boto3.resource("dynamodb", region_name=_region()).Table(
             _required_env("TABLE_SCAN_RESULTS")
         )
         created_at = to_iso(now_ist())
@@ -53,7 +54,7 @@ def lambda_handler(event, context):
             "ttl": int(time.time()) + 86_400,
         })
         s3 = boto3.client(
-            "s3", region_name=REGION,
+            "s3", region_name=_region(),
             config=Config(signature_version="s3v4"),
         )
         key = f"captures/{request_id}.jpg"
