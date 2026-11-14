@@ -38,7 +38,7 @@ Apply role:
 - aws-portal:ModifyBilling and aws-portal:ViewBilling on Resource=* because these account-level billing actions do not support a budget resource ARN.
 - Billing state Get/Put; billing lockfile Get/Put/Delete; ListBucket restricted to the billing state/lock prefixes.
 
-The apply role does not receive broad IAM administration, PassRole, or permissions to manage dev/prod runtime resources. The dev/prod plan/apply roles do not receive budgets:* or aws-portal:*.
+The apply role does not receive broad IAM administration, PassRole, or permissions to manage dev/prod runtime resources. The dev/prod plan/apply roles do not receive budgets:* or aws-portal:*. The aws-portal:ModifyBilling permission is account-level and cannot be restricted to a single budget ARN in the provider action model; it is isolated to billing-apply, gated by the main branch and an independent GitHub environment reviewer, and must be explicitly approved in the bootstrap review.
 
 ## GitHub environment configuration
 
