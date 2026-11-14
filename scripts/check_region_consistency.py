@@ -63,6 +63,7 @@ def validate() -> None:
     for relative in (
         "infra/envs/dev/backend.hcl.example",
         "infra/envs/prod/backend.hcl.example",
+        "infra/billing/backend.hcl.example",
     ):
         content = (ROOT / relative).read_text(encoding="utf-8")
         if re.search(r"^\s*region\s*=", content, re.MULTILINE):
