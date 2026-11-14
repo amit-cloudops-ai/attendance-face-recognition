@@ -13,7 +13,8 @@ from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = os.getenv("AWS_REGION", "us-east-1")
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 IST = ZoneInfo("Asia/Kolkata")
 
 
@@ -216,12 +217,12 @@ def _finalize_record(record: dict, bucket_name: str, results, attendance,
 
 
 def lambda_handler(event, context):
-    db = boto3.resource("dynamodb", region_name=REGION)
+    db = boto3.resource("dynamodb", region_name=_region())
     results = db.Table(_required_env("TABLE_SCAN_RESULTS"))
     attendance = db.Table(_required_env("TABLE_ATTENDANCE"))
     employees = db.Table(_required_env("TABLE_EMPLOYEES"))
-    s3 = boto3.client("s3", region_name=REGION)
-    rekognition = boto3.client("rekognition", region_name=REGION)
+    s3 = boto3.client("s3", region_name=_region())
+    rekognition = boto3.client("rekognition", region_name=_region())
     bucket_name = _required_env("BUCKET_RAW")
     failures = []
 

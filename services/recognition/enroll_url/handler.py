@@ -13,7 +13,8 @@ from botocore.config import Config
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = os.getenv("AWS_REGION", "us-east-1")
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
 
 
@@ -33,7 +34,7 @@ def lambda_handler(event, context):
     if not isinstance(employee_id, str) or not _EMPLOYEE_ID.fullmatch(employee_id):
         return error(400, "invalid_employee_id", "A valid employee_id is required.")
     try:
-        db = boto3.resource("dynamodb", region_name=REGION)
+        db = boto3.resource("dynamodb", region_name=_region())
         employee = db.Table(_required_env("TABLE_EMPLOYEES")).get_item(
             Key={"employee_id": employee_id}, ConsistentRead=True
         ).get("Item")
@@ -48,7 +49,7 @@ def lambda_handler(event, context):
             "message": "Enrollment photo uploaded. Processing is underway.",
             "created_at": created_at, "ttl": int(time.time()) + 86_400,
         })
-        s3 = boto3.client("s3", region_name=REGION, config=Config(signature_version="s3v4"))
+        s3 = boto3.client("s3", region_name=_region(), config=Config(signature_version="s3v4"))
         key = f"enroll/{employee_id}/{request_id}.jpg"
         upload = s3.generate_presigned_post(
             Bucket=_required_env("BUCKET_RAW"),

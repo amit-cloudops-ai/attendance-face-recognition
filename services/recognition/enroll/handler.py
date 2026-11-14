@@ -14,7 +14,8 @@ from botocore.exceptions import ClientError
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
-REGION = os.getenv("AWS_REGION", "us-east-1")
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 _LOCK_SECONDS = 45
 
 
@@ -26,7 +27,7 @@ def _required_env(name: str) -> str:
 
 
 def _table(env_name: str):
-    return boto3.resource("dynamodb", region_name=REGION).Table(_required_env(env_name))
+    return boto3.resource("dynamodb", region_name=_region()).Table(_required_env(env_name))
 
 
 def _not_found(exc: ClientError) -> bool:
@@ -168,7 +169,7 @@ def _process_record(record: dict) -> None:
     if not parsed:
         return
     employee_id, request_id = parsed
-    s3 = boto3.client("s3", region_name=REGION)
+    s3 = boto3.client("s3", region_name=_region())
     results = _table("TABLE_SCAN_RESULTS")
     pending = results.get_item(
         Key={"request_id": request_id}, ConsistentRead=True
@@ -187,7 +188,7 @@ def _process_record(record: dict) -> None:
         raise
 
     employees = _table("TABLE_EMPLOYEES")
-    rekognition = boto3.client("rekognition", region_name=REGION)
+    rekognition = boto3.client("rekognition", region_name=_region())
     image = {"S3Object": {"Bucket": bucket, "Name": key}}
     request_external_id = f"{employee_id}#{request_id}"
     marker = _request_marker(request_id)

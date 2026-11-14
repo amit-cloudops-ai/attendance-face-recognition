@@ -12,7 +12,8 @@ from attendance_common.tz import now_ist, to_iso
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = os.getenv("AWS_REGION", "us-east-1")
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 
 
 def _required_env(name: str) -> str:
@@ -79,7 +80,7 @@ def lambda_handler(event, context):
         if method != "PUT":
             return error(405, "method_not_allowed", "Only GET and PUT are supported.")
         updates = _validate_updates(_body(event))
-        db = boto3.resource("dynamodb", region_name=REGION)
+        db = boto3.resource("dynamodb", region_name=_region())
         config = db.Table(_required_env("TABLE_CONFIG"))
         audit = db.Table(_required_env("TABLE_AUDIT"))
         old = get_settings()

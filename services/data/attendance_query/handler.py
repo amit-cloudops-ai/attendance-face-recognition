@@ -13,7 +13,8 @@ from boto3.dynamodb.conditions import Attr, Key
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = os.getenv("AWS_REGION", "us-east-1")
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
 _STATUSES = {"present", "late", "absent"}
 
@@ -123,7 +124,7 @@ def lambda_handler(event, context):
         cursor = _decode_cursor(params.get("cursor"))
         if params.get("cursor") and cursor is None:
             return error(400, "invalid_cursor", "cursor is invalid.")
-        db = boto3.resource("dynamodb", region_name=REGION)
+        db = boto3.resource("dynamodb", region_name=_region())
         attendance = db.Table(_required_env("TABLE_ATTENDANCE"))
         employees = db.Table(_required_env("TABLE_EMPLOYEES"))
         filter_expression = Attr("status").eq(status) if status else None

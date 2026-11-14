@@ -12,7 +12,8 @@ from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = os.getenv("AWS_REGION", "us-east-1")
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
 _NOT_FOUND_REASONS = {"FACE_NOT_FOUND", "RESOURCE_NOT_FOUND"}
 
@@ -60,7 +61,7 @@ def lambda_handler(event, context):
     if not isinstance(employee_id, str) or not _EMPLOYEE_ID.fullmatch(employee_id):
         return error(400, "invalid_employee_id", "A valid employee_id is required.")
     try:
-        db = boto3.resource("dynamodb", region_name=REGION)
+        db = boto3.resource("dynamodb", region_name=_region())
         employees = db.Table(_required_env("TABLE_EMPLOYEES"))
         audit = db.Table(_required_env("TABLE_AUDIT"))
         employee = employees.get_item(
@@ -81,7 +82,7 @@ def lambda_handler(event, context):
         audit_id = _audit_id(employee_id, face_ids)
         now = now_ist().isoformat(timespec="seconds")
         deleted = _delete_all_faces(
-            boto3.client("rekognition", region_name=REGION),
+            boto3.client("rekognition", region_name=_region()),
             _required_env("COLLECTION_ID"),
             face_ids,
         )

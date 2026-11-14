@@ -13,7 +13,8 @@ from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = os.getenv("AWS_REGION", "us-east-1")
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 _EMPLOYEE_ID = re.compile(r"^[A-Z0-9_-]{3,20}$")
 _EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
@@ -26,7 +27,7 @@ def _required_env(name: str) -> str:
 
 
 def _tables():
-    db = boto3.resource("dynamodb", region_name=REGION)
+    db = boto3.resource("dynamodb", region_name=_region())
     return (
         db.Table(_required_env("TABLE_EMPLOYEES")),
         db.Table(_required_env("TABLE_AUDIT")),

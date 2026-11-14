@@ -14,7 +14,8 @@ from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = os.getenv("AWS_REGION", "us-east-1")
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 
 
 def _required_env(name: str) -> str:
@@ -25,7 +26,7 @@ def _required_env(name: str) -> str:
 
 
 def _tables():
-    db = boto3.resource("dynamodb", region_name=REGION)
+    db = boto3.resource("dynamodb", region_name=_region())
     return (
         db.Table(_required_env("TABLE_EMPLOYEES")),
         db.Table(_required_env("TABLE_ATTENDANCE")),
@@ -69,7 +70,7 @@ def _alert_failure(exc):
     if not topic:
         return
     try:
-        boto3.client("sns", region_name=REGION).publish(
+        boto3.client("sns", region_name=_region()).publish(
             TopicArn=topic,
             Subject="Attendance daily job failed",
             Message=f"Daily attendance job failed ({type(exc).__name__}). Check CloudWatch logs.",
@@ -190,7 +191,7 @@ def lambda_handler(event, context):
             "records": records,
         }
         _write_report(
-            boto3.client("s3", region_name=REGION),
+            boto3.client("s3", region_name=_region()),
             _required_env("BUCKET_REPORTS"),
             report,
         )

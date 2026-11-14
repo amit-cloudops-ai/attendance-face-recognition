@@ -11,7 +11,8 @@ from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
-REGION = os.getenv("AWS_REGION", "us-east-1")
+def _region() -> str:
+    return os.getenv("AWS_REGION", "us-east-1")
 _DAILY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _WEEKLY = re.compile(r"^(\d{4})-W(\d{2})$")
 
@@ -65,7 +66,7 @@ def lambda_handler(event, context):
     bucket = _required_env("BUCKET_REPORTS")
     json_key = f"reports/{kind}/{period}.json"
     csv_key = f"reports/{kind}/{period}.csv"
-    s3 = boto3.client("s3", region_name=REGION)
+    s3 = boto3.client("s3", region_name=_region())
     try:
         response = s3.get_object(Bucket=bucket, Key=json_key)
         summary = json.loads(response["Body"].read())
