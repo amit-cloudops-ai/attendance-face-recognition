@@ -759,6 +759,13 @@ jobs:
               raise SystemExit("Billing deployment must be gated to main")
           if "inputs.environment != 'billing'" not in workflow:
               raise SystemExit("Billing root must not require Cognito/runtime boundary variables")
+          billing_docs = Path("docs/BILLING-DEPLOYMENT.md").read_text(encoding="utf-8")
+          for required in ("attendance-dev-monthly-cost", "attendance-prod-monthly-cost",
+                           "budgets:ViewBudget", "budgets:ModifyBudget",
+                           "aws-portal:ViewBilling", "aws-portal:ModifyBilling",
+                           "attendance/billing/terraform.tfstate", "billing-plan", "billing-apply"):
+              if required not in billing_docs:
+                  raise SystemExit(f"Billing deployment guide missing: {required}")
           PY
 
   terraform-fmt:
