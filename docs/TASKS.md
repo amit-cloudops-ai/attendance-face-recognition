@@ -22,7 +22,7 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 | T07 | Verify Terraform provider IAM actions for data and recognition modules | DONE | All provider operations mapped, including Lambda, IAM, DynamoDB, Scheduler, SQS, Rekognition and CloudWatch |
 | T08 | Verify Terraform provider IAM actions for access module | DONE | Cognito, API Gateway v2, CloudFront, S3 and Lambda permission operations mapped |
 | T09 | Build dev plan-role policy | DONE | Read-only planning permissions, dev-only state/lock access, no resource mutation |
-| T10 | Build dev apply-role policy | IN_PROGRESS | Exact dev resource permissions, boundary enforcement and exact iam:PassRole scopes |
+| T10 | Build dev apply-role policy | DONE | Exact dev resource permissions, boundary enforcement and exact iam:PassRole scopes |
 | T11 | Build prod plan-role policy | TODO | Read-only planning permissions, prod-only state/lock access, no resource mutation |
 | T12 | Build prod apply-role policy | TODO | Exact prod resource permissions, boundary enforcement and exact iam:PassRole scopes |
 | T13 | Review Terraform state bucket bootstrap specification | TODO | Versioning, public access block, SSE-S3, ownership controls, TLS-only bucket policy, state/lock object scope documented |
@@ -69,6 +69,6 @@ Status values: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. A task is not `DONE` un
 
 - T01 is complete: governance files restored and branch CI passed on commits `be5b4e94c41f760d6bd750bf283f76dec222b2ef` and `aa293276cc8d35961ac75b6cd70ccd681105ae0f`.
 - T07 is complete: provider v6.73.0 operations for DynamoDB, CloudWatch, IAM, Lambda, Scheduler, SQS, Rekognition and S3 notifications are mapped in `docs/security/DATA-RECOGNITION-PROVIDER-IAM.md`. CI run [43614059591](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43614059591) passed Python and Terraform jobs.
-- T08 is complete (PR #11); T09 is complete (PR #12); T32 is complete (PR #13). T33 is complete (PR #17). T34 is complete (PR #14); T35 and T36 are complete (PRs #15–#16). T10 is now active: finish and validate the dev apply-role policy set.
+- T08 is complete (PR #11); T09 is complete (PR #12); T32 is complete (PR #13). T33 is complete (PR #17). T34 is complete (PR #14); T35 and T36 are complete (PRs #15–#16). T10 is complete: split dev apply-role policy set passes CI run [43617809368](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43617809368). T11 is active: build the prod read-only plan-role policy.
 - Do not reorder or mark tasks complete without evidence.
 - The task board is a plan, not proof that implementation or AWS validation has occurred.
