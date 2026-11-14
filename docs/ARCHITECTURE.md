@@ -49,6 +49,8 @@ Latency budget (target p95 under 3 s): client resize + upload about 0.5 s, S3 ev
 Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee over a date range (PK query), by date for all employees (GSI `date-index`), employee list (about 100 items; Scan is acceptable at this scale), result polling by `request_id` (TTL 1 day).
 
 ## 6. Security
+The encrypted alerts topic is protected by an explicit SNS topic policy that preserves account-owner management and allows only CloudWatch alarms in the same account with the `attendance-${var.env}-*` alarm-name prefix to publish. The customer-managed KMS key policy separately permits the CloudWatch service principal to encrypt alarm notifications. Daily/weekly Lambda publisher roles have `kms:Decrypt` and `kms:GenerateDataKey*` through the regional SNS service, bounded by the environment runtime permissions boundary. The dev/prod runtime modules wait for foundation resources so the topic policy exists before alarms are created.
+
 ### 6.1 IAM matrix (one role per Lambda; all get CloudWatch Logs on their own log group; KMS permissions are granted only to handlers that need encrypted S3/SQS/SNS operations)
 | Lambda | Allowed actions and resources |
 |---|---|
