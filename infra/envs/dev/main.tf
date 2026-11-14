@@ -3,7 +3,8 @@ module "foundation" {
 
   env         = var.env
   account_id  = var.account_id
-  alert_email = var.alert_email
+  alert_email        = var.alert_email
+  raw_upload_origins = var.allowed_origins
 }
 
 module "data" {
