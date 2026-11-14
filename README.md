@@ -47,6 +47,9 @@ scripts/     seed data, e2e smoke test
 ## Environments and branches
 `develop` auto-deploys to **dev**; `main` deploys to **prod** after manual approval. Feature branches: `a/<topic>`, `b/<topic>`, `c/<topic>`, `lead/<topic>`; open PRs into `develop`.
 
+## Frontend and local verification
+The kiosk is served at `/`, the admin app at `/admin/`, and Cognito returns to `/callback.html`. See [docs/FRONTEND.md](docs/FRONTEND.md) for local run instructions, runtime configuration and the browser verification matrix. The generated `web/config.json` is ignored by Git and uploaded by the access Terraform module.
+
 ## Deploy
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 11 (bootstrap once, then CI deploys).
 
@@ -61,3 +64,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 11 (bootstrap once, the
 | [COST](docs/COST.md) | Cost sheet (100 employees, 2 scans/day) |
 | [DEMO_SCRIPT](docs/DEMO_SCRIPT.md) | Video storyboard |
 | [AI_CONTEXT](docs/AI_CONTEXT.md) | Paste into any AI assistant at the start of a session |
+| [FRONTEND](docs/FRONTEND.md) | Local run, Cognito config and browser verification |
