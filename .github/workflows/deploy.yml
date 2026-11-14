@@ -42,7 +42,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      AWS_REGION: us-east-1
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       TF_ROOT: ${{ inputs.environment == 'billing' && 'infra/billing' || format('infra/envs/{0}', inputs.environment) }}
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
@@ -60,6 +59,13 @@ jobs:
     steps:
       - name: Check out selected release branch
         uses: actions/checkout@v4
+
+      - name: Load canonical AWS region
+        shell: bash
+        run: |
+          set -euo pipefail
+          region="$(python scripts/check_region_consistency.py --print-region)"
+          echo "AWS_REGION=$region" >> "$GITHUB_ENV"
 
       - name: Validate deployment configuration
         shell: bash
