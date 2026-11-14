@@ -22,3 +22,13 @@ variable "alert_email" {
   description = "Email address subscribed to the attendance alerts topic and AWS Budget notifications."
   type        = string
 }
+
+variable "raw_upload_origins" {
+  description = "Exact browser origins permitted to POST short-lived kiosk/enrollment presigned uploads."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.raw_upload_origins) > 0
+    error_message = "At least one raw upload origin is required."
+  }
+}
