@@ -45,10 +45,30 @@ Create GitHub Environments:
 Configure these repository/environment variables:
 
 - `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`
+- `TF_PLAN_AGE_RECIPIENT` (environment variable; age public recipient for the matching environment)
 - `TF_STATE_BUCKET`, `AWS_ACCOUNT_ID`, `ALERT_EMAIL`
 - `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS`, `ALLOWED_ORIGINS` (each a non-empty JSON array of strings)
 
 The manual workflow is `.github/workflows/deploy.yml`. Trigger it from `develop` for dev or `main` for prod, choose `plan` first, review the uploaded plan artifact, then trigger `apply` and supply the successful plan run ID. Apply downloads and uses that exact saved plan. It verifies the plan run succeeded on the same environment branch and exact commit SHA; stale or mismatched plans fail safely. Production runs are gated by the `prod` environment reviewer. The workflow uses GitHub OIDC and short-lived credentials; never store AWS access keys.
+
+### Encrypt saved Terraform plans
+
+This repository is public. GitHub Actions artifacts are readable by anyone with repository read access, and Terraform plan files can contain sensitive values in clear text. The workflow therefore encrypts the binary plan with `age` before upload and decrypts it only in the matching apply run.
+
+Create a separate age key pair for each GitHub Environment (`dev` and `prod`) on a trusted local machine:
+
+```bash
+age-keygen -o attendance-dev-plan-identity.txt
+age-keygen -o attendance-prod-plan-identity.txt
+```
+
+For each key pair:
+- Copy the `# public key:` recipient from the generated file into that environment's `TF_PLAN_AGE_RECIPIENT` variable.
+- Store the complete private identity file contents as that environment's `TF_PLAN_AGE_IDENTITY` secret.
+- Keep the identity files outside the repository and store a protected offline backup. Never paste the private identity into a workflow variable, commit, issue, or chat.
+- Use the dev recipient/identity only in the `dev` environment and the prod pair only in `prod`.
+
+The plan artifact remains encrypted at rest in GitHub Actions and expires after one day. Only a run with access to the matching environment secret can decrypt it. The GitHub environment branch restrictions and production reviewer remain mandatory controls.
 
 ## Safety gate
 
