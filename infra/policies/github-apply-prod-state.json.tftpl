@@ -11,7 +11,7 @@
       "Resource": "arn:aws:s3:::${state_bucket}"
     },
     {
-      "Sid": "DevStateBucketList",
+      "Sid": "ProdStateBucketList",
       "Effect": "Allow",
       "Action": [
         "s3:ListBucket"
@@ -27,7 +27,7 @@
       }
     },
     {
-      "Sid": "DevStateObject",
+      "Sid": "ProdStateObject",
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
@@ -36,7 +36,7 @@
       "Resource": "arn:aws:s3:::${state_bucket}/attendance/prod/terraform.tfstate"
     },
     {
-      "Sid": "DevLockfileLifecycle",
+      "Sid": "ProdLockfileLifecycle",
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
