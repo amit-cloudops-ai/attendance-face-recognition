@@ -2,6 +2,26 @@
 
 ## Executive status
 
+## Application correctness release gate — 15 November 2026
+
+**Status: PASS at code, unit-regression, static-analysis and Terraform-validation level.** Source of truth remains `solo/amit-monday`; no teammate branch or PR was merged.
+
+The application audit and fixes completed on this branch include:
+
+- Weekly metrics now exclude attendance records on weekends and holidays from every numerator.
+- Employee create/deactivate, attendance override, settings updates, and face-template offboarding commit the relevant DynamoDB state change and audit record transactionally.
+- Settings updates use a strongly consistent read and conditional version check; overrides reject stale concurrent writes.
+- Recognition attendance writes include an employee-active condition in the same transaction, closing the deactivation/scan race.
+- A late-arriving clock-out clears the stale `missing_clock_out` flag, including after the daily job has finalized the date.
+- Exhausted scan failures reconcile the strongly consistent attendance base table if the date-index GSI has not caught up.
+- Admin offboarding can be retried after partial failure without exposing FaceIds; enrollment capacity and attendance pagination now track current UI state.
+- Regression coverage was added for transaction failures, concurrency, deactivation races, eventual GSI consistency, offboarding retries, stale flags and enrollment capacity.
+
+**Final consolidated CI evidence:** run [43678470743](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43678470743), commit `ed71923c67e962ece4773aec044b653323653b95`. Both jobs passed: **108 Python tests**, Ruff, region consistency, browser JavaScript syntax/CSP, shell syntax, workflow YAML, IAM/security template validations, Terraform formatting, and Terraform init/validate for recognition, data, foundation, access, dev, prod and billing.
+
+**Important boundary:** this is not a claim that live AWS authorization, real Rekognition behavior, or physical-browser performance has been measured. The browser code passed syntax/CSP checks and the deployed browser/device matrix plus the 20-scan p95 latency acceptance test remain Part 2 post-deployment checks. No AWS resources have been provisioned, no remote backend initialized, and no Terraform plan or apply run. AWS writes remain separately approval-gated.
+
+
 The solo application and the T01–T38 deployment-security and region-guard task chain have been consolidated into `solo/amit-monday`. The T01–T15, T17 and T31–T37 implementation tasks are complete at the code/documentation level with historical CI evidence recorded in their task PRs. T16 and T18 remain blocked on repository-administrator and owner-controlled AWS-account information/actions.
 
 The region-consistency implementation is complete on this branch: `config/deployment.json` is the canonical AWS region manifest; Terraform provider roots read it; the deployment workflow and local Terraform wrapper export it for the S3 backend; Lambda clients use the Lambda-reserved `AWS_REGION`; contracts and examples are aligned; CI rejects any noncanonical AWS region literal, regional ARN or regional endpoint. The full consolidated CI run 43622495235 passed on commit `65f82c6597bd9705c334b5cb2f6b3bfc528c946d` (27 Python/security steps and 21 Terraform formatting/validation steps).
