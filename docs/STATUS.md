@@ -64,6 +64,7 @@ The task PR CI runs are historical evidence for their respective commits. The fi
 - Moto test fixtures are aligned to the target region.
 - CI runs `scripts/check_region_consistency.py`, which checks the manifest, Terraform roots, backend configuration, all repository text for noncanonical region tokens, regional ARNs/endpoints and Lambda region selection. The local Terraform wrapper and GitHub deployment workflow also run the full gate before proceeding.
 - Full CI run 43622495235 passed on commit `65f82c6`.
+- A subsequent pre-deployment review found two gaps not covered by the prior region gate: `infra/modules/access` duplicated the canonical region literal, and the DynamoDB KMS grant statement had been placed in the S3 web-bucket policy instead of the KMS key policy. T38 has been reopened on a dedicated follow-up branch to move all access-module region references to the root-provided manifest value, relocate the KMS statement to the KMS key policy, and add regression checks. No AWS operations have been performed.
 
 No system can guarantee that a future contributor never writes an incorrect region, but the new automated gate is designed to fail every pull request/push that reintroduces a conflicting region into tracked project files.
 
