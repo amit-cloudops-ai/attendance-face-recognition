@@ -8,6 +8,11 @@ variable "env" {
   }
 }
 
+variable "region" {
+  description = "Canonical AWS region supplied by the environment root."
+  type        = string
+}
+
 variable "account_id" {
   description = "12-digit AWS account ID used for the Cognito domain and CloudFront policy."
   type        = string
