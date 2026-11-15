@@ -1,0 +1,144 @@
+"""Fail CI when repository configuration drifts from its canonical AWS region."""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+REGION_FILE = ROOT / "config" / "deployment.json"
+LEGACY_REGION = "ap-" + "south-1"
+EXPECTED_REGION = "us-east-1"
+AWS_REGION_TOKEN = re.compile(r"\b(?:af|ap|ca|cn|eu|il|me|mx|sa|us|eusc|us-gov|us-iso|us-isob)-[a-z]+(?:-[a-z]+)?-\d\b")
+REGIONAL_ARN = re.compile(r"arn:aws:[^:\s\"']+:([a-z]{2}(?:-[a-z0-9]+)+-\d):")
+REGIONAL_ENDPOINT = re.compile(
+    r"\b[a-z0-9-]+\.([a-z]{2}(?:-[a-z0-9]+)+-\d)\.(?:amazonaws|amazoncognito)\.com\b"
+)
+
+
+def load_region() -> str:
+    config = json.loads(REGION_FILE.read_text(encoding="utf-8"))
+    region = config.get("aws_region")
+    if region != EXPECTED_REGION:
+        raise SystemExit(
+            f"config/deployment.json must declare {EXPECTED_REGION!r}; found {region!r}"
+        )
+    return region
+
+
+def validate() -> None:
+    region = load_region()
+    errors: list[str] = []
+
+    required_markers = {
+        "README.md": f"AWS ({region})",
+        "docs/contracts.md": f"| Region | {chr(96)}{region}{chr(96)}",
+        "docs/SPEC.md": f"Single region ({region})",
+        "docs/ARCHITECTURE.md": f"Single region {region}",
+        "docs/COST.md": f"region {region}",
+        "docs/FRONTEND.md": f'"region": "{region}"',
+        "docs/parts/PART-A-recognition.md": "AWS_REGION",
+        ".github/workflows/deploy.yml": "scripts/check_region_consistency.py --print-region",
+    }
+    for relative, marker in required_markers.items():
+        path = ROOT / relative
+        if not path.exists() or marker not in path.read_text(encoding="utf-8"):
+            errors.append(f"{relative} is missing the canonical region marker: {marker}")
+
+    terraform_roots = {
+        "infra/envs/dev/versions.tf": "../../../config/deployment.json",
+        "infra/envs/prod/versions.tf": "../../../config/deployment.json",
+        "infra/billing/versions.tf": "../../config/deployment.json",
+    }
+    for relative, manifest_path in terraform_roots.items():
+        content = (ROOT / relative).read_text(encoding="utf-8")
+        if manifest_path not in content or "region = local.deployment_region" not in content:
+            errors.append(f"{relative} must load its provider region from {manifest_path}")
+        backend = content.split('backend "s3" {', 1)[1].split("}", 1)[0]
+        if re.search(r"^\s*region\s*=", backend, re.MULTILINE):
+            errors.append(f"{relative} must not duplicate the backend region; use AWS_REGION")
+
+    access_module = (ROOT / "infra/modules/access/main.tf").read_text(encoding="utf-8")
+    access_variables = (ROOT / "infra/modules/access/variables.tf").read_text(encoding="utf-8")
+    if 'region = "us-east-1"' in access_module or "local.region" in access_module:
+        errors.append("infra/modules/access must not hardcode a second AWS region")
+    if "var.region" not in access_module or 'variable "region"' not in access_variables:
+        errors.append("infra/modules/access must consume an explicit canonical region input")
+    for relative in ("infra/envs/dev/main.tf", "infra/envs/prod/main.tf"):
+        content = (ROOT / relative).read_text(encoding="utf-8")
+        access_call = content.split('module "access" {', 1)[1].split("\n}", 1)[0]
+        if "region                          = local.deployment_region" not in access_call:
+            errors.append(f"{relative} must pass the canonical manifest region into module.access")
+
+    for relative in (
+        "infra/envs/dev/backend.hcl.example",
+        "infra/envs/prod/backend.hcl.example",
+    ):
+        content = (ROOT / relative).read_text(encoding="utf-8")
+        if re.search(r"^\s*region\s*=", content, re.MULTILINE):
+            errors.append(f"{relative} must not duplicate the canonical region")
+        if "attendance-tf-state-" not in content or "attendance-tfstate-" in content:
+            errors.append(f"{relative} must use the approved attendance-tf-state bucket naming pattern")
+
+    # Every SDK-using Lambda handler must resolve its region from the Lambda runtime.
+    for path in (ROOT / "services").rglob("*.py"):
+        content = path.read_text(encoding="utf-8")
+        if "boto3." in content and 'os.getenv("AWS_REGION", "us-east-1")' not in content:
+            errors.append(f"{path.relative_to(ROOT)} must resolve SDK region from AWS_REGION")
+
+    # Shared AWS helpers must follow the same runtime-region contract.
+    for relative in (
+        "shared/python/attendance_common/config.py",
+        "shared/python/attendance_common/record_scan.py",
+    ):
+        content = (ROOT / relative).read_text(encoding="utf-8")
+        if 'os.getenv("AWS_REGION", "us-east-1")' not in content:
+            errors.append(f"{relative} must resolve SDK region from AWS_REGION")
+
+    ignored_parts = {".git", ".terraform", "__pycache__", ".venv", "node_modules"}
+    for path in ROOT.rglob("*"):
+        if not path.is_file() or ignored_parts.intersection(path.parts):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        relative = path.relative_to(ROOT)
+        if LEGACY_REGION in text:
+            errors.append(f"{relative} contains a superseded region reference")
+        for match in AWS_REGION_TOKEN.finditer(text):
+            if match.group(0) != region:
+                errors.append(
+                    f"{relative} contains region literal {match.group(0)}, expected {region}"
+                )
+                break
+        for pattern, label in (
+            (REGIONAL_ARN, "regional ARN"),
+            (REGIONAL_ENDPOINT, "regional AWS endpoint"),
+        ):
+            for match in pattern.finditer(text):
+                if match.group(1) != region:
+                    errors.append(
+                        f"{relative} contains {label} in {match.group(1)}, expected {region}"
+                    )
+                    break
+
+    if errors:
+        print("AWS region consistency check failed:", file=sys.stderr)
+        for error in errors:
+            print(f" - {error}", file=sys.stderr)
+        raise SystemExit(1)
+
+    print(f"AWS region consistency check passed: {region}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--print-region", action="store_true")
+    args = parser.parse_args()
+    if args.print_region:
+        print(load_region())
+    else:
+        validate()

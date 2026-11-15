@@ -1,0 +1,177 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EmployeesTableRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Scan",
+        "dynamodb:ConditionCheckItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-dev-employees"
+    },
+    {
+      "Sid": "AttendanceTableRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-dev-attendance",
+        "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-dev-attendance/index/date-index"
+      ]
+    },
+    {
+      "Sid": "ScanResultsTableRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-dev-scan-results"
+    },
+    {
+      "Sid": "ConfigTableRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-dev-config"
+    },
+    {
+      "Sid": "AuditTableRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:${account_id}:table/attendance-dev-audit"
+    },
+    {
+      "Sid": "RawCaptureObjectRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::attendance-dev-${account_id}-raw/captures/*"
+    },
+    {
+      "Sid": "RawEnrollmentObjectRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::attendance-dev-${account_id}-raw/enroll/*"
+    },
+    {
+      "Sid": "ReportObjectRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::attendance-dev-${account_id}-reports/reports/*"
+    },
+    {
+      "Sid": "KmsRuntimeAccessViaS3AndSqs",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:GenerateDataKey"
+      ],
+      "Resource": "arn:aws:kms:us-east-1:${account_id}:key/*",
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "kms:ResourceAliases": "alias/attendance-dev"
+        },
+        "StringEquals": {
+          "kms:ViaService": [
+            "s3.us-east-1.amazonaws.com",
+            "sqs.us-east-1.amazonaws.com"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "RekognitionDetectFaces",
+      "Effect": "Allow",
+      "Action": [
+        "rekognition:DetectFaces"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RekognitionCollectionRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "rekognition:SearchFacesByImage",
+        "rekognition:IndexFaces",
+        "rekognition:DeleteFaces"
+      ],
+      "Resource": "arn:aws:rekognition:us-east-1:${account_id}:collection/attendance-dev-faces"
+    },
+    {
+      "Sid": "SqsProducerRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:SendMessage"
+      ],
+      "Resource": [
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-recognize-dlq",
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-enroll-dlq"
+      ]
+    },
+    {
+      "Sid": "SqsConsumerRuntimeAccess",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:GetQueueAttributes"
+      ],
+      "Resource": [
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-recognize-dlq",
+        "arn:aws:sqs:us-east-1:${account_id}:attendance-dev-enroll-dlq"
+      ]
+    },
+    {
+      "Sid": "AlertsTopicPublish",
+      "Effect": "Allow",
+      "Action": [
+        "sns:Publish"
+      ],
+      "Resource": "arn:aws:sns:us-east-1:${account_id}:attendance-dev-alerts"
+    },
+    {
+      "Sid": "SchedulerInvokeMatchingJobs",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:InvokeFunction"
+      ],
+      "Resource": [
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-dev-daily-job",
+        "arn:aws:lambda:us-east-1:${account_id}:function:attendance-dev-weekly-job"
+      ]
+    },
+    {
+      "Sid": "LambdaLogStreamWrite",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:${account_id}:log-group:/aws/lambda/attendance-dev-*:*"
+    }
+  ]
+}

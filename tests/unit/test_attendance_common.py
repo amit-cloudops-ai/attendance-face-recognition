@@ -1,0 +1,237 @@
+from datetime import datetime
+from decimal import Decimal
+from uuid import uuid4
+from zoneinfo import ZoneInfo
+
+import boto3
+import pytest
+from attendance_common import config
+from attendance_common.record_scan import record_scan
+from attendance_common.responses import error, ok
+from attendance_common.tz import IST, now_ist, parse_hhmm, to_iso, today_ist
+from moto import mock_aws
+
+from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
+
+UTC = ZoneInfo("UTC")
+
+@pytest.fixture
+def aws_tables(monkeypatch):
+    with mock_aws():
+        monkeypatch.setenv("AWS_REGION", "us-east-1")
+        monkeypatch.setenv("TABLE_EMPLOYEES", "employees")
+        monkeypatch.setenv("TABLE_ATTENDANCE", "attendance")
+        monkeypatch.delenv("TABLE_CONFIG", raising=False)
+        config._reset_cache()
+        db = boto3.resource("dynamodb", region_name="us-east-1")
+        monkeypatch.setattr(boto3, "resource", lambda *args, **kwargs: db)
+        employees = db.create_table(TableName="employees", KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "employee_id", "AttributeType": "S"}], BillingMode="PAY_PER_REQUEST")
+        attendance = db.create_table(TableName="attendance", KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"},
+            {"AttributeName": "date", "KeyType": "RANGE"}], AttributeDefinitions=[{"AttributeName": "employee_id", "AttributeType": "S"},
+            {"AttributeName": "date", "AttributeType": "S"}], BillingMode="PAY_PER_REQUEST")
+        employees.put_item(Item={"employee_id": "EMP001", "name": "Test Employee", "active": True,
+                                 "shift_start": "09:00", "shift_end": "18:00"})
+        install_transaction_emulator(monkeypatch, db)
+        yield employees, attendance
+        config._reset_cache()
+
+def scan(at, confidence=98.5):
+    return record_scan("EMP001", datetime.fromisoformat(at), confidence)
+
+def test_time_helpers():
+    assert parse_hhmm("09:05").isoformat(timespec="minutes") == "09:05"
+    assert to_iso(datetime(2026, 11, 14, 3, 30, tzinfo=UTC)) == "2026-11-14T09:00:00+05:30"
+    assert now_ist().tzinfo == IST
+    assert today_ist() == now_ist().date()
+    for bad in ("9:05", "24:00", "12:60", "12:00:01", None):
+        with pytest.raises(ValueError):
+            parse_hhmm(bad)
+    with pytest.raises(ValueError):
+        to_iso(datetime(2026, 11, 14, 9, 0))
+
+def test_response_envelopes():
+    import json
+    assert ok({"x": 1})["statusCode"] == 200
+    failure = error(404, "not_found", "Missing")
+    assert failure["statusCode"] == 404
+    assert json.loads(failure["body"]) == {"error": {"code": "not_found", "message": "Missing"}}
+
+def test_first_scan_creates_present_clock_in(aws_tables):
+    _, table = aws_tables
+    result = scan("2026-11-14T09:10:00+05:30")
+    assert result == {"action": "clock_in", "status": "present", "date": "2026-11-14",
+                      "clock_in": "2026-11-14T09:10:00+05:30", "clock_out": None}
+    item = table.get_item(Key={"employee_id": "EMP001", "date": "2026-11-14"})["Item"]
+    assert item["confidence"] == Decimal("98.5") and item["source"] == "face"
+
+def test_late_boundary_is_strictly_after_shift_plus_grace(aws_tables):
+    assert scan("2026-11-14T09:15:00+05:30")["status"] == "present"
+    # Different business date so this is an independent first scan.
+    assert scan("2026-11-15T09:16:00+05:30")["status"] == "late"
+
+def test_duplicate_inside_debounce_does_not_write_clock_out(aws_tables):
+    first = scan("2026-11-14T09:00:00+05:30")
+    second = scan("2026-11-14T09:09:59+05:30")
+    assert first["action"] == "clock_in" and second["action"] == "duplicate_ignored"
+    assert second["clock_in"] == first["clock_in"] and second["clock_out"] is None
+
+def test_scan_at_debounce_boundary_sets_clock_out(aws_tables):
+    scan("2026-11-14T09:00:00+05:30")
+    result = scan("2026-11-14T09:10:00+05:30")
+    assert result["action"] == "clock_out" and result["clock_out"] == "2026-11-14T09:10:00+05:30"
+
+def test_later_scan_updates_clock_out_and_out_of_order_event_cannot_reverse_it(aws_tables):
+    scan("2026-11-14T09:00:00+05:30")
+    scan("2026-11-14T09:10:00+05:30")
+    latest = scan("2026-11-14T17:30:00+05:30")
+    stale = scan("2026-11-14T12:00:00+05:30")
+    assert latest["clock_out"] == "2026-11-14T17:30:00+05:30"
+    assert stale["clock_out"] == latest["clock_out"]
+
+def test_business_date_uses_ist_after_offset_conversion(aws_tables):
+    result = scan("2026-11-13T20:00:00+00:00")
+    assert result["date"] == "2026-11-14"
+    assert result["clock_in"] == "2026-11-14T01:30:00+05:30"
+
+def test_absent_row_is_conditionally_promoted_to_clock_in(aws_tables):
+    _, table = aws_tables
+    table.put_item(Item={"employee_id": "EMP001", "date": "2026-11-14", "status": "absent",
+                         "flags": {"missing_clock_out"}, "source": "system", "updated_at": "2026-11-14T23:59:00+05:30"})
+    result = scan("2026-11-14T09:05:00+05:30")
+    item = table.get_item(Key={"employee_id": "EMP001", "date": "2026-11-14"})["Item"]
+    assert result["action"] == "clock_in" and item["status"] == "present"
+    assert "flags" not in item
+
+def test_inactive_and_unknown_employees_do_not_create_attendance(aws_tables):
+    employees, table = aws_tables
+    employees.update_item(Key={"employee_id": "EMP001"}, UpdateExpression="SET active=:v", ExpressionAttributeValues={":v": False})
+    with pytest.raises(ValueError, match="inactive"):
+        scan("2026-11-14T09:00:00+05:30")
+    with pytest.raises(ValueError, match="does not exist"):
+        record_scan("EMP999", datetime.fromisoformat("2026-11-14T09:00:00+05:30"), 98)
+    assert table.scan()["Items"] == []
+
+@pytest.mark.parametrize("employee_id,confidence,stamp", [("", 98, "2026-11-14T09:00:00+05:30"),
+    ("EMP001", -1, "2026-11-14T09:00:00+05:30"), ("EMP001", 101, "2026-11-14T09:00:00+05:30"),
+    ("EMP001", 98, "2026-11-14T09:00:00")])
+def test_invalid_inputs_are_rejected(aws_tables, employee_id, confidence, stamp):
+    with pytest.raises(ValueError):
+        record_scan(employee_id, datetime.fromisoformat(stamp), confidence)
+
+def test_settings_defaults_are_filled_in(monkeypatch):
+    monkeypatch.delenv("TABLE_CONFIG", raising=False)
+    config._reset_cache()
+    settings = config.get_settings()
+    assert settings["grace_minutes"] == 15 and settings["debounce_minutes"] == 10
+    assert settings["weekend_days"] == [6, 7]
+    config._reset_cache()
+
+def test_same_request_id_returns_original_clock_in_without_clocking_out(aws_tables):
+    _, table = aws_tables
+    request_id = str(uuid4())
+    stamp = datetime.fromisoformat("2026-11-14T09:00:00+05:30")
+    first = record_scan("EMP001", stamp, 98.5, request_id=request_id)
+    retried = record_scan("EMP001", stamp, 98.5, request_id=request_id)
+    item = table.get_item(Key={"employee_id": "EMP001", "date": "2026-11-14"})["Item"]
+    assert first == retried
+    assert first["action"] == "clock_in"
+    assert item.get("clock_out") is None
+    assert item["scan_events"][request_id] == first
+
+def test_different_request_after_debounce_records_clock_out(aws_tables):
+    first_id, second_id = str(uuid4()), str(uuid4())
+    first = record_scan(
+        "EMP001", datetime.fromisoformat("2026-11-14T09:00:00+05:30"),
+        98.5, request_id=first_id,
+    )
+    second = record_scan(
+        "EMP001", datetime.fromisoformat("2026-11-14T09:10:00+05:30"),
+        98.5, request_id=second_id,
+    )
+    assert first["action"] == "clock_in"
+    assert second["action"] == "clock_out"
+    assert second["clock_out"] == "2026-11-14T09:10:00+05:30"
+
+def test_request_idempotency_initializes_existing_attendance_rows(aws_tables):
+    _, table = aws_tables
+    table.put_item(Item={
+        "employee_id": "EMP001", "date": "2026-11-14",
+        "clock_in": "2026-11-14T09:00:00+05:30", "status": "present",
+        "source": "face", "updated_at": "2026-11-14T09:00:00+05:30",
+    })
+    request_id = str(uuid4())
+    stamp = datetime.fromisoformat("2026-11-14T09:10:00+05:30")
+    first = record_scan("EMP001", stamp, 98.5, request_id=request_id)
+    retried = record_scan("EMP001", stamp, 98.5, request_id=request_id)
+    assert first == retried
+    assert first["action"] == "clock_out"
+
+def test_employee_deactivation_between_read_and_attendance_write_is_blocked(aws_tables, monkeypatch):
+    employees, attendance = aws_tables
+    client = attendance.meta.client
+    original = client.transact_write_items
+    deactivated = {"done": False}
+
+    def deactivate_before_commit(**kwargs):
+        if not deactivated["done"]:
+            employees.update_item(Key={"employee_id": "EMP001"},
+                UpdateExpression="SET active=:inactive", ExpressionAttributeValues={":inactive": False})
+            deactivated["done"] = True
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", deactivate_before_commit)
+    with pytest.raises(ValueError, match="inactive"):
+        scan("2026-11-14T09:00:00+05:30")
+    assert attendance.scan()["Items"] == []
+
+def test_active_employee_guard_and_attendance_write_share_transaction(aws_tables, monkeypatch):
+    employees, attendance = aws_tables
+    client = attendance.meta.client
+    original = client.transact_write_items
+    captured = []
+
+    def capture(**kwargs):
+        captured.append(kwargs["TransactItems"])
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", capture)
+    scan("2026-11-14T09:00:00+05:30")
+    assert len(captured) == 1
+    assert [next(iter(action)) for action in captured[0]] == ["ConditionCheck", "Put"]
+    assert captured[0][0]["ConditionCheck"]["TableName"] == employees.name
+    assert captured[0][1]["Put"]["TableName"] == attendance.name
+
+
+
+def test_late_clockout_clears_daily_missing_clockout_flag(aws_tables):
+    _, attendance = aws_tables
+    scan("2026-11-14T09:00:00+05:30")
+    attendance.update_item(
+        Key={"employee_id": "EMP001", "date": "2026-11-14"},
+        UpdateExpression="ADD flags :flags",
+        ExpressionAttributeValues={":flags": {"missing_clock_out"}},
+    )
+    result = scan("2026-11-14T18:00:00+05:30")
+    item = attendance.get_item(
+        Key={"employee_id": "EMP001", "date": "2026-11-14"}
+    )["Item"]
+    assert result["action"] == "clock_out"
+    assert result["clock_out"] == "2026-11-14T18:00:00+05:30"
+    assert "missing_clock_out" not in item.get("flags", set())
+
+
+
+def test_recognition_writes_monotonically_increasing_attendance_version(aws_tables):
+    _, attendance = aws_tables
+    scan("2026-11-14T09:00:00+05:30")
+    first = attendance.get_item(
+        Key={"employee_id": "EMP001", "date": "2026-11-14"}
+    )["Item"]
+    assert first["version"] == 1
+
+    scan("2026-11-14T18:00:00+05:30")
+    second = attendance.get_item(
+        Key={"employee_id": "EMP001", "date": "2026-11-14"}
+    )["Item"]
+    assert second["version"] == 2

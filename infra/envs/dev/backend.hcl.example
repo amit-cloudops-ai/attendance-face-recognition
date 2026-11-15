@@ -1,0 +1,3 @@
+bucket       = "attendance-tf-state-924422830139-approved-suffix"
+encrypt      = true
+use_lockfile = true

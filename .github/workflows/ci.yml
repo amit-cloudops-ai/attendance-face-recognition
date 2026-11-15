@@ -1,25 +1,913 @@
 name: CI
 on:
   pull_request:
-    branches: [develop, main]
+    branches: [solo/amit-monday, develop, main, "release/**"]
   push:
-    branches: [develop, main]
+    branches: [solo/amit-monday, develop, main, "ai/**", "release/**"]
 
 jobs:
   python:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12"
-      - run: pip install -r requirements-dev.txt
+          python-version: "3.12.16"
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Audit pinned Python dependencies for known vulnerabilities
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: requirements-dev.txt
+          no-deps: true
       - run: ruff check .
       - run: pytest -q
+      - name: Enforce canonical AWS region across contracts, code and infrastructure
+        run: python scripts/check_region_consistency.py
+      - name: Check frontend and Terraform configuration contracts
+        run: python scripts/check_frontend_terraform_contract.py
+      - name: Check browser JavaScript syntax and HTML CSP hygiene
+        run: |
+          for file in web/*.js web/shared/*.js web/admin/*.js; do
+            [ -f "$file" ] || continue
+            node --input-type=module --check < "$file"
+          done
+          if grep -R --include='*.html' -n 'style="' web; then
+            echo "Inline styles conflict with the strict Content-Security-Policy."
+            exit 1
+          fi
+      - name: Enforce camera-first enrollment and exact S3 CSP scope
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          admin = Path("web/admin.js").read_text(encoding="utf-8")
+          admin_html = Path("web/admin/index.html").read_text(encoding="utf-8")
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          if "navigator.mediaDevices?.getUserMedia" not in admin:
+              raise SystemExit("Admin enrollment must request browser camera access.")
+          if 'id="enroll-camera"' not in admin_html or 'id="enroll-capture"' not in admin_html:
+              raise SystemExit("Admin enrollment camera and capture controls are required.")
+          if 'picker.type = "file"' in admin or "picker.click()" in admin:
+              raise SystemExit("Gallery-first enrollment is not permitted.")
+          if 'https://${var.raw_bucket_name}.s3.amazonaws.com' not in access:
+              raise SystemExit("CSP must allow the exact virtual-hosted raw S3 upload endpoint.")
+          if "style-src 'self'" not in access:
+              raise SystemExit("Keep stylesheets restricted to the same origin.")
+          for path in Path("web").rglob("*"):
+              if path.is_file() and path.suffix.lower() in {".html", ".js", ".css"}:
+                  content = path.read_text(encoding="utf-8")
+                  if "fonts.googleapis.com" in content or "cdn.jsdelivr.net" in content:
+                      raise SystemExit(f"External stylesheet dependency must be self-hosted: {path}")
+          PY
+
+      - name: Check shell script syntax
+        run: |
+          for script in scripts/*.sh; do
+            bash -n "$script"
+          done
+      - name: Validate GitHub Actions workflow YAML
+        run: |
+          python - <<'PY'
+          import yaml
+
+          for path in (".github/workflows/ci.yml", ".github/workflows/deploy.yml"):
+              with open(path, encoding="utf-8") as stream:
+                  yaml.compose(stream, Loader=yaml.BaseLoader)
+          PY
+
+      - name: Validate rendered IAM permissions-boundary templates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          for env in ("dev", "prod"):
+              path = Path(f"infra/policies/execution-role-boundary-{env}.json.tftpl")
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              if "${account_id}" in rendered:
+                  raise SystemExit(f"Unresolved account placeholder in {path}")
+              policy = json.loads(rendered)
+              if policy.get("Version") != "2012-10-17" or not policy.get("Statement"):
+                  raise SystemExit(f"Invalid IAM policy envelope in {path}")
+              expected_alias = f"alias/attendance-{env}"
+              statements = policy["Statement"]
+              for statement in statements:
+                  actions = statement.get("Action", [])
+                  actions = [actions] if isinstance(actions, str) else actions
+                  if any(action.startswith(("iam:", "sts:")) for action in actions):
+                      raise SystemExit(f"Boundary must not manage IAM/STS: {path}")
+                  if statement.get("Resource") == "*" and actions != ["rekognition:DetectFaces"]:
+                      raise SystemExit(f"Unexpected unscoped resource in {path}: {actions}")
+              kms = next(s for s in statements if s["Sid"] == "KmsRuntimeAccessViaS3AndSqs")
+              if kms["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != expected_alias:
+                  raise SystemExit(f"Wrong KMS alias scope in {path}")
+              if set(kms["Condition"]["StringEquals"]["kms:ViaService"]) != {
+                  "s3.us-east-1.amazonaws.com", "sqs.us-east-1.amazonaws.com"
+              }:
+                  raise SystemExit(f"Wrong KMS ViaService scope in {path}")
+              compact = json.dumps(policy, separators=(",", ":"))
+              if len(compact) > 6144:
+                  raise SystemExit(f"IAM managed policy size exceeds 6144 characters: {path}")
+          PY
+
+      - name: Validate environment deployment IAM policy templates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("infra/policies")
+          names = (
+              "github-plan-dev-core.json.tftpl",
+              "github-plan-dev-edge.json.tftpl",
+              "github-plan-dev-state.json.tftpl",
+          )
+          policies = {}
+          for name in names:
+              path = root / name
+              rendered = path.read_text(encoding="utf-8")
+              rendered = rendered.replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
+              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
+              if "${account_id}" in rendered or "${state_bucket}" in rendered or "${api_id}" in rendered:
+                  raise SystemExit(f"Unresolved template variable in {path}")
+              policy = json.loads(rendered)
+              if policy.get("Version") != "2012-10-17" or not policy.get("Statement"):
+                  raise SystemExit(f"Invalid policy envelope: {path}")
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy size exceeded: {path}")
+              policies[name] = policy
+
+          if any(statement["Sid"] in ("BudgetRead", "BillingRead") for statement in policies[names[0]]["Statement"]):
+              raise SystemExit("Environment plan role must not receive account-level billing permissions")
+          core_edge = policies[names[0]]["Statement"] + policies[names[1]]["Statement"]
+          scheduler_read = next(
+              statement for statement in policies[names[0]]["Statement"]
+              if statement["Sid"] == "SchedulerRead"
+          )
+          scheduler_group_read = next(
+              statement for statement in policies[names[0]]["Statement"]
+              if statement["Sid"] == "SchedulerGroupRead"
+          )
+          if scheduler_read["Resource"] != (
+              "arn:aws:scheduler:us-east-1:123456789012:schedule/attendance-dev/attendance-dev-*"
+          ):
+              raise SystemExit("Dev plan schedule read must use the dedicated dev schedule group")
+          if scheduler_group_read["Resource"] != (
+              "arn:aws:scheduler:us-east-1:123456789012:schedule-group/attendance-dev"
+          ):
+              raise SystemExit("Dev plan schedule-group read must be environment-scoped")
+          forbidden_prefixes = (
+              "iam:Create", "iam:Put", "iam:Update", "iam:Delete", "iam:PassRole",
+              "iam:Attach", "iam:Detach", "iam:Tag", "iam:Untag", "sts:Assume",
+              "lambda:Create", "lambda:Update", "lambda:Delete", "lambda:AddPermission",
+              "lambda:RemovePermission", "lambda:Put", "lambda:Invoke",
+              "s3:Put", "s3:Delete", "kms:Create", "kms:Put", "kms:Schedule",
+              "kms:Enable", "kms:Disable", "cloudfront:Create", "cloudfront:Update",
+              "cloudfront:Delete", "cloudfront:TagResource", "cloudfront:UntagResource",
+              "cognito-idp:Create", "cognito-idp:Update", "cognito-idp:Delete",
+              "cognito-idp:TagResource", "cognito-idp:UntagResource",
+              "apigateway:POST", "apigateway:PUT", "apigateway:PATCH", "apigateway:DELETE",
+              "sns:Publish", "dynamodb:Create", "dynamodb:Update", "dynamodb:Delete",
+              "dynamodb:Put", "sqs:Create", "sqs:Set", "sqs:Delete", "sqs:Send",
+              "scheduler:Create", "scheduler:Update", "scheduler:Delete", "scheduler:TagResource", "scheduler:UntagResource",
+              "rekognition:Create", "rekognition:Index", "rekognition:Delete",
+              "cloudwatch:Put", "cloudwatch:Delete", "logs:Create", "logs:Put",
+              "logs:Delete", "budgets:", "aws-portal:"
+          )
+          for statement in core_edge:
+              actions = statement.get("Action", [])
+              actions = [actions] if isinstance(actions, str) else actions
+              if any(action.startswith(forbidden_prefixes) for action in actions):
+                  raise SystemExit(f"Mutation action in read-only plan policy: {statement['Sid']}")
+              resources = statement.get("Resource", [])
+              resources = [resources] if isinstance(resources, str) else resources
+              if any("attendance/prod/" in resource or "attendance-prod-" in resource for resource in resources):
+                  raise SystemExit(f"Production resource in dev plan policy: {statement['Sid']}")
+
+          state_statements = policies[names[2]]["Statement"]
+          for statement in state_statements:
+              actions = statement.get("Action", [])
+              actions = [actions] if isinstance(actions, str) else actions
+              resources = statement.get("Resource", [])
+              resources = [resources] if isinstance(resources, str) else resources
+              if any(action in ("s3:PutObject", "s3:DeleteObject") for action in actions):
+                  if not all(resource.endswith(".tflock") for resource in resources):
+                      raise SystemExit("Dev plan may mutate only its Terraform lockfile")
+              if any("attendance/prod/" in resource for resource in resources):
+                  raise SystemExit("Dev state policy references production state")
+          prod_names = (
+              "github-plan-prod-core.json.tftpl",
+              "github-plan-prod-edge.json.tftpl",
+              "github-plan-prod-state.json.tftpl",
+          )
+          prod_policies = {}
+          for name in prod_names:
+              path = root / name
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
+              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
+              if "${account_id}" in rendered or "${state_bucket}" in rendered or "${api_id}" in rendered:
+                  raise SystemExit(f"Unresolved template variable in {path}")
+              policy = json.loads(rendered)
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy size exceeded: {path}")
+              prod_policies[name] = policy
+
+          prod_access = json.loads((root / "github-apply-prod-access.json.tftpl").read_text(encoding="utf-8").replace("${account_id}", "123456789012").replace("${api_id}", "a1b2c3d4e5"))["Statement"]
+          prod_api = next(s for s in prod_access if s["Sid"] == "ApiGatewayManageApi")
+          prod_child = next(s for s in prod_access if s["Sid"] == "ApiGatewayManageChildResources")
+          if prod_api["Resource"] != "arn:aws:apigateway:us-east-1::/apis/a1b2c3d4e5" or prod_child["Resource"] != "arn:aws:apigateway:us-east-1::/apis/a1b2c3d4e5/*":
+              raise SystemExit("Prod API Gateway permissions must be restricted to the exact imported API ID")
+          prod_bootstrap_cf = json.loads((root / "github-apply-prod-cloudfront-bootstrap.json.tftpl").read_text(encoding="utf-8"))["Statement"]
+          if not prod_bootstrap_cf or any(not str(action).startswith("cloudfront:Create") for statement in prod_bootstrap_cf for action in (statement["Action"] if isinstance(statement["Action"], list) else [statement["Action"]])):
+              raise SystemExit("Temporary prod CloudFront bootstrap policy must grant create-only actions")
+
+          prod_core_edge = prod_policies[prod_names[0]]["Statement"] + prod_policies[prod_names[1]]["Statement"]
+          prod_scheduler = next(s for s in prod_policies[prod_names[0]]["Statement"] if s["Sid"] == "SchedulerRead")
+          prod_group = next(s for s in prod_policies[prod_names[0]]["Statement"] if s["Sid"] == "SchedulerGroupRead")
+          if prod_scheduler["Resource"] != "arn:aws:scheduler:us-east-1:123456789012:schedule/attendance-prod/attendance-prod-*":
+              raise SystemExit("Prod plan schedule read must use the dedicated prod schedule group")
+          if prod_group["Resource"] != "arn:aws:scheduler:us-east-1:123456789012:schedule-group/attendance-prod":
+              raise SystemExit("Prod plan schedule-group read must be environment-scoped")
+          for statement in prod_core_edge:
+              actions = statement.get("Action", [])
+              actions = [actions] if isinstance(actions, str) else actions
+              if any(action.startswith(forbidden_prefixes) for action in actions):
+                  raise SystemExit(f"Mutation action in prod read-only plan policy: {statement['Sid']}")
+              resources = statement.get("Resource", [])
+              resources = [resources] if isinstance(resources, str) else resources
+              if any("attendance/dev/" in resource or "attendance-dev-" in resource for resource in resources):
+                  raise SystemExit(f"Dev resource in prod plan policy: {statement['Sid']}")
+          prod_state = prod_policies[prod_names[2]]["Statement"]
+          for statement in prod_state:
+              actions = statement.get("Action", [])
+              actions = [actions] if isinstance(actions, str) else actions
+              resources = statement.get("Resource", [])
+              resources = [resources] if isinstance(resources, str) else resources
+              if any(action in ("s3:PutObject", "s3:DeleteObject") for action in actions):
+                  if not all(resource.endswith(".tflock") for resource in resources):
+                      raise SystemExit("Prod plan may mutate only its Terraform lockfile")
+              if any("attendance/dev/" in resource for resource in resources):
+                  raise SystemExit("Prod state policy references dev state")
+          PY
+
+      - name: Validate environment-specific Scheduler trust
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          module = Path("infra/modules/data/main.tf").read_text(encoding="utf-8")
+          variables = Path("infra/modules/data/variables.tf").read_text(encoding="utf-8")
+          if 'resource "aws_scheduler_schedule_group" "attendance"' not in module:
+              raise SystemExit("Missing dedicated attendance Scheduler group")
+          if 'name = "attendance-${var.env}"' not in module:
+              raise SystemExit("Scheduler group name must be environment-specific")
+          if 'variable = "aws:SourceAccount"' not in module or "values   = [var.account_id]" not in module:
+              raise SystemExit("Scheduler trust must require the owning AWS account")
+          if 'variable = "aws:SourceArn"' not in module or "aws_scheduler_schedule_group.attendance.arn" not in module:
+              raise SystemExit("Scheduler trust must use the exact environment schedule-group ARN")
+          if "group_name                   = aws_scheduler_schedule_group.attendance.name" not in module:
+              raise SystemExit("Schedules must be assigned to the dedicated environment group")
+          if 'variable "account_id"' not in variables:
+              raise SystemExit("Data module must receive the verified account ID")
+          for env in ("dev", "prod"):
+              root = Path(f"infra/envs/{env}/main.tf").read_text(encoding="utf-8")
+              start = root.index('module "data"')
+              end = root.find('\n}', start)
+              if "account_id                  = var.account_id" not in root[start:end]:
+                  raise SystemExit(f"{env} data module must receive account_id")
+          PY
+
+      - name: Validate exact CloudFront KMS key policy scope
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          foundation = Path("infra/modules/foundation/main.tf").read_text(encoding="utf-8")
+          outputs = Path("infra/modules/foundation/outputs.tf").read_text(encoding="utf-8")
+          access_vars = Path("infra/modules/access/variables.tf").read_text(encoding="utf-8")
+          if 'resource "aws_kms_key_policy" "attendance"' not in access:
+              raise SystemExit("Access module must own final KMS key policy")
+          if "aws_cloudfront_distribution.site.arn" not in access:
+              raise SystemExit("CloudFront KMS policy must use exact distribution ARN")
+          if 'variable = "aws:SourceArn"' not in access or 'test     = "ArnEquals"' not in access:
+              raise SystemExit("CloudFront KMS grant must use ArnEquals SourceArn")
+          if "distribution/*" in access or "distribution/*" in foundation:
+              raise SystemExit("CloudFront distribution wildcard remains in KMS policy")
+          if 'policy                  = data.aws_iam_policy_document.kms_key.json' in foundation:
+              raise SystemExit("Foundation must not install a pre-distribution KMS policy")
+          if 'output "kms_key_id"' not in outputs or 'variable "kms_key_id"' not in access_vars:
+              raise SystemExit("Foundation key ID must be passed into access module")
+          for env in ("dev", "prod"):
+              root = Path(f"infra/envs/{env}/main.tf").read_text(encoding="utf-8")
+              start = root.index('module "access"')
+              end = root.find('\n}', start)
+              if "kms_key_id" not in root[start:end]:
+                  raise SystemExit(f"{env} access module must receive foundation KMS key ID")
+          access_outputs = Path("infra/modules/access/outputs.tf").read_text(encoding="utf-8")
+          if "cognito-idp.${var.region}.amazonaws.com" not in access_outputs:
+              raise SystemExit("Cognito issuer output must use the canonical region input")
+          PY
+
+      - name: Validate DynamoDB customer-managed KMS policies
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          required_service_actions = {
+              "kms:Encrypt", "kms:Decrypt", "kms:ReEncryptFrom", "kms:ReEncryptTo",
+              "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext", "kms:CreateGrant",
+              "kms:DescribeKey",
+          }
+          if "AllowDynamoDBUseOfKeyThroughService" not in access:
+              raise SystemExit("Missing DynamoDB KMS ViaService statement")
+          web_start = access.index('data "aws_iam_policy_document" "web_bucket"')
+          key_start = access.index('data "aws_iam_policy_document" "attendance_kms_key"')
+          key_end = access.index('resource "aws_kms_key_policy" "attendance"')
+          web_policy = access[web_start:key_start]
+          key_policy = access[key_start:key_end]
+          if "kms:" in web_policy:
+              raise SystemExit("KMS actions must not be placed in an S3 bucket policy")
+          if (
+              "dynamodb.${var.region}.amazonaws.com" not in key_policy
+              or "kms:CallerAccount" not in key_policy
+          ):
+              raise SystemExit("DynamoDB KMS service statement must be in the key policy and region/account constrained")
+
+          for env in ("dev", "prod"):
+              path = Path(f"infra/policies/github-apply-{env}-dynamodb-kms.json.tftpl")
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              if "${account_id}" in rendered:
+                  raise SystemExit(f"Unresolved account placeholder in {path}")
+              policy = json.loads(rendered)
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy size exceeded: {path}")
+              crypto = next(s for s in policy["Statement"] if s["Sid"] == "DynamoDBCustomerKeyCrypto")
+              grant = next(s for s in policy["Statement"] if s["Sid"] == "DynamoDBCustomerKeyGrant")
+              actions = set(crypto["Action"])
+              if actions != required_service_actions - {"kms:CreateGrant"}:
+                  raise SystemExit(f"Unexpected DynamoDB crypto action set: {path}")
+              if crypto["Condition"]["StringEquals"]["kms:ViaService"] != "dynamodb.us-east-1.amazonaws.com":
+                  raise SystemExit(f"Wrong DynamoDB ViaService condition: {path}")
+              if crypto["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != f"alias/attendance-{env}":
+                  raise SystemExit(f"Wrong environment KMS alias scope: {path}")
+              if grant["Action"] != "kms:CreateGrant" or grant["Condition"]["Bool"]["kms:GrantIsForAWSResource"] != "true":
+                  raise SystemExit(f"CreateGrant must be AWS-resource constrained: {path}")
+              if grant["Condition"]["StringEquals"]["kms:ViaService"] != "dynamodb.us-east-1.amazonaws.com":
+                  raise SystemExit(f"CreateGrant must be ViaService constrained: {path}")
+          PY
+
+      - name: Validate dev apply-role IAM policy templates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("infra/policies")
+          names = (
+              "github-apply-dev-core.json.tftpl",
+              "github-apply-dev-data.json.tftpl",
+              "github-apply-dev-lambda.json.tftpl",
+              "github-apply-dev-iam.json.tftpl",
+              "github-apply-dev-foundation.json.tftpl",
+              "github-apply-dev-access.json.tftpl",
+              "github-apply-dev-cloudfront-bootstrap.json.tftpl",
+              "github-apply-dev-state.json.tftpl",
+              "github-apply-dev-dynamodb-kms.json.tftpl",
+          )
+          policies = {}
+          for name in names:
+              path = root / name
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
+              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
+              if "${account_id}" in rendered or "${state_bucket}" in rendered or "${api_id}" in rendered:
+                  raise SystemExit(f"Unresolved template variable: {path}")
+              policy = json.loads(rendered)
+              if policy.get("Version") != "2012-10-17" or not policy.get("Statement"):
+                  raise SystemExit(f"Invalid policy envelope: {path}")
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy exceeds 6,144 characters: {path}")
+              for statement in policy["Statement"]:
+                  actions = statement.get("Action", [])
+                  actions = [actions] if isinstance(actions, str) else actions
+                  resources = statement.get("Resource", [])
+                  resources = [resources] if isinstance(resources, str) else resources
+                  if any(action.startswith(("budgets:", "aws-portal:")) for action in actions):
+                      raise SystemExit(f"Billing permissions must stay in separate billing root: {path}")
+                  if any("attendance/prod/" in resource or "attendance-prod-" in resource for resource in resources):
+                      raise SystemExit(f"Production resource in dev apply policy: {path}")
+              policies[name] = policy
+
+          iam = policies["github-apply-dev-iam.json.tftpl"]["Statement"]
+          for sid in ("PassRoleToLambda", "PassRoleToScheduler"):
+              statement = next(s for s in iam if s["Sid"] == sid)
+              if any("*" in resource for resource in statement["Resource"]):
+                  raise SystemExit(f"{sid} must use exact role ARNs")
+              if "iam:PassRole" not in statement["Action"]:
+                  raise SystemExit(f"{sid} missing iam:PassRole")
+              if "iam:PassedToService" not in statement.get("Condition", {}).get("StringEquals", {}):
+                  raise SystemExit(f"{sid} must constrain PassedToService")
+          create_role = next(s for s in iam if s["Sid"] == "IamRoleCreate")
+          if create_role.get("Condition", {}).get("StringEquals", {}).get("iam:PermissionsBoundary") != (
+              "arn:aws:iam::123456789012:policy/attendance-dev-execution-boundary"
+          ):
+              raise SystemExit("CreateRole must require the exact dev permissions boundary")
+
+          state = policies["github-apply-dev-state.json.tftpl"]["Statement"]
+          state_object = next(s for s in state if s["Sid"] == "DevStateObject")
+          if set(state_object["Action"]) != {"s3:GetObject", "s3:PutObject"}:
+              raise SystemExit("Dev apply state object permissions must be read/write only")
+          if state_object["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012-ci-test/attendance/dev/terraform.tfstate":
+              raise SystemExit("Dev apply state object must be exact")
+          lock = next(s for s in state if s["Sid"] == "DevLockfileLifecycle")
+          lock_resources = lock["Resource"]
+          lock_resources = [lock_resources] if isinstance(lock_resources, str) else lock_resources
+          if not all(resource.endswith(".tflock") for resource in lock_resources):
+              raise SystemExit("State lock mutations must be limited to the dev .tflock object")
+
+          data = policies["github-apply-dev-data.json.tftpl"]["Statement"]
+          tables = next(s for s in data if s["Sid"] == "DynamoDBTableLifecycle")
+          if len(tables["Resource"]) != 5 or any("attendance-prod-" in r for r in tables["Resource"]):
+              raise SystemExit("DynamoDB apply policy must use the five dev table ARNs only")
+
+          lambda_policy = policies["github-apply-dev-lambda.json.tftpl"]["Statement"]
+          mapping = next(s for s in lambda_policy if s["Sid"] == "LambdaEventSourceMappingCreate")
+          if mapping["Resource"] != "*" or mapping["Condition"]["StringEquals"]["lambda:FunctionArn"] != (
+              "arn:aws:lambda:us-east-1:123456789012:function:attendance-dev-failure"
+          ):
+              raise SystemExit("Event source mapping create must be function-conditioned")
+
+          access = policies["github-apply-dev-access.json.tftpl"]["Statement"]
+          api = next(s for s in access if s["Sid"] == "ApiGatewayManageApi")
+          child = next(s for s in access if s["Sid"] == "ApiGatewayManageChildResources")
+          create_child = next(s for s in access if s["Sid"] == "ApiGatewayCreateChildResources")
+          exact_api = "arn:aws:apigateway:us-east-1::/apis/a1b2c3d4e5"
+          if api["Resource"] != exact_api:
+              raise SystemExit("API Gateway parent API permissions must use the exact imported API ID")
+          if child["Resource"] != exact_api + "/*" or create_child["Resource"] != exact_api + "/*":
+              raise SystemExit("API Gateway child permissions must use the exact imported API ID")
+          if api["Condition"]["StringEquals"] != {"aws:ResourceTag/Project": "attendance", "aws:ResourceTag/Environment": "dev"}:
+              raise SystemExit("Dev API Gateway parent updates must require project/environment tags")
+
+          bootstrap_cf = policies["github-apply-dev-cloudfront-bootstrap.json.tftpl"]["Statement"]
+          if not bootstrap_cf or any(not str(action).startswith("cloudfront:Create") for statement in bootstrap_cf for action in (statement["Action"] if isinstance(statement["Action"], list) else [statement["Action"]])):
+              raise SystemExit("Temporary dev CloudFront bootstrap policy must grant create-only actions")
+          for sid in ("CloudFrontOAC", "CloudFrontCachePolicies", "CloudFrontOriginPolicies", "CloudFrontResponsePolicies"):
+              statement = next(s for s in access if s["Sid"] == sid)
+              actions = statement["Action"] if isinstance(statement["Action"], list) else [statement["Action"]]
+              if any(action.startswith(("cloudfront:Update", "cloudfront:Delete")) for action in actions):
+                  raise SystemExit(f"Permanent dev policy must not broadly update/delete {sid}")
+          PY
+
+      - name: Validate prod apply-role IAM policy templates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("infra/policies")
+          names = (
+              "github-apply-prod-core.json.tftpl",
+              "github-apply-prod-data.json.tftpl",
+              "github-apply-prod-lambda.json.tftpl",
+              "github-apply-prod-iam.json.tftpl",
+              "github-apply-prod-foundation.json.tftpl",
+              "github-apply-prod-access.json.tftpl",
+              "github-apply-prod-cloudfront-bootstrap.json.tftpl",
+              "github-apply-prod-state.json.tftpl",
+              "github-apply-prod-dynamodb-kms.json.tftpl",
+          )
+          policies = {}
+          for name in names:
+              path = root / name
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
+              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
+              if "${account_id}" in rendered or "${state_bucket}" in rendered or "${api_id}" in rendered:
+                  raise SystemExit(f"Unresolved template variable: {path}")
+              policy = json.loads(rendered)
+              if policy.get("Version") != "2012-10-17" or not policy.get("Statement"):
+                  raise SystemExit(f"Invalid policy envelope: {path}")
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy exceeds 6,144 characters: {path}")
+              for statement in policy["Statement"]:
+                  actions = statement.get("Action", [])
+                  actions = [actions] if isinstance(actions, str) else actions
+                  resources = statement.get("Resource", [])
+                  resources = [resources] if isinstance(resources, str) else resources
+                  if any(action.startswith(("budgets:", "aws-portal:")) for action in actions):
+                      raise SystemExit(f"Billing permissions must stay in separate billing root: {path}")
+                  if any("attendance/dev/" in resource or "attendance-dev-" in resource for resource in resources):
+                      raise SystemExit(f"Dev resource in prod apply policy: {path}")
+              policies[name] = policy
+
+          iam = policies["github-apply-prod-iam.json.tftpl"]["Statement"]
+          for sid, service in (("PassRoleToLambda", "lambda.amazonaws.com"), ("PassRoleToScheduler", "scheduler.amazonaws.com")):
+              statement = next(s for s in iam if s["Sid"] == sid)
+              if any("*" in resource for resource in statement["Resource"]):
+                  raise SystemExit(f"{sid} must use exact role ARNs")
+              if statement.get("Condition", {}).get("StringEquals", {}).get("iam:PassedToService") != service:
+                  raise SystemExit(f"{sid} must constrain PassedToService to {service}")
+          create_role = next(s for s in iam if s["Sid"] == "IamRoleCreate")
+          if create_role.get("Condition", {}).get("StringEquals", {}).get("iam:PermissionsBoundary") != (
+              "arn:aws:iam::123456789012:policy/attendance-prod-execution-boundary"
+          ):
+              raise SystemExit("CreateRole must require the exact prod permissions boundary")
+
+          state = policies["github-apply-prod-state.json.tftpl"]["Statement"]
+          state_object = next(s for s in state if s["Sid"] == "ProdStateObject")
+          if set(state_object["Action"]) != {"s3:GetObject", "s3:PutObject"}:
+              raise SystemExit("Prod apply state object permissions must be read/write only")
+          if state_object["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012-ci-test/attendance/prod/terraform.tfstate":
+              raise SystemExit("Prod apply state object must be exact")
+          lock = next(s for s in state if s["Sid"] == "ProdLockfileLifecycle")
+          lock_resources = lock["Resource"]
+          lock_resources = [lock_resources] if isinstance(lock_resources, str) else lock_resources
+          if not all(resource.endswith(".tflock") for resource in lock_resources):
+              raise SystemExit("Prod state lock mutations must be limited to the prod .tflock object")
+
+          data = policies["github-apply-prod-data.json.tftpl"]["Statement"]
+          tables = next(s for s in data if s["Sid"] == "DynamoDBTableLifecycle")
+          if len(tables["Resource"]) != 5 or any("attendance-dev-" in r for r in tables["Resource"]):
+              raise SystemExit("DynamoDB apply policy must use the five prod table ARNs only")
+
+          lambda_policy = policies["github-apply-prod-lambda.json.tftpl"]["Statement"]
+          mapping = next(s for s in lambda_policy if s["Sid"] == "LambdaEventSourceMappingCreate")
+          if mapping["Resource"] != "*" or mapping["Condition"]["StringEquals"]["lambda:FunctionArn"] != (
+              "arn:aws:lambda:us-east-1:123456789012:function:attendance-prod-failure"
+          ):
+              raise SystemExit("Event source mapping create must be function-conditioned to prod failure processor")
+
+          kms = policies["github-apply-prod-dynamodb-kms.json.tftpl"]["Statement"]
+          crypto = next(s for s in kms if s["Sid"] == "DynamoDBCustomerKeyCrypto")
+          grant = next(s for s in kms if s["Sid"] == "DynamoDBCustomerKeyGrant")
+          if crypto["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != "alias/attendance-prod":
+              raise SystemExit("Prod DynamoDB KMS crypto policy must use prod alias")
+          if crypto["Condition"]["StringEquals"]["kms:ViaService"] != "dynamodb.us-east-1.amazonaws.com":
+              raise SystemExit("Prod DynamoDB KMS crypto policy must use DynamoDB ViaService")
+          if grant["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != "alias/attendance-prod":
+              raise SystemExit("Prod CreateGrant policy must use prod alias")
+          if grant["Condition"]["Bool"]["kms:GrantIsForAWSResource"] != "true":
+              raise SystemExit("Prod CreateGrant must be AWS-resource constrained")
+          PY
+
+      - name: Validate S3 Terraform state backend configuration
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          expected = {
+              "dev": ("attendance/dev/terraform.tfstate", "../../../config/deployment.json"),
+              "prod": ("attendance/prod/terraform.tfstate", "../../../config/deployment.json"),
+              "billing": ("attendance/billing/terraform.tfstate", "../../config/deployment.json"),
+          }
+          for env, (key, manifest_path) in expected.items():
+              path = Path(f"infra/{'envs/' + env if env in ('dev', 'prod') else 'billing'}/versions.tf")
+              source = path.read_text(encoding="utf-8")
+              for required in ('backend "s3"', f'key          = "{key}"',
+                               "encrypt      = true", "use_lockfile = true",
+                               manifest_path, "region = local.deployment_region"):
+                  if required not in source:
+                      raise SystemExit(f"{path} missing backend/provider requirement: {required}")
+              backend = source.split('backend "s3" {', 1)[1].split("}", 1)[0]
+              if re.search(r"^\s*region\s*=", backend, re.MULTILINE):
+                  raise SystemExit(f"{path} duplicates backend region outside canonical manifest")
+          spec = Path("docs/STATE-BUCKET-BOOTSTRAP.md").read_text(encoding="utf-8")
+          for required in ("SSE-S3", "BucketOwnerEnforced", "BlockPublicAcls",
+                           "IgnorePublicAcls", "BlockPublicPolicy", "RestrictPublicBuckets",
+                           "aws:SecureTransport", "attendance/dev/terraform.tfstate",
+                           "attendance/prod/terraform.tfstate", "attendance/billing/terraform.tfstate",
+                           "No object lock", "No automatic state expiration"):
+              if required not in spec:
+                  raise SystemExit(f"State bucket bootstrap spec missing: {required}")
+          PY
+
+      - name: Validate GitHub OIDC trust and deployment workflow boundaries
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          repo = "amit-cloudops-ai/attendance-face-recognition"
+          provider = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+          for env in ("dev", "prod", "billing"):
+              for operation in ("plan", "apply"):
+                  path = Path(f"infra/policies/github-oidc-trust-{env}-{operation}.json.tftpl")
+                  rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+                  if "${account_id}" in rendered:
+                      raise SystemExit(f"Unresolved account placeholder: {path}")
+                  policy = json.loads(rendered)
+                  if len(policy.get("Statement", [])) != 1:
+                      raise SystemExit(f"Expected one trust statement: {path}")
+                  statement = policy["Statement"][0]
+                  if statement.get("Principal", {}).get("Federated") != provider:
+                      raise SystemExit(f"Wrong OIDC provider principal: {path}")
+                  if statement.get("Action") != "sts:AssumeRoleWithWebIdentity":
+                      raise SystemExit(f"Wrong OIDC action: {path}")
+                  conditions = statement.get("Condition", {}).get("StringEquals", {})
+                  if conditions.get("token.actions.githubusercontent.com:aud") != "sts.amazonaws.com":
+                      raise SystemExit(f"Wrong OIDC audience: {path}")
+                  expected_sub = f"repo:{repo}:environment:{env}-{operation}"
+                  if conditions.get("token.actions.githubusercontent.com:sub") != expected_sub:
+                      raise SystemExit(f"Wrong or broad OIDC subject: {path}")
+
+          workflow = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          environment_expr = "$" + "{{ inputs.environment }}"
+          operation_expr = "$" + "{{ inputs.operation }}"
+          role_var_expr = "$" + "{{ vars.AWS_ROLE_ARN }}"
+          role_env_expr = "$" + "{{ env.AWS_ROLE_ARN }}"
+          for required in (
+              "name: " + environment_expr + "-" + operation_expr,
+              "AWS_ROLE_ARN: " + role_var_expr,
+              "github.ref == 'refs/heads/develop'",
+              "github.ref == 'refs/heads/main'",
+              "actions: read",
+              "contents: read",
+              "id-token: write",
+              "role-to-assume: " + role_env_expr,
+              "aws sts get-caller-identity --query Account --output text",
+              "expected_role_prefix=",
+              "expected_bucket_prefix=",
+              '"${actual_account}" != "${TF_VAR_account_id}"',
+          ):
+              if required not in workflow:
+                  raise SystemExit(f"Deployment workflow missing required OIDC boundary: {required}")
+          if "AWS_ACCESS_KEY_ID" in workflow or "AWS_SECRET_ACCESS_KEY" in workflow:
+              raise SystemExit("Static AWS credentials are not permitted in deployment workflow")
+
+          docs = Path("docs/GITHUB-OIDC-DEPLOYMENT.md").read_text(encoding="utf-8")
+          for required in ("dev-plan", "dev-apply", "prod-plan", "prod-apply", "billing-plan", "billing-apply",
+                           "self-review is allowed", "TF_PLAN_AGE_RECIPIENT",
+                           "TF_PLAN_AGE_IDENTITY", "CODEOWNERS"):
+              if required not in docs:
+                  raise SystemExit(f"OIDC deployment guide missing: {required}")
+          PY
+
+      - name: Validate encrypted Terraform plan artifact lifecycle
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          required = (
+              "age --recipient",
+              "TF_PLAN_AGE_RECIPIENT",
+              "-lockfile=readonly",
+              "retention-days: 1",
+              "if-no-files-found: error",
+              "github.run_attempt",
+              "plan_path",
+              ".github/workflows/deploy.yml",
+              "plan_attempt",
+              "steps.plan-provenance.outputs.run_attempt",
+              "run-id: " + "$" + "{{ inputs.plan_run_id }}",
+              "TF_PLAN_AGE_IDENTITY",
+              "umask 077",
+              "trap 'rm -f \"$identity_file\"' EXIT",
+              "always() && inputs.operation == 'apply'",
+              'rm -f "$TF_ROOT/tfplan"',
+          )
+          for item in required:
+              if item not in workflow:
+                  raise SystemExit(f"Encrypted plan lifecycle missing: {item}")
+          if "path: " + "$" + "{{ env.TF_ROOT }}/tfplan.age" not in workflow:
+              raise SystemExit("Only the encrypted plan may be uploaded")
+          if "tfplan" in workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]:
+              upload = workflow.split("Upload encrypted plan for review", 1)[1].split("Verify saved plan", 1)[0]
+              if ("path: " + "$" + "{{ env.TF_ROOT }}/tfplan.age") not in upload:
+                  raise SystemExit("Plan upload path must be encrypted age artifact")
+          if "AWS_ACCESS_KEY_ID" in workflow or "AWS_SECRET_ACCESS_KEY" in workflow:
+              raise SystemExit("Static AWS credentials are prohibited")
+          docs = Path("docs/TERRAFORM-PLAN-ARTIFACT.md").read_text(encoding="utf-8")
+          for item in ("run attempt", "workflow_dispatch", "one-day", "TF_PLAN_AGE_IDENTITY", "umask 077"):
+              if item not in docs:
+                  raise SystemExit(f"Plan artifact documentation missing: {item}")
+          PY
+
+      - name: Validate GitHub environment setup documentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          docs = Path("docs/GITHUB-ENVIRONMENT-SETUP.md").read_text(encoding="utf-8")
+          for required in (
+              "dev-plan", "dev-apply", "prod-plan", "prod-apply",
+              "develop only", "main only", "AWS_ROLE_ARN", "AWS_ACCOUNT_ID",
+              "EXECUTION_ROLE_BOUNDARY_ARN", "TF_STATE_BUCKET",
+              "COGNITO_CALLBACK_URLS", "COGNITO_LOGOUT_URLS", "ALLOWED_ORIGINS",
+              "TF_PLAN_AGE_RECIPIENT", "TF_PLAN_AGE_IDENTITY",
+              "self-review is allowed", "Required approvals: 0", "Require pull requests", "Python",
+              "terraform-fmt", "cannot be verified from this session",
+          ):
+              if required not in docs:
+                  raise SystemExit(f"GitHub environment setup guide missing: {required}")
+          workflow = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          environment_expr = "$" + "{{ inputs.environment }}"
+          operation_expr = "$" + "{{ inputs.operation }}"
+          if "name: " + environment_expr + "-" + operation_expr not in workflow:
+              raise SystemExit("Deployment workflow must bind OIDC subject to operation-specific environment")
+          PY
+
+      - name: Lint current infrastructure template formats
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          ignored = {".git", ".terraform", "node_modules", ".venv"}
+          candidates = []
+          for path in Path(".").rglob("*"):
+              if not path.is_file() or any(part in ignored for part in path.parts):
+                  continue
+              name = path.name.lower()
+              path_text = str(path).lower()
+              if name in ("template.yaml", "template.yml", "template.json", "samconfig.toml"):
+                  candidates.append(path)
+              elif "cloudformation" in path_text or "serverless.yml" in name:
+                  candidates.append(path)
+          if candidates:
+              paths = ", ".join(str(path) for path in candidates)
+              raise SystemExit(
+                  "CloudFormation/SAM template introduced without cfn-lint or sam validate --lint: " + paths
+              )
+
+          policies = list(Path("infra/policies").glob("*.json.tftpl"))
+          if not policies:
+              raise SystemExit("Expected IAM policy JSON templates under infra/policies")
+          for path in policies:
+              rendered = path.read_text(encoding="utf-8")
+              rendered = rendered.replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
+              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
+              if "${" in rendered:
+                  raise SystemExit(f"Unresolved template variable in {path}")
+              policy = json.loads(rendered)
+              if policy.get("Version") != "2012-10-17" or not policy.get("Statement"):
+                  raise SystemExit(f"Invalid IAM policy structure: {path}")
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"IAM managed policy exceeds 6,144 characters: {path}")
+          print(f"Validated {len(policies)} IAM policy JSON templates; no CloudFormation/SAM templates are present.")
+          PY
+
+      - name: Validate approval-gated AWS bootstrap plan
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          plan = Path("docs/MANUAL-AWS-BOOTSTRAP-PLAN.md").read_text(encoding="utf-8")
+          for required in (
+              "us-east-1", "12-digit account ID", "attendance-tf-state-",
+              "token.actions.githubusercontent.com", "sts.amazonaws.com",
+              "attendance-github-dev-plan", "attendance-github-dev-apply",
+              "attendance-github-prod-plan", "attendance-github-prod-apply",
+              "attendance-github-billing-plan", "attendance-github-billing-apply",
+              "attendance-dev-execution-boundary", "attendance-prod-execution-boundary",
+              "docs/STATE-BUCKET-BOOTSTRAP.md", "docs/GITHUB-ENVIRONMENT-SETUP.md",
+              "explicitly approves", "No action may proceed",
+              "billing-plan", "billing-apply", "28 managed policy documents",
+          ):
+              if required not in plan:
+                  raise SystemExit(f"Manual bootstrap plan missing: {required}")
+          if "aws s3api create-bucket" in plan or "terraform apply -auto-approve" in plan:
+              raise SystemExit("Bootstrap plan must not contain executable auto-approval commands")
+          policy_dir = Path("infra/policies")
+          for env in ("dev", "prod", "billing"):
+              for operation in ("plan", "apply"):
+                  if not list(policy_dir.glob(f"github-{operation}-{env}-*.json.tftpl")):
+                      raise SystemExit(f"Missing {env} {operation} role policy templates")
+                  trust = policy_dir / f"github-oidc-trust-{env}-{operation}.json.tftpl"
+                  if not trust.exists():
+                      raise SystemExit(f"Missing OIDC trust template: {trust}")
+          PY
+
+      - name: Validate isolated billing policies and workflow
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("infra/policies")
+          expected = {
+              "github-plan-billing-core.json.tftpl",
+              "github-plan-billing-state.json.tftpl",
+              "github-apply-billing-core.json.tftpl",
+              "github-apply-billing-state.json.tftpl",
+          }
+          for name in expected:
+              path = root / name
+              rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
+              rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
+              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
+              policy = json.loads(rendered)
+              if len(json.dumps(policy, separators=(",", ":"))) > 6144:
+                  raise SystemExit(f"Billing managed policy too large: {path}")
+              for statement in policy["Statement"]:
+                  resources = statement.get("Resource", [])
+                  resources = [resources] if isinstance(resources, str) else resources
+                  if any("attendance/dev/" in r or "attendance/prod/" in r for r in resources):
+                      raise SystemExit(f"Environment state path in billing policy: {path}")
+
+          plan = json.loads((root / "github-plan-billing-core.json.tftpl").read_text().replace("${account_id}", "123456789012"))
+          plan_actions = [a for s in plan["Statement"] for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])]
+          if set(plan_actions) != {"budgets:ViewBudget", "aws-portal:ViewBilling"}:
+              raise SystemExit("Billing plan policy must be read-only")
+
+          apply = json.loads((root / "github-apply-billing-core.json.tftpl").read_text().replace("${account_id}", "123456789012"))
+          apply_actions = [a for s in apply["Statement"] for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])]
+          if set(apply_actions) != {"budgets:ModifyBudget", "budgets:ViewBudget", "aws-portal:ModifyBilling", "aws-portal:ViewBilling"}:
+              raise SystemExit("Billing apply policy must contain only the documented budget/account billing actions")
+
+          state = json.loads((root / "github-apply-billing-state.json.tftpl").read_text().replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test"))
+          state_statements = state["Statement"]
+          billing_state = next(s for s in state_statements if s["Sid"] == "BillingStateObjectReadWrite")
+          if billing_state["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012-ci-test/attendance/billing/terraform.tfstate":
+              raise SystemExit("Billing apply state path must be exact")
+          lock = next(s for s in state_statements if s["Sid"] == "BillingLockfileLifecycle")
+          if lock["Resource"] != "arn:aws:s3:::attendance-tf-state-123456789012-ci-test/attendance/billing/terraform.tfstate.tflock":
+              raise SystemExit("Billing lock lifecycle must be exact")
+
+          for operation in ("plan", "apply"):
+              trust_path = root / f"github-oidc-trust-billing-{operation}.json.tftpl"
+              trust = json.loads(trust_path.read_text().replace("${account_id}", "123456789012"))
+              conditions = trust["Statement"][0]["Condition"]["StringEquals"]
+              if conditions.get("token.actions.githubusercontent.com:sub") != (
+                  f"repo:amit-cloudops-ai/attendance-face-recognition:environment:billing-{operation}"
+              ):
+                  raise SystemExit(f"Wrong billing OIDC subject: {trust_path}")
+
+          workflow = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          if "- billing" not in workflow or "infra/billing" not in workflow:
+              raise SystemExit("Deployment workflow must support the separate billing root")
+          if "inputs.environment == 'billing'" not in workflow or "github.ref == 'refs/heads/main'" not in workflow:
+              raise SystemExit("Billing deployment must be gated to main")
+          if '!= "billing"' not in workflow:
+              raise SystemExit("Billing root must not require Cognito/runtime boundary variables")
+          billing_docs = Path("docs/BILLING-DEPLOYMENT.md").read_text(encoding="utf-8")
+          for required in ("attendance-dev-monthly-cost", "attendance-prod-monthly-cost",
+                           "budgets:ViewBudget", "budgets:ModifyBudget",
+                           "aws-portal:ViewBilling", "aws-portal:ModifyBilling",
+                           "attendance/billing/terraform.tfstate", "billing-plan", "billing-apply"):
+              if required not in billing_docs:
+                  raise SystemExit(f"Billing deployment guide missing: {required}")
+          PY
+
+
+      - name: Enforce pinned actions and reproducible tool dependencies
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          workflow_files = list(Path(".github/workflows").glob("*.yml")) + list(Path(".github/workflows").glob("*.yaml"))
+          for path in workflow_files:
+              for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                  if not line.strip().startswith("uses:"):
+                      continue
+                  match = re.search(r"uses:\s*[^@\s]+@([0-9a-f]{40})(?:\s+#\s*.+)?$", line.strip())
+                  if not match:
+                      raise SystemExit(f"{path}:{number}: action must be pinned to a full 40-character commit SHA")
+
+          requirements = Path("requirements-dev.txt").read_text(encoding="utf-8").splitlines()
+          for number, line in enumerate(requirements, 1):
+              stripped = line.strip()
+              if stripped and not stripped.startswith("#") and "==" not in stripped:
+                  raise SystemExit(f"requirements-dev.txt:{number}: dependency is not exactly pinned")
+
+          deploy = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          if "age=1.2.1-1build1" not in deploy or "runs-on: ubuntu-26.04" not in deploy:
+              raise SystemExit("Deployment runner and age package must remain pinned")
+          if 'python-version: "3.12.16"' not in Path(".github/workflows/ci.yml").read_text(encoding="utf-8"):
+              raise SystemExit("CI Python patch version must remain pinned")
+          PY
 
   terraform-fmt:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - run: terraform fmt -check -recursive infra
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: terraform fmt -check -diff -recursive infra
+      - name: Verify committed environment and billing provider lockfiles
+        run: |
+          terraform -chdir=infra/envs/dev init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/envs/prod init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/billing init -backend=false -input=false -lockfile=readonly
+      - run: terraform -chdir=infra/modules/recognition init -backend=false -input=false
+      - run: terraform -chdir=infra/modules/recognition validate
+      - run: terraform -chdir=infra/modules/data init -backend=false -input=false
+      - run: terraform -chdir=infra/modules/data validate
+      - run: terraform -chdir=infra/modules/foundation init -backend=false -input=false
+      - run: terraform -chdir=infra/modules/foundation validate
+      - run: terraform -chdir=infra/modules/access init -backend=false -input=false
+      - run: terraform -chdir=infra/modules/access validate
+      - run: terraform -chdir=infra/envs/dev init -backend=false -input=false -lockfile=readonly
+      - run: terraform -chdir=infra/envs/dev validate
+      - run: terraform -chdir=infra/envs/prod init -backend=false -input=false -lockfile=readonly
+      - run: terraform -chdir=infra/envs/prod validate
+      - run: terraform -chdir=infra/billing init -backend=false -input=false -lockfile=readonly
+      - run: terraform -chdir=infra/billing validate

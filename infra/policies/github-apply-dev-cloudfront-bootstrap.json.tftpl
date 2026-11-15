@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CreateCloudFrontOriginAccessControlOnce",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateOriginAccessControl",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CreateCloudFrontCachePolicyOnce",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateCachePolicy",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CreateCloudFrontOriginRequestPolicyOnce",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateOriginRequestPolicy",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CreateCloudFrontResponseHeadersPolicyOnce",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateResponseHeadersPolicy",
+      "Resource": "*"
+    }
+  ]
+}

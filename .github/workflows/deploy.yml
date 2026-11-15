@@ -1,0 +1,240 @@
+name: Manual Terraform deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+          - billing
+      operation:
+        description: Create a plan, or apply a previously reviewed plan artifact
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
+      plan_run_id:
+        description: Required for apply; run ID of the successful plan workflow
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: attendance-deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    name: ${{ inputs.operation }} ${{ inputs.environment }}
+    if: ${{ (inputs.environment == 'dev' && github.ref == 'refs/heads/develop') || ((inputs.environment == 'prod' || inputs.environment == 'billing') && github.ref == 'refs/heads/main') }}
+    environment:
+      name: ${{ inputs.environment }}-${{ inputs.operation }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    env:
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      TF_ROOT: ${{ inputs.environment == 'billing' && 'infra/billing' || format('infra/envs/{0}', inputs.environment) }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_PLAN_AGE_RECIPIENT: ${{ vars.TF_PLAN_AGE_RECIPIENT }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TF_VAR_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+      TF_VAR_api_id: ${{ vars.API_ID }}
+      TF_VAR_execution_role_boundary_arn: ${{ vars.EXECUTION_ROLE_BOUNDARY_ARN }}
+      TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+      TF_VAR_callback_urls: ${{ vars.COGNITO_CALLBACK_URLS }}
+      TF_VAR_logout_urls: ${{ vars.COGNITO_LOGOUT_URLS }}
+      TF_VAR_allowed_origins: ${{ vars.ALLOWED_ORIGINS }}
+      PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+
+    steps:
+      - name: Check out selected release branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Load canonical AWS region
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/check_region_consistency.py
+          region="$(python scripts/check_region_consistency.py --print-region)"
+          echo "AWS_REGION=$region" >> "$GITHUB_ENV"
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in AWS_ROLE_ARN TF_STATE_BUCKET TF_VAR_account_id TF_VAR_alert_email; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing GitHub repository/environment variable for ${name}."
+              exit 1
+            fi
+          done
+          if [[ "${{ inputs.environment }}" != "billing" ]]; then
+            for name in TF_VAR_execution_role_boundary_arn TF_VAR_api_id TF_VAR_callback_urls TF_VAR_logout_urls TF_VAR_allowed_origins; do
+              if [[ -z "${!name}" ]]; then
+                echo "Missing environment-specific configuration for ${name}."
+                exit 1
+              fi
+            done
+            if [[ ! "${TF_VAR_api_id}" =~ ^[a-z0-9]{10}$ ]]; then
+              echo "TF_VAR_api_id must be the exact 10-character API Gateway ID for this environment."
+              exit 1
+            fi
+            python - <<'PY'
+          import json
+          import os
+
+          for name in ("TF_VAR_callback_urls", "TF_VAR_logout_urls", "TF_VAR_allowed_origins"):
+              value = json.loads(os.environ[name])
+              if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
+                  raise SystemExit(f"{name} must be a non-empty JSON array of strings")
+          PY
+          fi
+          if [[ "${{ inputs.operation }}" == "plan" && -z "$TF_PLAN_AGE_RECIPIENT" ]]; then
+            echo "Missing TF_PLAN_AGE_RECIPIENT environment/repository variable."
+            exit 1
+          fi
+          if [[ "${{ inputs.operation }}" == "apply" && ! "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "Apply requires the numeric run ID of a successful plan workflow."
+            exit 1
+          fi
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.10.5
+
+      - name: Configure short-lived AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: attendance-${{ inputs.environment }}-${{ github.run_id }}
+
+      - name: Verify assumed AWS account and state-bucket scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_role_prefix="arn:aws:iam::${TF_VAR_account_id}:role/"
+          expected_bucket_prefix="attendance-tf-state-${TF_VAR_account_id}-"
+          if [[ "${AWS_ROLE_ARN}" != "${expected_role_prefix}"* ]]; then
+            echo "Configured deployment role ARN does not belong to TF_VAR_account_id."
+            exit 1
+          fi
+          if [[ "${TF_STATE_BUCKET}" != "${expected_bucket_prefix}"* ]]; then
+            echo "Terraform state bucket does not match the configured AWS account."
+            exit 1
+          fi
+          actual_account="$(aws sts get-caller-identity --query Account --output text)"
+          if [[ "${actual_account}" != "${TF_VAR_account_id}" ]]; then
+            echo "OIDC role resolved to AWS account ${actual_account}, expected ${TF_VAR_account_id}."
+            exit 1
+          fi
+          echo "Verified deployment account ${actual_account} in ${AWS_REGION}."
+
+      - name: Initialize remote state
+        run: |
+          terraform -chdir="$TF_ROOT" init -input=false -lockfile=readonly \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="region=$AWS_REGION" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Validate Terraform root
+        run: terraform -chdir="$TF_ROOT" validate
+
+      - name: Install age for encrypted plan hand-off
+        if: ${{ inputs.operation == 'plan' || inputs.operation == 'apply' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes age=1.2.1-1build1
+          age --version | grep -F 'v1.2.1'
+
+      - name: Create and encrypt plan
+        if: ${{ inputs.operation == 'plan' }}
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$TF_ROOT/tfplan"' EXIT
+          terraform -chdir="$TF_ROOT" plan -input=false -out=tfplan
+          age --recipient "$TF_PLAN_AGE_RECIPIENT" --output "$TF_ROOT/tfplan.age" "$TF_ROOT/tfplan"
+          rm -f "$TF_ROOT/tfplan"
+
+      - name: Upload encrypted plan for review
+        if: ${{ inputs.operation == 'plan' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: attendance-${{ inputs.environment }}-terraform-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.TF_ROOT }}/tfplan.age
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Verify saved plan belongs to this exact release revision
+        id: plan-provenance
+        if: ${{ inputs.operation == 'apply' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          plan_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PLAN_RUN_ID")"
+          plan_sha="$(jq -r '.head_sha' <<<"$plan_run")"
+          plan_branch="$(jq -r '.head_branch' <<<"$plan_run")"
+          plan_result="$(jq -r '.conclusion' <<<"$plan_run")"
+          plan_event="$(jq -r '.event' <<<"$plan_run")"
+          plan_path="$(jq -r '.path' <<<"$plan_run")"
+          plan_attempt="$(jq -r '.run_attempt' <<<"$plan_run")"
+          expected_branch="${{ inputs.environment == 'dev' && 'develop' || 'main' }}"
+          if [[ "$plan_sha" != "$GITHUB_SHA" || "$plan_branch" != "$expected_branch" || "$plan_result" != "success" || "$plan_event" != "workflow_dispatch" || "$plan_path" != ".github/workflows/deploy.yml" || ! "$plan_attempt" =~ ^[0-9]+$ ]]; then
+            echo "Plan must be a successful run of the deployment workflow for this exact commit, attempt and environment branch."
+            exit 1
+          fi
+          echo "run_attempt=$plan_attempt" >> "$GITHUB_OUTPUT"
+
+      - name: Download the previously reviewed plan
+        if: ${{ inputs.operation == 'apply' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: attendance-${{ inputs.environment }}-terraform-plan-${{ inputs.plan_run_id }}-${{ steps.plan-provenance.outputs.run_attempt }}
+          path: ${{ env.TF_ROOT }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.plan_run_id }}
+
+      - name: Decrypt the exact reviewed plan
+        if: ${{ inputs.operation == 'apply' }}
+        shell: bash
+        env:
+          TF_PLAN_AGE_IDENTITY: ${{ secrets.TF_PLAN_AGE_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$TF_PLAN_AGE_IDENTITY" ]]; then
+            echo "Missing TF_PLAN_AGE_IDENTITY environment secret."
+            exit 1
+          fi
+          identity_file="$RUNNER_TEMP/attendance-plan-identity.txt"
+          umask 077
+          trap 'rm -f "$identity_file"' EXIT
+          printf '%s' "$TF_PLAN_AGE_IDENTITY" > "$identity_file"
+          age --decrypt --identity "$identity_file" --output "$TF_ROOT/tfplan" "$TF_ROOT/tfplan.age"
+          rm -f "$identity_file" "$TF_ROOT/tfplan.age"
+
+      - name: Apply the exact reviewed plan
+        if: ${{ inputs.operation == 'apply' }}
+        run: terraform -chdir="$TF_ROOT" apply -input=false -auto-approve tfplan
+
+      - name: Remove decrypted plan from runner
+        if: ${{ always() && inputs.operation == 'apply' }}
+        run: rm -f "$TF_ROOT/tfplan"
+
+      - name: Print deployed site URL
+        if: ${{ inputs.operation == 'apply' && inputs.environment != 'billing' }}
+        run: terraform -chdir="$TF_ROOT" output -raw site_url

@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BillingBudgetManage",
+      "Effect": "Allow",
+      "Action": "budgets:ModifyBudget",
+      "Resource": [
+        "arn:aws:budgets::${account_id}:budget/attendance-dev-monthly-cost",
+        "arn:aws:budgets::${account_id}:budget/attendance-prod-monthly-cost"
+      ]
+    },
+    {
+      "Sid": "BillingBudgetRead",
+      "Effect": "Allow",
+      "Action": "budgets:ViewBudget",
+      "Resource": [
+        "arn:aws:budgets::${account_id}:budget/attendance-dev-monthly-cost",
+        "arn:aws:budgets::${account_id}:budget/attendance-prod-monthly-cost"
+      ]
+    },
+    {
+      "Sid": "BillingAccountModify",
+      "Effect": "Allow",
+      "Action": "aws-portal:ModifyBilling",
+      "Resource": "*"
+    },
+    {
+      "Sid": "BillingAccountRead",
+      "Effect": "Allow",
+      "Action": "aws-portal:ViewBilling",
+      "Resource": "*"
+    }
+  ]
+}
