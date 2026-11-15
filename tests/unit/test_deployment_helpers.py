@@ -23,8 +23,8 @@ fi
 case "$*" in
   *".permissions.admin"*) echo true ;;
   *".owner.login"*) echo repository-owner ;;
-  *"api user"*) echo "${FAKE_GH_LOGIN:-repo-admin}" ;;
   *"users/reviewer-user"*) echo 123456 ;;
+  *"api user"*) echo "${FAKE_GH_LOGIN:-repo-admin}" ;;
   *".permission"*) echo write ;;
   *) echo '{}' ;;
 esac
@@ -75,9 +75,9 @@ set -euo pipefail
 if [[ "$1" == "auth" ]]; then exit 0; fi
 case "$*" in
   *".permissions.admin"*) echo true ;;
+  *"users/reviewer-user"*) echo 123456 ;;
   *"api user"*) echo reviewer-user ;;
   *".owner.login"*) echo repository-owner ;;
-  *"users/reviewer-user"*) echo 123456 ;;
   *".permission"*) echo write ;;
   *) echo '{}' ;;
 esac
