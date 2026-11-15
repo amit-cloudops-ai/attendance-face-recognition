@@ -135,8 +135,8 @@ locals {
         Resource = [var.tables.attendance.arn]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem"]
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
         Resource = [
           var.tables.employees.arn,
           var.tables.config.arn,
