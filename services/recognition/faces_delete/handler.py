@@ -3,6 +3,7 @@ import hashlib
 import logging
 import os
 import re
+import uuid
 
 import boto3
 from attendance_common.auth import get_username, require_group
@@ -28,7 +29,7 @@ def _required_env(name: str) -> str:
 
 def _audit_id(employee_id: str, face_ids: list[str]) -> str:
     fingerprint = hashlib.sha256(",".join(sorted(face_ids)).encode()).hexdigest()[:32]
-    return f"faces-delete#{employee_id}#{fingerprint}"
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"attendance-faces-delete:{employee_id}:{fingerprint}"))
 
 
 def _delete_all_faces(rekognition, collection_id: str, face_ids: list[str]) -> int:
