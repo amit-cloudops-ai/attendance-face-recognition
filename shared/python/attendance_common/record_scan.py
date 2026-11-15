@@ -277,9 +277,10 @@ def record_scan(
             ":ci": current["clock_in"],
             ":co": scanned_iso,
             ":ua": scanned_iso,
+            ":missing_flag": {"missing_clock_out"},
         }
         condition = "clock_in=:ci AND (attribute_not_exists(clock_out) OR clock_out < :co)"
-        update = "SET clock_out=:co, updated_at=:ua"
+        update = "SET clock_out=:co, updated_at=:ua DELETE flags :missing_flag"
         if request_id is not None:
             names = {"#events": "scan_events", "#request": request_id}
             values[":outcome"] = outcome
