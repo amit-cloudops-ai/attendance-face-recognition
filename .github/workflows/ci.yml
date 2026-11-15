@@ -738,13 +738,24 @@ jobs:
 
           plan = json.loads((root / "github-plan-billing-core.json.tftpl").read_text().replace("${account_id}", "123456789012"))
           plan_actions = [a for s in plan["Statement"] for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])]
-          if set(plan_actions) != {"budgets:ViewBudget", "aws-portal:ViewBilling"}:
-              raise SystemExit("Billing plan policy must be read-only")
+          if set(plan_actions) != {"budgets:ViewBudget", "aws-portal:ViewBilling", "ce:ListCostAllocationTags"}:
+              raise SystemExit("Billing plan policy must be read-only and inspect the project cost-allocation tag")
+          project_budget_arn = "arn:aws:budgets::123456789012:budget/attendance-project-monthly-cost"
+          plan_budget = next(s for s in plan["Statement"] if s["Sid"] == "BillingBudgetRead")
+          if plan_budget["Resource"] != project_budget_arn:
+              raise SystemExit("Billing plan policy must read only the project budget")
 
           apply = json.loads((root / "github-apply-billing-core.json.tftpl").read_text().replace("${account_id}", "123456789012"))
           apply_actions = [a for s in apply["Statement"] for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])]
-          if set(apply_actions) != {"budgets:ModifyBudget", "budgets:ViewBudget", "aws-portal:ModifyBilling", "aws-portal:ViewBilling"}:
-              raise SystemExit("Billing apply policy must contain only the documented budget/account billing actions")
+          if set(apply_actions) != {
+              "budgets:ModifyBudget", "budgets:ViewBudget", "aws-portal:ModifyBilling",
+              "aws-portal:ViewBilling", "ce:ListCostAllocationTags", "ce:UpdateCostAllocationTagsStatus",
+          }:
+              raise SystemExit("Billing apply policy must contain only the documented budget and cost-tag actions")
+          for sid in ("BillingBudgetManage", "BillingBudgetRead"):
+              statement = next(s for s in apply["Statement"] if s["Sid"] == sid)
+              if statement["Resource"] != project_budget_arn:
+                  raise SystemExit("Billing apply policy must be scoped to the project budget")
 
           state = json.loads((root / "github-apply-billing-state.json.tftpl").read_text().replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test"))
           state_statements = state["Statement"]
