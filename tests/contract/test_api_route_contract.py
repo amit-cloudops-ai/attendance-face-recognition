@@ -1,17 +1,9 @@
 """Cross-check the frozen API contract against Terraform route exports."""
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-ROUTE_BLOCK = re.compile(
-    r'"(?P<method>GET|POST|PUT|PATCH|DELETE) (?P<path>/api/[^"]+)"\\s*=\\s*\\{'
-    r'(?:(?!\\n\\s*\\}).)*?'
-    r'function_name\\s*=\\s*aws_lambda_function\\.lambda\\["(?P<function>[^"]+)"\\]\\.function_name'
-    r'(?:(?!\\n\\s*\\}).)*?group\\s*=\\s*"(?P<group>[^"]+)"',
-    re.DOTALL,
-)
 
 
 def _terraform_routes() -> dict[str, tuple[str, str]]:
@@ -20,12 +12,26 @@ def _terraform_routes() -> dict[str, tuple[str, str]]:
         ROOT / "infra/modules/recognition/outputs.tf",
         ROOT / "infra/modules/data/outputs.tf",
     ):
-        content = path.read_text(encoding="utf-8")
-        for match in ROUTE_BLOCK.finditer(content):
-            route = f"{match.group('method')} {match.group('path')}"
-            if route in routes:
-                raise AssertionError(f"duplicate Terraform API route: {route}")
-            routes[route] = (match.group("function"), match.group("group"))
+        current_route = None
+        function = None
+        group = None
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped.startswith('"') and stripped.endswith('" = {') and "/api/" in stripped:
+                current_route = stripped[1:-4]
+                function = None
+                group = None
+            elif current_route is not None and stripped.startswith("function_name = aws_lambda_function.lambda["):
+                function = stripped.split('lambda["', 1)[1].split('"]', 1)[0]
+            elif current_route is not None and stripped.startswith("group = "):
+                group = stripped.split('"', 2)[1]
+            elif current_route is not None and stripped == "}":
+                if function is None or group is None:
+                    raise AssertionError(f"incomplete Terraform route contract: {current_route}")
+                if current_route in routes:
+                    raise AssertionError(f"duplicate Terraform API route: {current_route}")
+                routes[current_route] = (function, group)
+                current_route = None
     return routes
 
 
