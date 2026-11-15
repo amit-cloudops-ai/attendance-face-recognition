@@ -73,3 +73,11 @@ def test_plan_metadata_rejects_missing_provenance_fields(tmp_path):
 
     with pytest.raises(ValueError, match="missing required fields"):
         verify_metadata(path, {})
+
+
+def test_plan_metadata_rejects_non_object_json(tmp_path):
+    path = tmp_path / "tfplan.metadata.json"
+    path.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
+
+    with pytest.raises(TypeError, match="must be a JSON object"):
+        verify_metadata(path, {})
