@@ -6,6 +6,7 @@ const REFRESH = "attendance.refreshToken";
 const STATE = "attendance.oauthState";
 const VERIFIER = "attendance.pkceVerifier";
 const NONCE = "attendance.oauthNonce";
+const RETURN_TO = "attendance.returnTo";
 
 function randomString(bytes = 32) {
   const data = crypto.getRandomValues(new Uint8Array(bytes));
@@ -50,6 +51,7 @@ export function clearSession() {
   sessionStorage.removeItem(ACCESS);
   sessionStorage.removeItem(ID);
   sessionStorage.removeItem(REFRESH);
+  sessionStorage.removeItem(RETURN_TO);
 }
 
 export async function login() {
@@ -57,6 +59,9 @@ export async function login() {
   const state = randomString();
   const nonce = randomString();
   const verifier = randomString(48);
+  const requestedPath = location.pathname === "/admin" ? "/admin/" : location.pathname;
+  const returnTo = requestedPath === "/admin/" ? "/admin/" : "/";
+  sessionStorage.setItem(RETURN_TO, returnTo);
   sessionStorage.setItem(STATE, state);
   sessionStorage.setItem(NONCE, nonce);
   sessionStorage.setItem(VERIFIER, verifier);
