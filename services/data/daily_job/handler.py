@@ -152,12 +152,16 @@ def lambda_handler(event, context):
                                 "SET updated_at=:now, version=if_not_exists(version,:zero)+:one "
                                 "ADD flags :flags"
                             ),
-                            ConditionExpression="attribute_exists(clock_in) AND attribute_not_exists(clock_out)",
+                            ConditionExpression=(
+                                "attribute_exists(clock_in) AND attribute_not_exists(clock_out) "
+                                "AND (attribute_not_exists(flags) OR NOT contains(flags,:missing_flag))"
+                            ),
                             ExpressionAttributeValues={
                                 ":now": now,
                                 ":flags": {"missing_clock_out"},
                                 ":zero": 0,
                                 ":one": 1,
+                                ":missing_flag": "missing_clock_out",
                             },
                         )
                     except ClientError as exc:
