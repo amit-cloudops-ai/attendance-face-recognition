@@ -155,12 +155,18 @@ def lambda_handler(event, context):
                 {"Put": {"TableName": audit.name, "Item": _ddb_item(audit_item)}},
             ])
         except ClientError as exc:
-            if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
+            if (
+                exc.response.get("Error", {}).get("Code") == "TransactionCanceledException"
+                and any(
+                    reason.get("Code") in {"ConditionalCheckFailed", "TransactionConflict"}
+                    for reason in exc.response.get("CancellationReasons", [])
+                )
+            ):
                 return error(409, "attendance_changed", "Attendance changed concurrently. Reload and retry the override.")
             raise
         return ok(item)
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         return error(400, "invalid_request", str(exc))
     except Exception as exc:  # noqa: BLE001 - API boundary returns a sanitized 500 response
-        LOGGER.error("Attendance override failed (%s): %r", type(exc).__name__, getattr(exc, "response", None))
+        LOGGER.error("Attendance override failed (%s)", type(exc).__name__)
         return error(500, "internal_error", "Unable to override the attendance record.")
