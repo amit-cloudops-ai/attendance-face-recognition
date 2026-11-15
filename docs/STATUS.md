@@ -1,3 +1,81 @@
+# Production acceptance and release evidence — 15 November 2026
+
+> **Current production state supersedes the historical bootstrap snapshots below.** Those entries are retained as an audit trail, not as the current deployment status.
+
+## Executive status
+
+The production AWS environment is deployed in **us-east-1** and the kiosk and admin applications are live over HTTPS. The release candidate is deployed from `release/aws-readiness-candidate`; it has **not** been promoted to `main`. Do not treat production deployment from this release branch as satisfying the frozen specification's separate `main)-deployment/governance gate.
+
+- Production CloudFront: https://d2l1fs6zsfo1ga.cloudfront.net
+- Production kiosk: https://d2l1fs6zsfo1ga.cloudfront.net/kiosk/
+- Production admin: https://d2l1fs6zsfo1ga.cloudfront.net/admin/
+- Production API Gateway HTTP API: `pmd8cihlki`; endpoint `https://pmd8cihlki.execute-api.us-east-1.amazonaws.com`
+- CloudFront distribution: `E3C89JGWXFNNGL` (reported Deployed and Enabled).
+- AWS account: `924422830139`; region: `us-east-1`.
+- Production DynamoDB tables: `attendance-prod-attendance`, `attendance-prod-audit`, `attendance-prod-config`, `attendance-prod-employees`, `attendance-prod-scan-results`.
+- Rekognition collection: `attendance-prod-faces`.
+- Production S3 buckets: `attendance-prod-924422830139-raw`, `attendance-prod-924422830139-reports`, `attendance-prod-924422830139-web`.
+- KMS key: `arn:aws:kms:us-east-1:924422830139:key/c445d9fd-ec63-42d7-b6d2-2f03c80b62fa`.
+- Alert topic: `arn:aws:sns:us-east-1:924422830139:attendance-prod-alerts`.
+- Terraform remote state: `attendance-tf-state-924422830139-amit-2026-1115`, key `attendance/prod/terraform.tfstate`.
+
+## Production acceptance results
+
+The following functional results were explicitly confirmed by the operator on 15 November 2026. They are recorded as **operator-confirmed production acceptance**; attach screenshots/request IDs or sanitized test records where available before external submission.
+
+| Criterion | Result | Evidence / qualification |
+|---|---|---|
+| F01 employee creation and face enrollment | PASS | Operator confirmed employee registration, photo upload and enrollment verification. Do not include employee names or biometric images in evidence. |
+| F02–F06 kiosk capture, recognition and attendance transitions | PASS | Operator confirmed successful kiosk recognition. Clock-in/clock-out/duplicate behavior was included in the kiosk acceptance confirmation; retain sanitized request IDs/results if available. |
+| F07 daily absence report | PASS | Operator confirmed daily report acceptance. Attach the report period and sanitized S3 object key. |
+| F08 weekly analytics | PASS | Operator confirmed weekly report acceptance. Attach the ISO week and sanitized S3 object key. |
+| F09–F10 admin authentication, attendance and reports | PASS | Admin login and production admin workflow were confirmed working; daily and weekly reports confirmed. |
+| N01 20-scan and browser acceptance | PASS — operator-confirmed | Operator confirmed 20-scan performance and browser acceptance. The numeric p95 result, 20 individual timings, browser/device/version matrix and evidence link have not yet been entered here. Do not claim a numeric p95 without the measurement output. |
+| Production HTTPS and frontend delivery | PASS | CloudFront distribution reported Deployed/Enabled; live site returned HTTP 200 with security response headers in the deployment verification. |
+| Cognito admin setup | PASS | Admin account was created, placed in the `admin` group and first-login password change completed; operator confirmed successful login. |
+| Terraform production deployment | PASS | First apply: 1 imported, 200 added, 1 changed, 0 destroyed. Follow-up config apply: 0 added, 4 changed, 0 destroyed. No claim is made here that a clean-checkout rebuild has been completed. |
+
+## Remaining production release gates
+
+The following are **not yet evidenced in this status file**. Mark each PASS only after collecting the listed evidence.
+
+| Gate | Required evidence | Current status |
+|---|---|---|
+| N02 raw biometric object deletion | After a production test, verify both `captures/` and `enroll/` prefixes contain no test objects within 10 minutes; record timestamps and object counts, never image contents | OPEN |
+| N03 encryption and TLS | Capture live checks for all five DynamoDB tables, S3 default encryption, public-access blocks and TLS-only bucket policies; include KMS key IDs, not key material | PARTIAL — Terraform configuration and bucket controls were applied; complete live evidence bundle outstanding |
+| N04 per-Lambda least privilege | Export deployed Lambda execution-role mappings and compare every attached policy/action/resource to the architecture IAM matrix; document the AWS-required `rekognition:DetectFaces` wildcard exception | OPEN |
+| N05 private buckets / CloudFront-only web access | Record Block Public Access and bucket policy/OAC evidence for raw, reports and web buckets | PARTIAL — bucket security controls were applied; full live evidence bundle outstanding |
+| N06 clean-checkout reproducibility | Rebuild a disposable dev environment from a clean checkout and record plan/apply/test results; do not destroy or rebuild production | OPEN |
+| N07 release governance | Verify required branch protections and CI policy on `main`; decide and approve the separate promotion path. Current production is on the release candidate, not `main` | OPEN — no promotion authorized |
+| N08 operational alert delivery | Verify SNS subscription confirmation and budget notification delivery; deliberately trigger one safe test alarm and record email receipt, alarm transition and reset | OPEN |
+| N09 cost ceiling | The cost sheet estimates approximately USD 12–14/month for 100 employees x 2 scans/day and defines a USD 15 budget guardrail. Attach an AWS Pricing Calculator estimate and verify the deployed budget and notifications | PARTIAL — estimate exists; calculator and live notification evidence outstanding |
+| N10 logging | Verify each Lambda log group has 30-day retention and inspect sanitized structured samples for absence of images, tokens and full face data | OPEN |
+| N11 browser/device matrix | Operator reports acceptance passed; record exact Chrome desktop, Chrome Android and Safari iOS versions/devices and outcomes | PASS — operator-confirmed; detailed matrix evidence outstanding |
+| Pilot | Whole team uses the production kiosk for at least one working day; record date/window, participant count (no names), issues and outcome | OPEN |
+| Backup/restore | Complete a dev-only DynamoDB restore drill and report-object recovery check; do not restore over production | OPEN |
+| Offboarding | Verify production employee deactivation, Rekognition face deletion, audit event and retained attendance history using an approved test employee | OPEN |
+| DLQ recovery | Exercise a controlled dev DLQ recovery/redrive and verify idempotency and raw-image cleanup | OPEN |
+
+## Final deliverables
+
+- [x] Production kiosk and admin are deployed over HTTPS.
+- [x] Operator-confirmed registration/enrollment, kiosk recognition, daily/weekly reports, 20-scan and browser acceptance.
+- [ ] Numeric N01 p95 result and complete browser/device matrix attached.
+- [ ] Security/retention/least-privilege evidence bundle attached.
+- [ ] Alarm and budget notification evidence attached.
+- [ ] One-working-day production pilot completed and recorded.
+- [ ] Architecture diagram exported as PNG and technical design PDF generated.
+- [ ] Demo video recorded from production using consenting participants and sanitized evidence.
+- [ ] Cost sheet supplemented with an AWS Pricing Calculator estimate.
+- [ ] README deployment instructions reconciled with the actual local Terraform production workflow.
+- [ ] Release branch/PR #33 governance and promotion decision completed separately; no automatic merge or promotion.
+
+## Evidence handling
+
+Use employee test IDs only where needed. Do not commit employee names, email addresses, raw captures, face images, FaceIds, Cognito tokens, credentials, or unredacted request/response bodies. For screenshots, redact personal data and browser storage. Record each test with date/time (IST), environment, deployed commit, operator, result and a link to sanitized evidence.
+
+---
+
 # Project status — 15 November 2026
 
 ## Executive status
