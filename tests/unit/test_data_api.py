@@ -31,6 +31,7 @@ def data_tables(monkeypatch):
         monkeypatch.setenv("TABLE_AUDIT", "audit")
         monkeypatch.setenv("TABLE_ATTENDANCE", "attendance")
         db = boto3.resource("dynamodb", region_name="us-east-1")
+        monkeypatch.setattr(boto3, "resource", lambda *args, **kwargs: db)
         employee_table = db.create_table(
             TableName="employees",
             KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"}],
