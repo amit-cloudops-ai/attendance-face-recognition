@@ -14,7 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_DIR = ROOT / "infra" / "policies"
 REGION_FILE = ROOT / "config" / "deployment.json"
-EXPECTED_TEMPLATE_COUNTS = {"trust": 6, "boundary": 2, "managed": 26}
+EXPECTED_TEMPLATE_COUNTS = {"trust": 6, "boundary": 2, "managed": 28}
 ACCOUNT_PLACEHOLDER = "$" + "{account_id}"
 BUCKET_PLACEHOLDER = "$" + "{state_bucket}"
 API_ID_PLACEHOLDER = "$" + "{api_id}"
