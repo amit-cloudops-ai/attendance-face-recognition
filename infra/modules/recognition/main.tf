@@ -25,12 +25,12 @@ locals {
     recognize = {
       memory_size                    = 512
       timeout                        = 15
-      reserved_concurrent_executions = 10
+      reserved_concurrent_executions = var.reserved_concurrency.recognize
     }
     enroll = {
       memory_size                    = 512
       timeout                        = 15
-      reserved_concurrent_executions = 5
+      reserved_concurrent_executions = var.reserved_concurrency.enroll
     }
     enroll_url = {
       memory_size                    = 256
@@ -45,7 +45,7 @@ locals {
     failure = {
       memory_size                    = 128
       timeout                        = 10
-      reserved_concurrent_executions = 2
+      reserved_concurrent_executions = var.reserved_concurrency.failure
     }
   }
 
