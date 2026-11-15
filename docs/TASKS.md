@@ -50,7 +50,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T36 | Add DynamoDB customer-managed KMS authorization | DONE | Customer-managed key policy and dev/prod apply fragments use exact DynamoDB ViaService and environment alias; CreateGrant is AWS-resource constrained |
 | T37 | Build dedicated billing plan/apply policies and OIDC roles | DONE | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
 
-| T38 | Establish canonical AWS region manifest and CI drift prevention | IN_PROGRESS | Follow-up audit found a hardcoded region inside the access module and KMS actions incorrectly placed in an S3 bucket policy; all access-module endpoints/ARNs must consume the root's canonical region and the DynamoDB KMS statement must exist only in the KMS key policy; CI must enforce both or legacy region reference |
+| T38 | Establish canonical AWS region manifest and CI drift prevention | DONE | Access-module endpoints, Cognito issuer, KMS ViaService and S3 upload URL consume the root's canonical region input; DynamoDB KMS actions exist only in the KMS key policy; regression checks enforce both; follow-up CI run 43679979477 passed (118 Python tests, both jobs successful) or legacy region reference |
 
 ## Phase C — release and operations
 
