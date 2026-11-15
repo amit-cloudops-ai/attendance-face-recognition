@@ -280,12 +280,13 @@ def record_scan(
             ":missing_flag": {"missing_clock_out"},
         }
         condition = "clock_in=:ci AND (attribute_not_exists(clock_out) OR clock_out < :co)"
-        update = "SET clock_out=:co, updated_at=:ua DELETE flags :missing_flag"
+        update = "SET clock_out=:co, updated_at=:ua"
         if request_id is not None:
             names = {"#events": "scan_events", "#request": request_id}
             values[":outcome"] = outcome
             condition += " AND attribute_not_exists(#events.#request)"
             update += ", #events.#request=:outcome"
+        update += " DELETE flags :missing_flag"
         try:
             update_args = {
                 "Key": {"employee_id": employee_id, "date": business_date},
