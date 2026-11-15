@@ -1,4 +1,5 @@
 import json
+import uuid
 
 import boto3
 import pytest
@@ -194,3 +195,12 @@ def test_face_deletion_surfaces_inconsistent_photo_count(resources, monkeypatch)
     assert json.loads(response["body"])["error"]["code"] == "face_state_inconsistent"
     assert audit.scan()["Items"] == []
     assert fake.calls == []
+
+
+
+def test_face_delete_audit_id_is_deterministic_uuid():
+    face_ids = ["face-b", "face-a"]
+    first = faces_delete._audit_id("EMP001", face_ids)
+    second = faces_delete._audit_id("EMP001", list(reversed(face_ids)))
+    assert first == second
+    assert str(uuid.UUID(first)) == first
