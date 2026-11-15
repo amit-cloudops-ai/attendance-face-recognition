@@ -10,14 +10,14 @@ The application audit and fixes completed on this branch include:
 
 - Weekly metrics now exclude attendance records on weekends and holidays from every numerator.
 - Employee create/deactivate, attendance override, settings updates, and face-template offboarding commit the relevant DynamoDB state change and audit record transactionally.
-- Settings updates use a strongly consistent read and monotonically increasing version check; overrides reject stale concurrent writes. Version-based guards also reject same-second concurrent writes that timestamp-only conditions cannot distinguish.
+- Settings updates use a strongly consistent read and monotonically increasing version check; overrides reject stale concurrent writes. Recognition and daily finalization increment the attendance row version on every mutation, so same-second concurrent writes cannot bypass optimistic locking. Daily missing-clock-out finalization is idempotent.
 - Recognition attendance writes include an employee-active condition in the same transaction, closing the deactivation/scan race.
 - A late-arriving clock-out clears the stale `missing_clock_out` flag, including after the daily job has finalized the date.
 - Exhausted scan failures reconcile the strongly consistent attendance base table if the date-index GSI has not caught up.
 - Admin offboarding can be retried after partial failure without exposing FaceIds; enrollment capacity and attendance pagination now track current UI state.
 - Regression coverage was added for transaction failures, concurrency, deactivation races, eventual GSI consistency, offboarding retries, stale flags and enrollment capacity.
 
-**Final consolidated CI evidence:** run [43678796733](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43678796733), commit `63e4de7ef06897f48dd5656bd93f7c575169be7e`. Both jobs passed: **110 Python tests**, Ruff, region consistency, browser JavaScript syntax/CSP, shell syntax, workflow YAML, IAM/security template validations, Terraform formatting, and Terraform init/validate for recognition, data, foundation, access, dev, prod and billing.
+**Final consolidated CI evidence:** run [43679052434](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43679052434), commit `0aa6aa527b57347d60b68b6d66d54734410f21f3`. Both jobs passed: **116 Python tests**, Ruff, region consistency, browser JavaScript syntax/CSP, shell syntax, workflow YAML, IAM/security template validations, Terraform formatting, and Terraform init/validate for recognition, data, foundation, access, dev, prod and billing.
 
 **Important boundary:** this is not a claim that live AWS authorization, real Rekognition behavior, or physical-browser performance has been measured. The browser application passed repository-level JavaScript syntax/CSP checks and its UI state fixes have regression review; the deployed Cognito/API/camera browser matrix plus the 20-scan p95 latency acceptance test require the approved dev stack and remain Part 2 acceptance checks. No AWS resources have been provisioned, no remote backend initialized, and no Terraform plan or apply run. AWS writes remain separately approval-gated.
 
