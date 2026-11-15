@@ -16,6 +16,7 @@ def _metadata() -> dict[str, str | int]:
         "branch": "develop",
         "terraform_root": "infra/envs/dev",
         "account_id": "123456789012",
+        "state_bucket": "attendance-tf-state-123456789012-ci-test",
         "api_id": "a1b2c3d4e5",
         "region": "us-east-1",
     }
@@ -46,6 +47,7 @@ def test_plan_metadata_rejects_wrong_environment_commit_or_api_id(tmp_path):
         "branch": "main",
         "terraform_root": "infra/envs/prod",
         "account_id": "123456789012",
+        "state_bucket": "attendance-tf-state-123456789012-ci-test",
         "api_id": "z9y8x7w6v5",
         "region": "us-east-1",
     }
