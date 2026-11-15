@@ -137,6 +137,7 @@ def lambda_handler(event, context):
                                 "status": "absent",
                                 "source": "system",
                                 "updated_at": now,
+                                "version": 1,
                             },
                             ConditionExpression="attribute_not_exists(employee_id)",
                         )
@@ -147,11 +148,16 @@ def lambda_handler(event, context):
                     try:
                         attendance_table.update_item(
                             Key={"employee_id": employee_id, "date": date_text},
-                            UpdateExpression="SET updated_at=:now ADD flags :flags",
+                            UpdateExpression=(
+                                "SET updated_at=:now, version=if_not_exists(version,:zero)+:one "
+                                "ADD flags :flags"
+                            ),
                             ConditionExpression="attribute_exists(clock_in) AND attribute_not_exists(clock_out)",
                             ExpressionAttributeValues={
                                 ":now": now,
                                 ":flags": {"missing_clock_out"},
+                                ":zero": 0,
+                                ":one": 1,
                             },
                         )
                     except ClientError as exc:
