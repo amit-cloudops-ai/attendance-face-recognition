@@ -59,7 +59,7 @@ terraform -chdir=infra/billing init -backend=false -input=false -lockfile=readon
 terraform -chdir=infra/billing validate
 ```
 
-The exact Terraform version used in CI is 1.10.5. Use the committed provider lockfiles; do not run `terraform init -upgrade` as part of a deployment.
+The CI toolchain is pinned to Ubuntu 26.04, Python 3.12.16, Terraform 1.10.5 and age 1.2.1-1build1. Python test/lint dependencies are pinned in `requirements-dev.txt`; CI runs the SHA-pinned PyPA pip-audit action against that full dependency list. GitHub Actions are pinned to full commit SHAs and Dependabot checks GitHub Actions and Python dependencies weekly. Use the committed provider lockfiles; do not run `terraform init -upgrade` as part of a deployment.
 
 ## 4. Account-specific read-only preparation
 
