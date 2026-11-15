@@ -38,7 +38,7 @@ def test_employee_api_uses_atomic_dynamodb_transactions_and_hides_face_ids(monke
         aws_secret_access_key="testing",
     )
     client = resource.meta.client
-    monkeypatch.setattr(boto3, "resource", lambda service_name: resource)
+    monkeypatch.setattr(boto3, "resource", lambda service_name, **kwargs: resource)
 
     captured_transactions: list[dict] = []
 
@@ -115,7 +115,7 @@ def test_employee_api_uses_atomic_dynamodb_transactions_and_hides_face_ids(monke
             _admin_event("DELETE", employee_id="EMP901"), None
         )
 
-    assert created["statusCode"] == 201
+    assert created["statusCode"] == 201, created
     created_employee = json.loads(created["body"])
     assert created_employee["employee_id"] == "EMP901"
     assert created_employee["has_face_templates"] is False
