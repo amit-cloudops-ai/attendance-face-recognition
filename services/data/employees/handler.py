@@ -6,6 +6,7 @@ import re
 import uuid
 
 import boto3
+from boto3.dynamodb.types import TypeSerializer
 from attendance_common.auth import get_username, require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist, parse_hhmm, to_iso
@@ -50,8 +51,13 @@ def _public_employee(item: dict) -> dict:
     }
 
 
-def _audit(table, event, action, employee_id, old, new, reason, at):
-    table.put_item(Item={
+def _ddb_item(item: dict) -> dict:
+    serializer = TypeSerializer()
+    return {key: serializer.serialize(value) for key, value in item.items()}
+
+
+def _audit_item(event, action, employee_id, old, new, reason, at):
+    return {
         "audit_id": str(uuid.uuid4()),
         "actor": get_username(event),
         "action": action,
@@ -60,7 +66,7 @@ def _audit(table, event, action, employee_id, old, new, reason, at):
         "new": new,
         "reason": reason,
         "at": at,
-    })
+    }
 
 
 def lambda_handler(event, context):
@@ -128,20 +134,31 @@ def lambda_handler(event, context):
                 "created_at": now,
                 "updated_at": now,
             }
-            try:
-                employees.put_item(
-                    Item=item,
-                    ConditionExpression="attribute_not_exists(employee_id)",
-                )
-            except ClientError as exc:
-                if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
-                    return error(409, "employee_exists", "An employee with this ID already exists.")
-                raise
-            _audit(
-                audit, event, "employee_create", employee_id, {},
+            audit_item = _audit_item(
+                event, "employee_create", employee_id, {},
                 {"active": True, "consent_at": now, "name": item["name"]},
                 "Employee created after explicit consent.", now,
             )
+            try:
+                employees.meta.client.transact_write_items(TransactItems=[
+                    {"Put": {
+                        "TableName": employees.name,
+                        "Item": _ddb_item(item),
+                        "ConditionExpression": "attribute_not_exists(employee_id)",
+                    }},
+                    {"Put": {
+                        "TableName": audit.name,
+                        "Item": _ddb_item(audit_item),
+                    }},
+                ])
+            except ClientError as exc:
+                if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
+                    existing = employees.get_item(
+                        Key={"employee_id": employee_id}, ConsistentRead=True
+                    ).get("Item")
+                    if existing:
+                        return error(409, "employee_exists", "An employee with this ID already exists.")
+                raise
             return ok(_public_employee(item), status=201)
 
         if method == "DELETE" and employee_id:
@@ -154,28 +171,40 @@ def lambda_handler(event, context):
                 return error(404, "employee_not_found", "The employee was not found.")
             if old.get("active", False):
                 now = to_iso(now_ist())
+                new = {**old, "active": False, "updated_at": now}
+                audit_item = _audit_item(
+                    event, "employee_deactivate", employee_id,
+                    {"active": True}, {"active": False},
+                    "Employee deactivated by administrator.", now,
+                )
+                serializer = TypeSerializer()
                 try:
-                    employees.update_item(
-                        Key={"employee_id": employee_id},
-                        UpdateExpression="SET active=:inactive, updated_at=:now",
-                        ConditionExpression="active=:active",
-                        ExpressionAttributeValues={
-                            ":inactive": False, ":active": True, ":now": now
-                        },
-                    )
+                    employees.meta.client.transact_write_items(TransactItems=[
+                        {"Update": {
+                            "TableName": employees.name,
+                            "Key": _ddb_item({"employee_id": employee_id}),
+                            "UpdateExpression": "SET active=:inactive, updated_at=:now",
+                            "ConditionExpression": "active=:active",
+                            "ExpressionAttributeValues": {
+                                ":inactive": serializer.serialize(False),
+                                ":active": serializer.serialize(True),
+                                ":now": serializer.serialize(now),
+                            },
+                        }},
+                        {"Put": {
+                            "TableName": audit.name,
+                            "Item": _ddb_item(audit_item),
+                        }},
+                    ])
                 except ClientError as exc:
-                    if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                    if exc.response.get("Error", {}).get("Code") != "TransactionCanceledException":
                         raise
                     latest = employees.get_item(
                         Key={"employee_id": employee_id}, ConsistentRead=True
                     ).get("Item")
-                    return ok(_public_employee(latest or old))
-                new = {**old, "active": False, "updated_at": now}
-                _audit(
-                    audit, event, "employee_deactivate", employee_id,
-                    {"active": True}, {"active": False},
-                    "Employee deactivated by administrator.", now,
-                )
+                    if latest and not latest.get("active", False):
+                        return ok(_public_employee(latest))
+                    raise
                 return ok(_public_employee(new))
             return ok(_public_employee(old))
 
