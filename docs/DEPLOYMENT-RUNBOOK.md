@@ -10,6 +10,8 @@ Target account: `924422830139`
 Target region: `us-east-1`
 Terraform root: `infra/envs/dev`
 
+Start from the reviewed release candidate commit only after its full CI run is green on that exact head. A green run on an earlier commit is not evidence for later changes.
+
 All steps below are instructions for the repository owner. They are not executed by this runbook or by this review. API creation, IAM policy creation, S3 bucket creation, remote backend initialization, Terraform plan and Terraform apply are separate owner-approved actions. Never proceed if the STS identity does not match the target account.
 
 ### Bootstrap order
@@ -21,7 +23,7 @@ All steps below are instructions for the repository owner. They are not executed
    AWS_PROFILE=Amit-admin bash scripts/aws_preflight_readonly.sh
    ```
 
-   Stop unless the returned account is `924422830139` and the region is `us-east-1`. Treat AccessDenied as unknown, not as proof that a resource is absent. Record existing OIDC, boundary, role and state-bucket resources so that none are duplicated.
+   Stop unless the returned account is `924422830139` and the region is `us-east-1`. Treat AccessDenied as unknown, not as proof that a resource is absent. Record existing OIDC, boundary, role and state-bucket resources so that none are duplicated. For this solo local path, the OIDC provider and six GitHub deployment roles may legitimately be absent; do not create them as part of the first dev bootstrap.
 
 2. **Create the dev API Gateway HTTP API.** First run the script in its default dry-run mode and inspect the exact account, region and API name. Only after approving that one API creation, run the second command:
 
