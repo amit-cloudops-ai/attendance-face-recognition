@@ -8,6 +8,8 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import boto3
+from boto3.dynamodb.types import TypeSerializer
+from botocore.exceptions import ClientError
 from attendance_common.auth import get_username, require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist, to_iso
@@ -115,8 +117,7 @@ def lambda_handler(event, context):
             item["clock_out"] = clock_out
         if status != "absent" and old.get("flags"):
             item["flags"] = old["flags"]
-        attendance.put_item(Item=item)
-        audit.put_item(Item={
+        audit_item = {
             "audit_id": str(uuid.uuid4()),
             "actor": username,
             "action": "override",
@@ -126,7 +127,34 @@ def lambda_handler(event, context):
             "new": item,
             "reason": reason.strip(),
             "at": now,
-        })
+        }
+        serializer = TypeSerializer()
+        marshal = lambda value: {key: serializer.serialize(entry) for key, entry in value.items()}
+        if not old:
+            condition = "attribute_not_exists(employee_id)"
+            condition_values = None
+        elif "updated_at" in old:
+            condition = "attribute_exists(employee_id) AND updated_at=:old_updated"
+            condition_values = {":old_updated": serializer.serialize(old["updated_at"])}
+        else:
+            condition = "attribute_exists(employee_id) AND attribute_not_exists(updated_at)"
+            condition_values = None
+        put = {
+            "TableName": attendance.name,
+            "Item": marshal(item),
+            "ConditionExpression": condition,
+        }
+        if condition_values:
+            put["ExpressionAttributeValues"] = condition_values
+        try:
+            attendance.meta.client.transact_write_items(TransactItems=[
+                {"Put": put},
+                {"Put": {"TableName": audit.name, "Item": marshal(audit_item)}},
+            ])
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
+                return error(409, "attendance_changed", "Attendance changed concurrently. Reload and retry the override.")
+            raise
         return ok(item)
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         return error(400, "invalid_request", str(exc))
