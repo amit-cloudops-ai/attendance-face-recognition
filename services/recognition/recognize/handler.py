@@ -1,6 +1,7 @@
 """S3-triggered face recognition worker with retry-safe result handling."""
 import logging
 import os
+import re
 from datetime import datetime
 from urllib.parse import unquote_plus
 from uuid import UUID
