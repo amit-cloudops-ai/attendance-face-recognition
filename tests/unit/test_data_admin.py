@@ -4,6 +4,7 @@ import boto3
 import pytest
 from attendance_common import config
 from moto import mock_aws
+from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
 from services.data.override import handler as override_handler
 from services.data.settings import handler as settings_handler
@@ -65,6 +66,7 @@ def admin_resources(monkeypatch):
         )
         employees.put_item(Item={"employee_id": "EMP001", "name": "Priya", "active": True})
         config._reset_cache()
+        install_transaction_emulator(monkeypatch, db)
         yield employees, attendance, settings, audit
         config._reset_cache()
 
