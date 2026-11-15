@@ -10,16 +10,16 @@ The application audit and fixes completed on this branch include:
 
 - Weekly metrics now exclude attendance records on weekends and holidays from every numerator.
 - Employee create/deactivate, attendance override, settings updates, and face-template offboarding commit the relevant DynamoDB state change and audit record transactionally.
-- Settings updates use a strongly consistent read and conditional version check; overrides reject stale concurrent writes.
+- Settings updates use a strongly consistent read and monotonically increasing version check; overrides reject stale concurrent writes. Version-based guards also reject same-second concurrent writes that timestamp-only conditions cannot distinguish.
 - Recognition attendance writes include an employee-active condition in the same transaction, closing the deactivation/scan race.
 - A late-arriving clock-out clears the stale `missing_clock_out` flag, including after the daily job has finalized the date.
 - Exhausted scan failures reconcile the strongly consistent attendance base table if the date-index GSI has not caught up.
 - Admin offboarding can be retried after partial failure without exposing FaceIds; enrollment capacity and attendance pagination now track current UI state.
 - Regression coverage was added for transaction failures, concurrency, deactivation races, eventual GSI consistency, offboarding retries, stale flags and enrollment capacity.
 
-**Final consolidated CI evidence:** run [43678470743](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43678470743), commit `ed71923c67e962ece4773aec044b653323653b95`. Both jobs passed: **108 Python tests**, Ruff, region consistency, browser JavaScript syntax/CSP, shell syntax, workflow YAML, IAM/security template validations, Terraform formatting, and Terraform init/validate for recognition, data, foundation, access, dev, prod and billing.
+**Final consolidated CI evidence:** run [43678796733](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43678796733), commit `63e4de7ef06897f48dd5656bd93f7c575169be7e`. Both jobs passed: **110 Python tests**, Ruff, region consistency, browser JavaScript syntax/CSP, shell syntax, workflow YAML, IAM/security template validations, Terraform formatting, and Terraform init/validate for recognition, data, foundation, access, dev, prod and billing.
 
-**Important boundary:** this is not a claim that live AWS authorization, real Rekognition behavior, or physical-browser performance has been measured. The browser code passed syntax/CSP checks and the deployed browser/device matrix plus the 20-scan p95 latency acceptance test remain Part 2 post-deployment checks. No AWS resources have been provisioned, no remote backend initialized, and no Terraform plan or apply run. AWS writes remain separately approval-gated.
+**Important boundary:** this is not a claim that live AWS authorization, real Rekognition behavior, or physical-browser performance has been measured. The browser application passed repository-level JavaScript syntax/CSP checks and its UI state fixes have regression review; the deployed Cognito/API/camera browser matrix plus the 20-scan p95 latency acceptance test require the approved dev stack and remain Part 2 acceptance checks. No AWS resources have been provisioned, no remote backend initialized, and no Terraform plan or apply run. AWS writes remain separately approval-gated.
 
 
 The solo application and the T01–T38 deployment-security and region-guard task chain have been consolidated into `solo/amit-monday`. The T01–T15, T17 and T31–T37 implementation tasks are complete at the code/documentation level with historical CI evidence recorded in their task PRs. T16 and T18 remain blocked on repository-administrator and owner-controlled AWS-account information/actions.
