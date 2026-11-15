@@ -49,6 +49,7 @@ jobs:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
       TF_VAR_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+      TF_VAR_api_id: ${{ vars.API_ID }}
       TF_VAR_execution_role_boundary_arn: ${{ vars.EXECUTION_ROLE_BOUNDARY_ARN }}
       TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
       TF_VAR_callback_urls: ${{ vars.COGNITO_CALLBACK_URLS }}
@@ -79,12 +80,16 @@ jobs:
             fi
           done
           if [[ "${{ inputs.environment }}" != "billing" ]]; then
-            for name in TF_VAR_execution_role_boundary_arn TF_VAR_callback_urls TF_VAR_logout_urls TF_VAR_allowed_origins; do
+            for name in TF_VAR_execution_role_boundary_arn TF_VAR_api_id TF_VAR_callback_urls TF_VAR_logout_urls TF_VAR_allowed_origins; do
               if [[ -z "${!name}" ]]; then
                 echo "Missing environment-specific configuration for ${name}."
                 exit 1
               fi
             done
+            if [[ ! "${TF_VAR_api_id}" =~ ^[a-z0-9]{10}$ ]]; then
+              echo "TF_VAR_api_id must be the exact 10-character API Gateway ID for this environment."
+              exit 1
+            fi
             python - <<'PY'
           import json
           import os
