@@ -52,6 +52,8 @@ Holiday items: `pk = "HOLIDAY#YYYY-MM-DD"`, `name` S.
 **audit**: PK `audit_id` (S, UUID)
 `actor` S (Cognito username), `action` S (`override` | `employee_create` | `employee_deactivate` | `faces_delete` | `settings_update`), `employee_id` S (optional), `date` S (optional), `old` M, `new` M, `reason` S, `at` S (ISO).
 
+Admin employee create/deactivate, attendance override, settings update, and biometric offboarding commit their DynamoDB state change and audit event in a single transaction. Biometric offboarding first deletes the Rekognition FaceIds idempotently, then atomically clears the employee's stored FaceIds/photo count and writes its deterministic audit event. The admin employee response exposes only a boolean cleanup indicator, never biometric identifiers.
+
 ## 4. S3 keys
 | Bucket | Key | Written by | Notes |
 |---|---|---|---|
@@ -86,11 +88,11 @@ Base path `/api` on the same CloudFront domain as the web apps (no CORS needed f
 | `POST /api/kiosk/upload-url` | kiosk, admin | presign (A) | `{}` | `200 {"request_id": "...", "upload": {"url": "...", "fields": {...}}, "expires_in": 60}` |
 | `GET /api/kiosk/result/{request_id}` | kiosk, admin | result (A) | none | `200 {"request_id","kind","code","action?","name?","time?","status?","message"}`; `404 not_found` if unknown |
 | `POST /api/admin/employees/{employee_id}/enroll-url` | admin | enroll-url (A) | `{}` | same shape as upload-url, key `enroll/{employee_id}/{request_id}.jpg` |
-| `DELETE /api/admin/employees/{employee_id}/faces` | admin | faces-delete (A) | none | `200 {"deleted": N}`; clears `face_ids`, `photo_count=0` |
+| `DELETE /api/admin/employees/{employee_id}/faces` | admin | faces-delete (A) | none | `200 {"deleted": N, "already_deleted"?: true}`; clears `face_ids` and `photo_count` in the same transaction as its audit event; `409 face_state_inconsistent` if photo_count is positive but no FaceIds remain |
 | `GET /api/admin/employees` | admin | employees (B) | none | `200 {"items": [employee...]}` |
-| `GET /api/admin/employees/{employee_id}` | admin | employees (B) | none | `200 employee` |
+| `GET /api/admin/employees/{employee_id}` | admin | employees (B) | none | `200 employee` (includes safe `has_face_templates` boolean; never returns FaceIds) |
 | `POST /api/admin/employees` | admin | employees (B) | `{employee_id,name,email,department,shift_start,shift_end,consent:true}` | `201 employee` (`consent` must be true; sets `consent_at`, `active=true`) |
-| `DELETE /api/admin/employees/{employee_id}` | admin | employees (B) | none | `200 employee` with `active=false` (history kept; UI then calls the faces DELETE) |
+| `DELETE /api/admin/employees/{employee_id}` | admin | employees (B) | none | `200 employee` with `active=false` (history kept; UI then calls the faces DELETE and exposes a retry action if biometric cleanup remains pending) |
 | `GET /api/admin/attendance` | admin | attendance-query (B) | query: `employee_id?`, `from?`, `to?` (YYYY-MM-DD), `status?`, `limit?` (default 50, max 200), `cursor?` | `200 {"items":[{"employee_id","name","date","clock_in","clock_out","status","flags","source"}],"next_cursor": "..."|null}` |
 | `GET /api/admin/reports` | admin | reports (B) | query: `type=daily|weekly`, `period` (`YYYY-MM-DD` or `YYYY-Www`) | `200 {"summary": <report json>, "csv_url": "<pre-signed GET, 300 s>"}`; `404` if not generated |
 | `POST /api/admin/attendance/override` | admin | override (B) | `{employee_id,date,clock_in?,clock_out?,status?,reason}` (`reason` required) | `200 attendance record`; writes audit row; `source="admin"` |
