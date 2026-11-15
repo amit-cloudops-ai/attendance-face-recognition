@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -12,7 +11,7 @@ from moto import mock_aws
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "shared/python"))
 
-from services.data.employees import handler  # noqa: E402
+from services.data.employees import handler
 
 
 def _admin_event(method: str, *, body: dict | None = None, employee_id: str | None = None) -> dict:
