@@ -179,7 +179,11 @@ async function loadAttendance(cursor = null) {
     status("Provide an employee ID or a date filter before searching.", true);
     return;
   }
-  if (!cursor) attendanceBody.replaceChildren();
+  if (!cursor) {
+    attendanceBody.replaceChildren();
+    nextCursor = null;
+    document.querySelector("#next-page").disabled = true;
+  }
   const data = await api(`/admin/attendance?${query}`);
   for (const item of data.items || []) {
     const row = document.createElement("tr");
