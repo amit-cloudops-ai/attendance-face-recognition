@@ -117,13 +117,13 @@ def lambda_handler(event, context):
         }
         if stored and "version" in stored:
             condition = "attribute_exists(pk) AND #version=:old_version"
-            condition_values = _ddb_item({"v": int(stored["version"])})
+            condition_values = {":old_version": _ddb_item({"v": int(stored["version"])})["v"]}
         elif stored and "updated_at" in stored:
             condition = (
                 "attribute_exists(pk) AND attribute_not_exists(#version) "
                 "AND updated_at=:old_updated"
             )
-            condition_values = _ddb_item({"v": stored["updated_at"]})
+            condition_values = {":old_updated": _ddb_item({"v": stored["updated_at"]})["v"]}
         elif stored:
             condition = (
                 "attribute_exists(pk) AND attribute_not_exists(#version) "
