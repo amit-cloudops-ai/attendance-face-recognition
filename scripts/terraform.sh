@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-python "$ROOT/scripts/check_region_consistency.py"
-REGION="$(python "$ROOT/scripts/check_region_consistency.py" --print-region)"
+python3 "$ROOT/scripts/check_region_consistency.py"
+REGION="$(python3 "$ROOT/scripts/check_region_consistency.py" --print-region)"
 
 for variable in AWS_REGION AWS_DEFAULT_REGION; do
   current="${!variable:-}"
