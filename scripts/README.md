@@ -15,15 +15,15 @@ bash scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-confi
 \`configure_github_environments.sh\` creates/updates the six exact deployment environments, enforces their single allowed branch and configures independent reviewers. It is dry-run by default and requires GitHub CLI authenticated as a repository administrator plus an independent reviewer with repository access.
 
 \`\`\`bash
-bash scripts/configure_github_environments.sh --reviewer <independent-github-username>
-bash scripts/configure_github_environments.sh --reviewer <independent-github-username> --apply
+bash scripts/configure_github_environments.sh
+bash scripts/configure_github_environments.sh --apply
 \`\`\`
 
 The apply mode changes GitHub environment protection and deployment-branch settings. Review the dry-run output first. It does not populate AWS role/account/bucket variables, age recipients or private age identity secrets; those values must be added only after the approved AWS bootstrap creates the corresponding resources.
 
 ## Branch protection
 
-\`configure_branch_protection.sh\` is dry-run by default. It configures PR reviews, required CI checks, conversation resolution, admin enforcement and force-push/deletion restrictions for \`main\`, \`develop\` and \`solo/amit-monday\`.
+\`configure_branch_protection.sh\` is dry-run by default. It requires PRs and the `python` and `terraform-fmt` checks, but sets mandatory approvals to zero so the solo owner can merge after CI. It also configures conversation resolution, admin enforcement and force-push/deletion restrictions for \`main\`, \`develop\` and \`solo/amit-monday\`.
 
 \`\`\`bash
 bash scripts/configure_branch_protection.sh
