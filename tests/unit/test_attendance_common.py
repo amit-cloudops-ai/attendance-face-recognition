@@ -201,3 +201,21 @@ def test_active_employee_guard_and_attendance_write_share_transaction(aws_tables
     assert [next(iter(action)) for action in captured[0]] == ["ConditionCheck", "Put"]
     assert captured[0][0]["ConditionCheck"]["TableName"] == employees.name
     assert captured[0][1]["Put"]["TableName"] == attendance.name
+
+
+
+def test_late_clockout_clears_daily_missing_clockout_flag(aws_tables):
+    _, attendance = aws_tables
+    scan("2026-11-14T09:00:00+05:30")
+    attendance.update_item(
+        Key={"employee_id": "EMP001", "date": "2026-11-14"},
+        UpdateExpression="ADD flags :flags",
+        ExpressionAttributeValues={":flags": {"missing_clock_out"}},
+    )
+    result = scan("2026-11-14T18:00:00+05:30")
+    item = attendance.get_item(
+        Key={"employee_id": "EMP001", "date": "2026-11-14"}
+    )["Item"]
+    assert result["action"] == "clock_out"
+    assert result["clock_out"] == "2026-11-14T18:00:00+05:30"
+    assert "missing_clock_out" not in item.get("flags", set())
