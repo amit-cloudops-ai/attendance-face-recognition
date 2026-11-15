@@ -2,6 +2,8 @@ import boto3
 import pytest
 from moto import mock_aws
 
+from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
+
 from services.recognition.faces_delete import handler as faces_delete
 
 
@@ -37,6 +39,8 @@ def resources(monkeypatch):
             AttributeDefinitions=[{"AttributeName": "audit_id", "AttributeType": "S"}],
             BillingMode="PAY_PER_REQUEST",
         )
+        monkeypatch.setattr(boto3, "resource", lambda *args, **kwargs: db)
+        install_transaction_emulator(monkeypatch, db)
         yield employees, audit
 
 
@@ -139,4 +143,37 @@ def test_face_deletion_treats_already_missing_face_as_deleted(resources, monkeyp
     assert response["statusCode"] == 200
     assert item["face_ids"] == []
     assert item["photo_count"] == 0
+    assert len(audit.scan()["Items"]) == 1
+
+
+
+def test_face_deletion_transaction_failure_preserves_employee_and_audit_for_retry(resources, monkeypatch):
+    employees, audit = resources
+    employees.put_item(Item={
+        "employee_id": "EMP001", "active": False,
+        "face_ids": ["face-001"], "photo_count": 1,
+        "updated_at": "2026-11-14T09:00:00+05:30",
+    })
+    fake = FakeRekognition()
+    monkeypatch.setattr(faces_delete.boto3, "client", lambda *args, **kwargs: fake)
+
+    def fail_transaction(**kwargs):
+        raise ClientError(
+            {"Error": {"Code": "InternalServerError", "Message": "simulated"}},
+            "TransactWriteItems",
+        )
+
+    from botocore.exceptions import ClientError
+    monkeypatch.setattr(employees.meta.client, "transact_write_items", fail_transaction)
+    failed = faces_delete.lambda_handler(admin_event(), None)
+    item = employees.get_item(Key={"employee_id": "EMP001"})["Item"]
+    assert failed["statusCode"] == 500
+    assert item["face_ids"] == ["face-001"]
+    assert audit.scan()["Items"] == []
+
+    install_transaction_emulator(monkeypatch, boto3.resource("dynamodb", region_name="us-east-1"))
+    retried = faces_delete.lambda_handler(admin_event(), None)
+    item = employees.get_item(Key={"employee_id": "EMP001"})["Item"]
+    assert retried["statusCode"] == 200
+    assert item["face_ids"] == []
     assert len(audit.scan()["Items"]) == 1
