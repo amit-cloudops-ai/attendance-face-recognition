@@ -72,7 +72,7 @@ The templates are policy source, not an AWS deployment. CI renders them with a d
 
 ## DynamoDB customer-managed KMS key deployment permissions
 
-The data module creates all five tables with the foundation customer-managed key. The final key policy therefore includes the AWS-documented DynamoDB model:
+The data module creates all five tables with the foundation customer-managed key. The final `aws_kms_key_policy` therefore includes the AWS-documented DynamoDB model. These `kms:*` actions must remain in the KMS key policy; they are not valid S3 bucket-policy actions:
 
 - Account principals can use the key for DynamoDB only when `kms:CallerAccount` matches the account and `kms:ViaService` is `dynamodb.us-east-1.amazonaws.com`. The statement grants `kms:Encrypt`, `kms:Decrypt`, `kms:ReEncrypt*`, `kms:GenerateDataKey*`, `kms:CreateGrant` and `kms:DescribeKey`.
 - The direct `dynamodb.amazonaws.com` metadata statement is intentionally omitted because AWS documents it in the AWS-managed-key example, not the customer-managed-key policy example.
