@@ -71,57 +71,193 @@ async function loadEmployees() {
   }
 }
 
-async function enrollPhotos(employee) {
-  const employeeId = employee.employee_id;
-  const remaining = Math.max(0, maxPhotos - Number(employee.photo_count || 0));
-  if (remaining === 0) {
-    status(`${employeeId} has reached the ${maxPhotos}-photo enrollment limit.`, true);
-    return;
+const enrollDialog = document.querySelector("#enroll-dialog");
+const enrollVideo = document.querySelector("#enroll-camera");
+const enrollCanvas = document.querySelector("#enroll-capture-canvas");
+const enrollInstructions = document.querySelector("#enroll-instructions");
+const enrollMessage = document.querySelector("#enroll-status");
+const enrollPreviews = document.querySelector("#enroll-previews");
+const enrollCaptureButton = document.querySelector("#enroll-capture");
+const enrollRetakeButton = document.querySelector("#enroll-retake");
+const enrollSubmitButton = document.querySelector("#enroll-submit");
+let enrollmentStream = null;
+let enrollmentEmployee = null;
+let enrollmentFiles = [];
+let enrollmentPreviewUrls = [];
+let enrollmentMinimum = 3;
+let enrollmentRemaining = 0;
+let enrollmentUploading = false;
+
+function stopEnrollmentCamera() {
+  if (enrollmentStream) {
+    for (const track of enrollmentStream.getTracks()) track.stop();
+    enrollmentStream = null;
   }
-  const minimum = Number(employee.photo_count || 0) > 0 ? 1 : 3;
-  const picker = document.createElement("input");
-  picker.type = "file";
-  picker.accept = "image/jpeg,image/png,image/webp";
-  picker.multiple = true;
-  picker.addEventListener("change", async () => {
-    const files = Array.from(picker.files || []);
-    if (files.length < minimum || files.length > remaining) {
-      status(`Select ${minimum} to ${remaining} photo${remaining === 1 ? "" : "s"} for ${employeeId}. The employee has ${employee.photo_count || 0} of ${maxPhotos} enrolled.`, true);
-      return;
-    }
-    try {
-      for (let index = 0; index < files.length; index += 1) {
-        status(`Enrolling photo ${index + 1} of ${files.length} for ${employeeId}…`);
-        const file = await normalizePhoto(files[index]);
-        const request = await api(`/admin/employees/${encodeURIComponent(employeeId)}/enroll-url`, { method: "POST", body: "{}" });
-        await uploadPresigned(request.upload, file);
-        const outcome = await pollEnrollment(request.request_id);
-        if (outcome.code !== "enrolled") throw new Error(outcome.message || `Photo ${index + 1} was not accepted (${outcome.code}).`);
-      }
-      status(`Enrollment completed for ${employeeId}.`);
-      await loadEmployees();
-    } catch (error) {
-      status(error.message || "Enrollment failed.", true);
-      await loadEmployees().catch(() => {});
-    }
-  });
-  picker.click();
+  enrollVideo.srcObject = null;
 }
 
-async function normalizePhoto(file) {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  for (const quality of [0.86, 0.76, 0.66, 0.56, 0.46]) {
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
-    if (blob && blob.size >= 1024 && blob.size <= 1_048_576) return new File([blob], "enrollment.jpg", { type: "image/jpeg" });
-  }
-  throw new Error("One selected photo could not be compressed to the 1 MB upload limit.");
+function clearEnrollmentPreviews() {
+  for (const url of enrollmentPreviewUrls) URL.revokeObjectURL(url);
+  enrollmentPreviewUrls = [];
+  enrollPreviews.replaceChildren();
 }
+
+function enrollmentPrompt() {
+  if (Number(enrollmentEmployee?.photo_count || 0) > 0) {
+    return "Look straight at the camera. Use even lighting and keep your face unobstructed.";
+  }
+  const prompts = [
+    "Photo 1 of 3 — look straight at the camera.",
+    "Photo 2 of 3 — turn your head slightly to your left.",
+    "Photo 3 of 3 — turn your head slightly to your right.",
+    "Optional — capture another natural angle.",
+    "Optional — capture one final natural angle."
+  ];
+  return prompts[enrollmentFiles.length] || "Enrollment photo limit reached.";
+}
+
+function renderEnrollment() {
+  const count = enrollmentFiles.length;
+  enrollInstructions.textContent = enrollmentPrompt();
+  enrollMessage.textContent = count + " of " + enrollmentRemaining + " photos captured. " + enrollmentMinimum + " required.";
+  enrollCaptureButton.disabled = enrollmentUploading || count >= enrollmentRemaining || !enrollmentStream;
+  enrollRetakeButton.disabled = enrollmentUploading || count === 0;
+  enrollSubmitButton.disabled = enrollmentUploading || count < enrollmentMinimum;
+  enrollSubmitButton.textContent = enrollmentUploading ? "Uploading…" : "Upload " + count + " photo" + (count === 1 ? "" : "s");
+}
+
+async function openEnrollmentCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Camera access is unavailable in this browser. Open the secure HTTPS site in a recent Chrome or Safari browser.");
+  }
+  enrollmentStream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false
+  });
+  enrollVideo.srcObject = enrollmentStream;
+  await enrollVideo.play();
+  renderEnrollment();
+}
+
+async function captureEnrollmentFrame() {
+  const width = enrollVideo.videoWidth;
+  const height = enrollVideo.videoHeight;
+  if (!width || !height) throw new Error("The camera is still starting. Please wait a moment and try again.");
+  const scale = Math.min(1, 1280 / Math.max(width, height));
+  enrollCanvas.width = Math.round(width * scale);
+  enrollCanvas.height = Math.round(height * scale);
+  const context = enrollCanvas.getContext("2d");
+  if (!context) throw new Error("This browser could not prepare the camera image.");
+  context.drawImage(enrollVideo, 0, 0, enrollCanvas.width, enrollCanvas.height);
+  for (const quality of [0.86, 0.76, 0.66, 0.56, 0.46]) {
+    const blob = await new Promise(resolve => enrollCanvas.toBlob(resolve, "image/jpeg", quality));
+    if (blob && blob.size >= 1024 && blob.size <= 1048576) {
+      return new File([blob], "enrollment-" + (enrollmentFiles.length + 1) + ".jpg", { type: "image/jpeg" });
+    }
+  }
+  throw new Error("The captured image could not be compressed below the 1 MB upload limit. Improve lighting and try again.");
+}
+
+async function enrollPhotos(employee) {
+  const currentCount = Number(employee.photo_count || 0);
+  enrollmentRemaining = Math.max(0, maxPhotos - currentCount);
+  if (!enrollmentRemaining) {
+    status(employee.employee_id + " has reached the " + maxPhotos + "-photo enrollment limit.", true);
+    return;
+  }
+  enrollmentEmployee = employee;
+  enrollmentFiles = [];
+  enrollmentMinimum = currentCount > 0 ? 1 : 3;
+  enrollmentUploading = false;
+  clearEnrollmentPreviews();
+  enrollMessage.textContent = "Requesting camera permission…";
+  enrollDialog.showModal();
+  renderEnrollment();
+  try {
+    await openEnrollmentCamera();
+    status("Camera ready for " + employee.employee_id + ". Capture at least " + enrollmentMinimum + " photo(s).");
+  } catch (error) {
+    enrollMessage.textContent = error.message || "Unable to open the camera.";
+    enrollCaptureButton.disabled = true;
+    status(enrollMessage.textContent, true);
+  }
+}
+
+enrollCaptureButton.addEventListener("click", async () => {
+  try {
+    enrollCaptureButton.disabled = true;
+    const file = await captureEnrollmentFrame();
+    enrollmentFiles.push(file);
+    const url = URL.createObjectURL(file);
+    enrollmentPreviewUrls.push(url);
+    const preview = document.createElement("img");
+    preview.src = url;
+    preview.alt = "Captured enrollment photo " + enrollmentFiles.length;
+    preview.className = "enroll-preview";
+    enrollPreviews.append(preview);
+    renderEnrollment();
+  } catch (error) {
+    enrollMessage.textContent = error.message || "Unable to capture this photo.";
+    renderEnrollment();
+  }
+});
+
+enrollRetakeButton.addEventListener("click", () => {
+  if (!enrollmentFiles.length || enrollmentUploading) return;
+  enrollmentFiles.pop();
+  const url = enrollmentPreviewUrls.pop();
+  if (url) URL.revokeObjectURL(url);
+  const preview = enrollPreviews.lastElementChild;
+  if (preview) preview.remove();
+  renderEnrollment();
+});
+
+enrollSubmitButton.addEventListener("click", async () => {
+  if (enrollmentUploading || enrollmentFiles.length < enrollmentMinimum || !enrollmentEmployee) return;
+  const employeeId = enrollmentEmployee.employee_id;
+  enrollmentUploading = true;
+  stopEnrollmentCamera();
+  renderEnrollment();
+  let completed = 0;
+  try {
+    for (let index = 0; index < enrollmentFiles.length; index += 1) {
+      enrollMessage.textContent = "Uploading and processing photo " + (index + 1) + " of " + enrollmentFiles.length + " for " + employeeId + "…";
+      const request = await api("/admin/employees/" + encodeURIComponent(employeeId) + "/enroll-url", {
+        method: "POST",
+        body: "{}"
+      });
+      await uploadPresigned(request.upload, enrollmentFiles[index]);
+      const outcome = await pollEnrollment(request.request_id);
+      if (outcome.code !== "enrolled") {
+        throw new Error(outcome.message || "Photo " + (index + 1) + " was rejected (" + outcome.code + ").");
+      }
+      completed += 1;
+    }
+    enrollDialog.close();
+    status("Enrollment completed for " + employeeId + ": " + completed + " photo(s) indexed.");
+  } catch (error) {
+    enrollDialog.close();
+    const detail = error.message || "Enrollment failed.";
+    status(completed
+      ? completed + " photo(s) indexed for " + employeeId + "; the next photo failed: " + detail + " Refreshing the confirmed count."
+      : "No photo was confirmed for " + employeeId + ": " + detail, true);
+  } finally {
+    enrollmentUploading = false;
+    await loadEmployees().catch(error => status(error.message || "Employee count could not be refreshed.", true));
+  }
+});
+
+enrollDialog.addEventListener("cancel", event => {
+  if (enrollmentUploading) event.preventDefault();
+});
+enrollDialog.addEventListener("close", () => {
+  stopEnrollmentCamera();
+  clearEnrollmentPreviews();
+  enrollmentFiles = [];
+  enrollmentEmployee = null;
+  enrollmentUploading = false;
+  renderEnrollment();
+});
 
 async function pollEnrollment(requestId) {
   const deadline = Date.now() + 12000;
