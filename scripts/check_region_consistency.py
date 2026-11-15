@@ -60,6 +60,18 @@ def validate() -> None:
         if re.search(r"^\s*region\s*=", backend, re.MULTILINE):
             errors.append(f"{relative} must not duplicate the backend region; use AWS_REGION")
 
+    access_module = (ROOT / "infra/modules/access/main.tf").read_text(encoding="utf-8")
+    access_variables = (ROOT / "infra/modules/access/variables.tf").read_text(encoding="utf-8")
+    if 'region = "us-east-1"' in access_module or "local.region" in access_module:
+        errors.append("infra/modules/access must not hardcode a second AWS region")
+    if "var.region" not in access_module or 'variable "region"' not in access_variables:
+        errors.append("infra/modules/access must consume an explicit canonical region input")
+    for relative in ("infra/envs/dev/main.tf", "infra/envs/prod/main.tf"):
+        content = (ROOT / relative).read_text(encoding="utf-8")
+        access_call = content.split('module "access" {', 1)[1].split("\n}", 1)[0]
+        if "region                          = local.deployment_region" not in access_call:
+            errors.append(f"{relative} must pass the canonical manifest region into module.access")
+
     for relative in (
         "infra/envs/dev/backend.hcl.example",
         "infra/envs/prod/backend.hcl.example",

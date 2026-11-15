@@ -12,13 +12,13 @@
 - Terraform S3 native lock files are enabled (`use_lockfile = true`); Terraform is pinned to 1.10.5 in CI.
 - Terraform providers load the region from the canonical manifest. The S3 backend receives the same value through `scripts/terraform.sh` locally and the deployment workflow in GitHub Actions.
 - Lambda SDK clients use the Lambda-reserved `AWS_REGION`; the local/test fallback is the canonical region.
-- CI includes a region-consistency gate intended to fail on conflicting region literals, stale regional endpoints, or Terraform roots that bypass the manifest. The gate is not considered complete until the consolidation branch's own CI passes.
+- CI includes a region-consistency gate that fails on conflicting region literals, stale regional endpoints, or Terraform roots that bypass the manifest. A follow-up audit also caught and corrected a hardcoded access-module region and a DynamoDB KMS statement incorrectly placed in an S3 bucket policy; CI now checks the canonical region input and KMS policy placement. Follow-up run 43679979477 passed on the dedicated T38 branch (118 Python tests and both CI jobs); merge and post-merge validation on `solo/amit-monday` remain pending.
 - The manual deployment workflow uses GitHub OIDC, operation-specific plan/apply environments, encrypted saved-plan artifacts using `age`, exact plan commit/branch/run provenance and explicit environment gates.
 - Dev workflow runs only from `develop`; prod and billing run only from `main`. The release branch must be reviewed and promoted through a PR before deployment workflow dispatch.
 
 ## Phase B implementation status
 
-The task chain T01–T15, T17 and T31–T37 has implementation/documentation and historical CI evidence recorded in `docs/TASKS.md` and `docs/STATUS.md`. This includes:
+The task chain T01–T15, T17 and T31–T38 has implementation/documentation and CI evidence recorded in `docs/TASKS.md` and `docs/STATUS.md`. T38's follow-up corrections are validated on a dedicated PR branch; merge and post-merge validation remain pending. This includes:
 
 - Per-handler runtime IAM reconciliation and environment-specific runtime permissions boundaries.
 - Terraform provider IAM action mapping for foundation, data, recognition and access modules.

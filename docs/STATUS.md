@@ -24,7 +24,7 @@ The application audit and fixes completed on this branch include:
 
 The solo application and the T01–T38 deployment-security and region-guard task chain have been consolidated into `solo/amit-monday`. The T01–T15, T17 and T31–T37 implementation tasks are complete at the code/documentation level with historical CI evidence recorded in their task PRs. T16 and T18 remain blocked on repository-administrator and owner-controlled AWS-account information/actions.
 
-The region-consistency implementation is complete on this branch: `config/deployment.json` is the canonical AWS region manifest; Terraform provider roots read it; the deployment workflow and local Terraform wrapper export it for the S3 backend; Lambda clients use the Lambda-reserved `AWS_REGION`; contracts and examples are aligned; CI rejects any noncanonical AWS region literal, regional ARN or regional endpoint. The full consolidated CI run 43622495235 passed on commit `65f82c6597bd9705c334b5cb2f6b3bfc528c946d` (27 Python/security steps and 21 Terraform formatting/validation steps).
+The region-consistency implementation is complete in the current T38 follow-up branch: `config/deployment.json` is the canonical AWS region manifest; Terraform provider roots read it; the dev/prod roots pass it into the access module; the deployment workflow and local Terraform wrapper export it for the S3 backend; Lambda clients use the Lambda-reserved `AWS_REGION`; contracts and examples are aligned; CI rejects any noncanonical AWS region literal, regional ARN or regional endpoint and checks access-module region wiring. The full consolidated CI run 43622495235 passed on commit `65f82c6597bd9705c334b5cb2f6b3bfc528c946d` (27 Python/security steps and 21 Terraform formatting/validation steps).
 
 **No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
 
@@ -64,6 +64,7 @@ The task PR CI runs are historical evidence for their respective commits. The fi
 - Moto test fixtures are aligned to the target region.
 - CI runs `scripts/check_region_consistency.py`, which checks the manifest, Terraform roots, backend configuration, all repository text for noncanonical region tokens, regional ARNs/endpoints and Lambda region selection. The local Terraform wrapper and GitHub deployment workflow also run the full gate before proceeding.
 - Full CI run 43622495235 passed on commit `65f82c6`.
+- A subsequent pre-deployment review found two gaps not covered by the prior region gate: `infra/modules/access` duplicated the canonical region literal, and the DynamoDB KMS grant statement had been placed in the S3 web-bucket policy instead of the KMS key policy. T38 has been reopened on a dedicated follow-up branch to move all access-module region references to the root-provided manifest value, relocate the KMS statement to the KMS key policy, and add regression checks. No AWS operations have been performed.
 
 No system can guarantee that a future contributor never writes an incorrect region, but the new automated gate is designed to fail every pull request/push that reintroduces a conflicting region into tracked project files.
 
