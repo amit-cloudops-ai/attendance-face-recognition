@@ -21,7 +21,7 @@ The OIDC provider must use issuer https://token.actions.githubusercontent.com an
 
 ## Workflow controls
 
-The manual Terraform deployment workflow now sets the GitHub environment to environment-operation (for example dev-plan or prod-apply) and reads only vars.AWS_ROLE_ARN from that environment. This prevents the plan/apply role selector from being shared across both operations.
+The manual Terraform deployment workflow now sets the GitHub environment to environment-operation (for example dev-plan or prod-apply) and reads only vars.AWS_ROLE_ARN from that environment. This prevents the plan/apply role selector from being shared across both operations. Immediately after OIDC credential configuration, the workflow verifies that the role ARN belongs to TF_VAR_account_id, the state-bucket name carries that account ID, and sts:GetCallerIdentity returns the same account. A mismatch fails before remote Terraform initialization.
 
 The workflow branch gate remains:
 - dev: only refs/heads/develop
@@ -43,8 +43,10 @@ Configure the following branch restrictions and reviewers before enabling deploy
 |---|---|---|
 | dev-plan | develop only | None required |
 | dev-apply | develop only | At least one independent reviewer; prevent self-review |
-| prod-plan | main only | At least one reviewer recommended |
-| prod-apply | main only | Required independent reviewer(s); prevent self-review |
+| prod-plan | main only | At least one independent reviewer; prevent self-review |
+| prod-apply | main only | At least one independent reviewer; prevent self-review |
+| billing-plan | main only | At least one independent reviewer; prevent self-review |
+| billing-apply | main only | At least one independent reviewer; prevent self-review |
 
 Protect main and develop with pull-request review requirements. Require CODEOWNERS review for .github/workflows/**, infra/policies/** and infra/** so changes to deployment logic, role policies and Terraform are reviewed before reaching the release branches. Restrict environment administration to repository maintainers.
 
