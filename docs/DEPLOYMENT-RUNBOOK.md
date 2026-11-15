@@ -171,12 +171,9 @@ python -m pip install -r requirements-dev.txt
 ruff check .
 pytest -q
 python scripts/check_region_consistency.py
-bash -n scripts/e2e_smoke.sh
-bash -n scripts/terraform.sh
-bash -n scripts/aws_preflight_readonly.sh
-bash -n scripts/configure_github_environments.sh
-bash -n scripts/configure_branch_protection.sh
-bash -n scripts/bootstrap_api_gateway.sh
+for script in scripts/*.sh; do
+  bash -n "$script"
+done
 
 terraform fmt -check -diff -recursive infra
 
