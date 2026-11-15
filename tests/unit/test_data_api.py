@@ -8,6 +8,7 @@ from services.data.attendance_query import handler as attendance_query
 from services.data.employees import handler as employees_handler
 from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
+
 def admin_event(method="GET", body=None, employee_id=None, query=None, group="admin"):
     return {
         "requestContext": {
