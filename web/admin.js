@@ -8,6 +8,7 @@ const reportOutput = document.querySelector("#report-output");
 const csvDownload = document.querySelector("#csv-download");
 const overrideDialog = document.querySelector("#override-dialog");
 let nextCursor = null;
+let maxPhotos = 5;
 
 function status(text, isError = false) {
   message.textContent = text;
@@ -35,7 +36,7 @@ async function loadEmployees() {
     activePill.className = "pill";
     activePill.textContent = employee.active ? "Active" : "Inactive";
     active.append(activePill);
-    cell(row, `${employee.photo_count || 0}/5`);
+    cell(row, `${employee.photo_count || 0}/${maxPhotos}`);
     const actions = document.createElement("td");
     const group = document.createElement("div");
     group.className = "actions";
@@ -43,7 +44,7 @@ async function loadEmployees() {
     enroll.className = "secondary";
     enroll.textContent = "Enroll photos";
     enroll.disabled = !employee.active;
-    enroll.addEventListener("click", () => enrollPhotos(employee.employee_id));
+    enroll.addEventListener("click", () => enrollPhotos(employee));
     group.append(enroll);
     if (employee.active) {
       const deactivate = document.createElement("button");
@@ -70,15 +71,22 @@ async function loadEmployees() {
   }
 }
 
-async function enrollPhotos(employeeId) {
+async function enrollPhotos(employee) {
+  const employeeId = employee.employee_id;
+  const remaining = Math.max(0, maxPhotos - Number(employee.photo_count || 0));
+  if (remaining === 0) {
+    status(`${employeeId} has reached the ${maxPhotos}-photo enrollment limit.`, true);
+    return;
+  }
+  const minimum = Number(employee.photo_count || 0) > 0 ? 1 : 3;
   const picker = document.createElement("input");
   picker.type = "file";
   picker.accept = "image/jpeg,image/png,image/webp";
   picker.multiple = true;
   picker.addEventListener("change", async () => {
     const files = Array.from(picker.files || []);
-    if (files.length < 3 || files.length > 5) {
-      status("Select 3 to 5 varied employee photos for enrollment.", true);
+    if (files.length < minimum || files.length > remaining) {
+      status(`Select ${minimum} to ${remaining} photo${remaining === 1 ? "" : "s"} for ${employeeId}. The employee has ${employee.photo_count || 0} of ${maxPhotos} enrolled.`, true);
       return;
     }
     try {
@@ -250,6 +258,7 @@ async function loadSettings() {
   document.querySelector("#setting-grace").value = data.grace_minutes;
   document.querySelector("#setting-debounce").value = data.debounce_minutes;
   document.querySelector("#setting-max-photos").value = data.max_photos_per_employee;
+  maxPhotos = data.max_photos_per_employee;
   document.querySelector("#setting-weekends").value = (data.weekend_days || []).join(",");
 }
 
@@ -318,6 +327,7 @@ document.querySelector("#settings-form").addEventListener("submit", async event 
   try {
     await api("/admin/settings", { method: "PUT", body: JSON.stringify(body) });
     await loadSettings();
+    await loadEmployees();
     status("Attendance settings saved and audit-logged.");
   } catch (error) {
     status(error.message || "Settings could not be saved.", true);
@@ -330,7 +340,8 @@ document.querySelector("#sign-out").addEventListener("click", logout);
 try {
   if (accessToken()) {
     if (!hasGroup("admin")) throw new Error("An administrator account is required.");
-    await Promise.all([loadEmployees(), loadSettings()]);
+    await loadSettings();
+    await loadEmployees();
     status("Administration ready.");
   } else {
     status("Sign in with your administrator account to continue.");
