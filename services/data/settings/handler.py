@@ -5,6 +5,8 @@ import os
 import uuid
 
 import boto3
+from boto3.dynamodb.types import TypeSerializer
+from botocore.exceptions import ClientError
 from attendance_common.auth import get_username, require_group
 from attendance_common.config import DEFAULT_SETTINGS, _reset_cache, get_settings
 from attendance_common.responses import error, ok
@@ -83,17 +85,22 @@ def lambda_handler(event, context):
         db = boto3.resource("dynamodb", region_name=_region())
         config = db.Table(_required_env("TABLE_CONFIG"))
         audit = db.Table(_required_env("TABLE_AUDIT"))
-        old = get_settings()
+        stored = config.get_item(
+            Key={"pk": "SETTINGS"}, ConsistentRead=True
+        ).get("Item")
+        old = DEFAULT_SETTINGS.copy()
+        if stored:
+            old.update({key: value for key, value in stored.items() if key in DEFAULT_SETTINGS})
         new = {**old, **updates}
         now = to_iso(now_ist())
         username = get_username(event)
-        config.put_item(Item={
+        config_item = {
             "pk": "SETTINGS",
             **new,
             "updated_at": now,
             "updated_by": username,
-        })
-        audit.put_item(Item={
+        }
+        audit_item = {
             "audit_id": str(uuid.uuid4()),
             "actor": username,
             "action": "settings_update",
@@ -101,7 +108,34 @@ def lambda_handler(event, context):
             "new": new,
             "reason": "Attendance settings updated by administrator.",
             "at": now,
-        })
+        }
+        serializer = TypeSerializer()
+        marshal = lambda value: {key: serializer.serialize(entry) for key, entry in value.items()}
+        if stored and "updated_at" in stored:
+            condition = "attribute_exists(pk) AND updated_at=:old_updated"
+            condition_values = {":old_updated": serializer.serialize(stored["updated_at"])}
+        elif stored:
+            condition = "attribute_exists(pk) AND attribute_not_exists(updated_at)"
+            condition_values = None
+        else:
+            condition = "attribute_not_exists(pk)"
+            condition_values = None
+        put_config = {
+            "TableName": config.name,
+            "Item": marshal(config_item),
+            "ConditionExpression": condition,
+        }
+        if condition_values:
+            put_config["ExpressionAttributeValues"] = condition_values
+        try:
+            config.meta.client.transact_write_items(TransactItems=[
+                {"Put": put_config},
+                {"Put": {"TableName": audit.name, "Item": marshal(audit_item)}},
+            ])
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
+                return error(409, "settings_changed", "Settings changed concurrently. Reload and retry the update.")
+            raise
         _reset_cache()
         return ok(get_settings())
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
