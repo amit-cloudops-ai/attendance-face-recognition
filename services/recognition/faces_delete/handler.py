@@ -5,10 +5,10 @@ import os
 import re
 
 import boto3
-from boto3.dynamodb.types import TypeSerializer
 from attendance_common.auth import get_username, require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist
+from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
@@ -51,6 +51,11 @@ def _delete_all_faces(rekognition, collection_id: str, face_ids: list[str]) -> i
     if confirmed != set(face_ids):
         raise RuntimeError("Rekognition did not confirm deletion of every face template")
     return len(confirmed)
+
+
+def _ddb_item(item: dict) -> dict:
+    serializer = TypeSerializer()
+    return {key: serializer.serialize(value) for key, value in item.items()}
 
 
 def lambda_handler(event, context):
@@ -101,10 +106,6 @@ def lambda_handler(event, context):
             "reason": "Biometric face templates removed after employee deactivation.",
             "at": now,
         }
-        serializer = TypeSerializer()
-        marshal = lambda item: {
-            key: serializer.serialize(value) for key, value in item.items()
-        }
         values = {
             ":empty": [],
             ":zero": 0,
@@ -122,21 +123,27 @@ def lambda_handler(event, context):
             employees.meta.client.transact_write_items(TransactItems=[
                 {"Update": {
                     "TableName": employees.name,
-                    "Key": marshal({"employee_id": employee_id}),
+                    "Key": _ddb_item({"employee_id": employee_id}),
                     "UpdateExpression": (
                         "SET face_ids=:empty, photo_count=:zero, updated_at=:now, "
                         "last_faces_delete_audit_id=:audit_id"
                     ),
                     "ConditionExpression": condition,
-                    "ExpressionAttributeValues": marshal(values),
+                    "ExpressionAttributeValues": _ddb_item(values),
                 }},
                 {"Put": {
                     "TableName": audit.name,
-                    "Item": marshal(audit_item),
+                    "Item": _ddb_item(audit_item),
                 }},
             ])
         except ClientError as exc:
-            if exc.response.get("Error", {}).get("Code") != "TransactionCanceledException":
+            if (
+                exc.response.get("Error", {}).get("Code") != "TransactionCanceledException"
+                or not any(
+                    reason.get("Code") in {"ConditionalCheckFailed", "TransactionConflict"}
+                    for reason in exc.response.get("CancellationReasons", [])
+                )
+            ):
                 raise
             latest = employees.get_item(
                 Key={"employee_id": employee_id}, ConsistentRead=True
