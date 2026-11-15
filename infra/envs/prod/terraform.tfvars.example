@@ -9,3 +9,13 @@ execution_role_boundary_arn = "arn:aws:iam::924422830139:policy/attendance-prod-
 callback_urls   = ["http://localhost:8000/callback.html"]
 logout_urls     = ["http://localhost:8000/"]
 allowed_origins = ["http://localhost:8000"]
+
+# Defaults reserve 19 concurrent executions across five Lambda functions.
+# Set individual values to null if the account quota cannot support reservations.
+lambda_reserved_concurrency = {
+  recognize = 10
+  enroll    = 5
+  failure   = 2
+  daily     = 1
+  weekly    = 1
+}
