@@ -570,6 +570,10 @@ jobs:
               "contents: read",
               "id-token: write",
               "role-to-assume: " + role_env_expr,
+              "aws sts get-caller-identity --query Account --output text",
+              "expected_role_prefix=",
+              "expected_bucket_prefix=",
+              'actual_account" != "${TF_VAR_account_id}"',
           ):
               if required not in workflow:
                   raise SystemExit(f"Deployment workflow missing required OIDC boundary: {required}")
