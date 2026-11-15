@@ -126,9 +126,7 @@
       "Effect": "Allow",
       "Action": [
         "cloudfront:GetOriginAccessControl",
-        "cloudfront:GetOriginAccessControlConfig",
-        "cloudfront:UpdateOriginAccessControl",
-        "cloudfront:DeleteOriginAccessControl"
+        "cloudfront:GetOriginAccessControlConfig"
       ],
       "Resource": "arn:aws:cloudfront::${account_id}:origin-access-control/*"
     },
@@ -137,9 +135,7 @@
       "Effect": "Allow",
       "Action": [
         "cloudfront:GetCachePolicy",
-        "cloudfront:GetCachePolicyConfig",
-        "cloudfront:UpdateCachePolicy",
-        "cloudfront:DeleteCachePolicy"
+        "cloudfront:GetCachePolicyConfig"
       ],
       "Resource": "arn:aws:cloudfront::${account_id}:cache-policy/*"
     },
@@ -148,9 +144,7 @@
       "Effect": "Allow",
       "Action": [
         "cloudfront:GetOriginRequestPolicy",
-        "cloudfront:GetOriginRequestPolicyConfig",
-        "cloudfront:UpdateOriginRequestPolicy",
-        "cloudfront:DeleteOriginRequestPolicy"
+        "cloudfront:GetOriginRequestPolicyConfig"
       ],
       "Resource": "arn:aws:cloudfront::${account_id}:origin-request-policy/*"
     },
@@ -159,9 +153,7 @@
       "Effect": "Allow",
       "Action": [
         "cloudfront:GetResponseHeadersPolicy",
-        "cloudfront:GetResponseHeadersPolicyConfig",
-        "cloudfront:UpdateResponseHeadersPolicy",
-        "cloudfront:DeleteResponseHeadersPolicy"
+        "cloudfront:GetResponseHeadersPolicyConfig"
       ],
       "Resource": "arn:aws:cloudfront::${account_id}:response-headers-policy/*"
     },
@@ -214,30 +206,6 @@
           "aws:RequestTag/Environment": "dev"
         }
       }
-    },
-    {
-      "Sid": "CloudFrontOACCreate",
-      "Effect": "Allow",
-      "Action": "cloudfront:CreateOriginAccessControl",
-      "Resource": "*"
-    },
-    {
-      "Sid": "CloudFrontCachePoliciesCreate",
-      "Effect": "Allow",
-      "Action": "cloudfront:CreateCachePolicy",
-      "Resource": "*"
-    },
-    {
-      "Sid": "CloudFrontOriginPoliciesCreate",
-      "Effect": "Allow",
-      "Action": "cloudfront:CreateOriginRequestPolicy",
-      "Resource": "*"
-    },
-    {
-      "Sid": "CloudFrontResponsePoliciesCreate",
-      "Effect": "Allow",
-      "Action": "cloudfront:CreateResponseHeadersPolicy",
-      "Resource": "*"
     },
     {
       "Sid": "ApiGatewayManageChildResources",
