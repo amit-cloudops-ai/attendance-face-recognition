@@ -94,7 +94,7 @@ def test_employee_api_uses_atomic_dynamodb_transactions_and_hides_face_ids(monke
             {"Item": existing_item},
             expected_params={
                 "TableName": "attendance-dev-employees",
-                "Key": {"employee_id": {"S": "EMP901"}},
+                "Key": {"employee_id": "EMP901"},
                 "ConsistentRead": True,
             },
         )
@@ -103,7 +103,7 @@ def test_employee_api_uses_atomic_dynamodb_transactions_and_hides_face_ids(monke
             {"Item": existing_item},
             expected_params={
                 "TableName": "attendance-dev-employees",
-                "Key": {"employee_id": {"S": "EMP901"}},
+                "Key": {"employee_id": "EMP901"},
                 "ConsistentRead": True,
             },
         )
