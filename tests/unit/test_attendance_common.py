@@ -23,6 +23,7 @@ def aws_tables(monkeypatch):
         monkeypatch.delenv("TABLE_CONFIG", raising=False)
         config._reset_cache()
         db = boto3.resource("dynamodb", region_name="us-east-1")
+        monkeypatch.setattr(boto3, "resource", lambda *args, **kwargs: db)
         employees = db.create_table(TableName="employees", KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"}],
             AttributeDefinitions=[{"AttributeName": "employee_id", "AttributeType": "S"}], BillingMode="PAY_PER_REQUEST")
         attendance = db.create_table(TableName="attendance", KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"},
