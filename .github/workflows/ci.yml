@@ -824,7 +824,7 @@ jobs:
           deploy = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
           if "age=1.2.1-1build1" not in deploy or "runs-on: ubuntu-26.04" not in deploy:
               raise SystemExit("Deployment runner and age package must remain pinned")
-          if "python-version: '3.12.16'" not in Path(".github/workflows/ci.yml").read_text(encoding="utf-8"):
+          if 'python-version: "3.12.16"' not in Path(".github/workflows/ci.yml").read_text(encoding="utf-8"):
               raise SystemExit("CI Python patch version must remain pinned")
           PY
 
