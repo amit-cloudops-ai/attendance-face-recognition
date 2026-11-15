@@ -1,4 +1,4 @@
 boto3
 pytest
 ruff
-moto[dynamodb,s3]==5.2.4
+moto[dynamodb,s3]
