@@ -6,8 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 command -v aws >/dev/null || { echo "AWS CLI v2 is required." >&2; exit 2; }
-python scripts/check_region_consistency.py
-REGION="$(python scripts/check_region_consistency.py --print-region)"
+python3 scripts/check_region_consistency.py
+REGION="$(python3 scripts/check_region_consistency.py --print-region)"
 
 for variable in AWS_REGION AWS_DEFAULT_REGION; do
   current="${!variable:-}"
@@ -26,7 +26,7 @@ echo
 echo "=== Authenticated AWS identity (read-only STS) ==="
 IDENTITY="$(aws sts get-caller-identity --output json)"
 printf '%s\n' "$IDENTITY"
-ACCOUNT_ID="$(python -c 'import json,sys; print(json.load(sys.stdin)["Account"])' <<<"$IDENTITY")"
+ACCOUNT_ID="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["Account"])' <<<"$IDENTITY")"
 if [[ ! "$ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
   echo "STS did not return a 12-digit AWS account ID." >&2
   exit 2
