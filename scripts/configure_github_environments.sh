@@ -22,7 +22,7 @@ USAGE
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --reviewer) REVIEWER="\${2:?Missing GitHub username}"; shift 2 ;;
+    --reviewer) REVIEWER="${2:?Missing GitHub username}"; shift 2 ;;
     --apply) APPLY=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -77,7 +77,7 @@ echo "Independent reviewer: $REVIEWER (ID $REVIEWER_ID)"
 echo "Mode: $([[ "$APPLY" == true ]] && echo APPLY || echo DRY RUN)"
 echo
 
-for item in "\${ENVIRONMENTS[@]}"; do
+for item in "${ENVIRONMENTS[@]}"; do
   IFS='|' read -r environment allowed_branch require_reviewer <<<"$item"
   reviewers='[]'
   if [[ "$require_reviewer" == true ]]; then
