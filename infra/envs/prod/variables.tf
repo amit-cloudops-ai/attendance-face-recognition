@@ -83,12 +83,15 @@ variable "lambda_reserved_concurrency" {
     daily     = number
     weekly    = number
   })
+  # The target AWS account currently has a concurrency quota of 10.
+  # Leave reservations unset until the account quota is increased and a
+  # production capacity allocation is approved.
   default = {
-    recognize = 10
-    enroll    = 5
-    failure   = 2
-    daily     = 1
-    weekly    = 1
+    recognize = null
+    enroll    = null
+    failure   = null
+    daily     = null
+    weekly    = null
   }
 
   validation {
