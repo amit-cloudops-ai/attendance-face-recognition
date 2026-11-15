@@ -39,14 +39,14 @@ Code must read names/ARNs only from these variables. Never hard-code a resource 
 `name` S, `email` S, `department` S, `shift_start` S "HH:MM", `shift_end` S "HH:MM", `active` BOOL, `face_ids` L of S, `photo_count` N, `consent_at` S (ISO), `created_at` S, `updated_at` S. Internal retry metadata: `enrollment_{request_id}` S (FaceId committed for that request), `enrollment_lock_request` S and `enrollment_lock_until` N (short per-employee lease), and `last_faces_delete_audit_id` S (deterministic offboarding audit marker).
 
 **attendance**: PK `employee_id` (S), SK `date` (S)
-`clock_in` S (ISO, absent for `absent` rows), `clock_out` S (ISO, optional), `status` S one of `present` | `late` | `absent`, `flags` SS (optional, value `missing_clock_out`), `confidence` N (optional), `source` S one of `face` | `admin` | `system`, `updated_at` S, `updated_by` S (optional). Internal retry metadata: `scan_events` M keyed by `request_id`, storing the exact outcome of each accepted scan request so retries cannot create a second attendance transition.
+`clock_in` S (ISO, absent for `absent` rows), `clock_out` S (ISO, optional), `status` S one of `present` | `late` | `absent`, `flags` SS (optional, value `missing_clock_out`), `confidence` N (optional), `source` S one of `face` | `admin` | `system`, `updated_at` S, `updated_by` S (optional), `version` N (monotonically increasing write version). Internal retry metadata: `scan_events` M keyed by `request_id`, storing the exact outcome of each accepted scan request so retries cannot create a second attendance transition.
 GSI **`date-index`**: PK `date`, SK `employee_id`, projection ALL.
 
 **scan-results**: PK `request_id` (S)
 `kind` S (`scan` | `enroll`), `code` S (see section 6), `employee_id` S (optional), `name` S (optional), `time` S (ISO, optional), `status` S (`present`|`late`, optional), `action` S (`clock_in`|`clock_out`|`duplicate_ignored`, optional), `message` S, `created_at` S, `ttl` N (epoch seconds, created_at + 86400). TTL attribute = `ttl`.
 
 **config**: PK `pk` (S). One settings item `pk = "SETTINGS"` with:
-`face_match_threshold` N default 95, `min_brightness` N default 40, `min_sharpness` N default 40, `grace_minutes` N default 15, `debounce_minutes` N default 10, `weekend_days` L of N ISO weekdays (Mon=1..Sun=7) default [6,7], `max_photos_per_employee` N default 5.
+`face_match_threshold` N default 95, `min_brightness` N default 40, `min_sharpness` N default 40, `grace_minutes` N default 15, `debounce_minutes` N default 10, `weekend_days` L of N ISO weekdays (Mon=1..Sun=7) default [6,7], `max_photos_per_employee` N default 5, `updated_at` S, `updated_by` S (optional), `version` N (monotonically increasing write version).
 Holiday items: `pk = "HOLIDAY#YYYY-MM-DD"`, `name` S.
 
 **audit**: PK `audit_id` (S, UUID)
