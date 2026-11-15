@@ -9,7 +9,6 @@ import boto3
 from attendance_common.auth import get_username, require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist
-from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
@@ -52,11 +51,6 @@ def _delete_all_faces(rekognition, collection_id: str, face_ids: list[str]) -> i
     if confirmed != set(face_ids):
         raise RuntimeError("Rekognition did not confirm deletion of every face template")
     return len(confirmed)
-
-
-def _ddb_item(item: dict) -> dict:
-    serializer = TypeSerializer()
-    return {key: serializer.serialize(value) for key, value in item.items()}
 
 
 def lambda_handler(event, context):
@@ -129,17 +123,17 @@ def lambda_handler(event, context):
             employees.meta.client.transact_write_items(TransactItems=[
                 {"Update": {
                     "TableName": employees.name,
-                    "Key": _ddb_item({"employee_id": employee_id}),
+                    "Key": {"employee_id": employee_id},
                     "UpdateExpression": (
                         "SET face_ids=:empty, photo_count=:zero, updated_at=:now, "
                         "last_faces_delete_audit_id=:audit_id"
                     ),
                     "ConditionExpression": condition,
-                    "ExpressionAttributeValues": _ddb_item(values),
+                    "ExpressionAttributeValues": values,
                 }},
                 {"Put": {
                     "TableName": audit.name,
-                    "Item": _ddb_item(audit_item),
+                    "Item": audit_item,
                 }},
             ])
         except ClientError as exc:
