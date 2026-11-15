@@ -221,5 +221,5 @@ def lambda_handler(event, context):
     except (ValueError, TypeError) as exc:
         return error(400, "invalid_request", str(exc))
     except Exception as exc:  # noqa: BLE001 - API boundary returns a sanitized 500 response
-        LOGGER.error("Employee handler failed (%s)", type(exc).__name__)
+        LOGGER.exception("Employee handler failed (%s)", type(exc).__name__)
         return error(500, "internal_error", "Unable to process the employee request.")
