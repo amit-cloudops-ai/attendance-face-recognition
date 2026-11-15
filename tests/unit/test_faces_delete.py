@@ -176,3 +176,19 @@ def test_face_deletion_transaction_failure_preserves_employee_and_audit_for_retr
     assert retried["statusCode"] == 200
     assert item["face_ids"] == []
     assert len(audit.scan()["Items"]) == 1
+
+
+
+def test_face_deletion_surfaces_inconsistent_photo_count(resources, monkeypatch):
+    employees, audit = resources
+    employees.put_item(Item={
+        "employee_id": "EMP001", "active": False,
+        "face_ids": [], "photo_count": 2,
+    })
+    fake = FakeRekognition()
+    monkeypatch.setattr(faces_delete.boto3, "client", lambda *args, **kwargs: fake)
+    response = faces_delete.lambda_handler(admin_event(), None)
+    assert response["statusCode"] == 409
+    assert json.loads(response["body"])["error"]["code"] == "face_state_inconsistent"
+    assert audit.scan()["Items"] == []
+    assert fake.calls == []
