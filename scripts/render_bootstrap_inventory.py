@@ -7,7 +7,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -105,7 +105,7 @@ def _render_policy_templates(
         except json.JSONDecodeError as exc:
             raise ValueError(f"Rendered policy is not valid JSON: {template.name}: {exc}") from exc
         if not isinstance(policy, dict) or not isinstance(policy.get("Statement"), list):
-            raise ValueError(f"Unexpected policy document shape: {template.name}")
+            raise TypeError(f"Unexpected policy document shape: {template.name}")
 
         if template.name.startswith("github-oidc-trust-"):
             group = "trust"
@@ -158,7 +158,7 @@ def render_inventory(
     )
 
     manifest = {
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "account_id": account_id,
         "region": region,
         "state_bucket": bucket,
