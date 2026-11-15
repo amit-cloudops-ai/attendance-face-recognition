@@ -621,7 +621,7 @@ jobs:
 
           docs = Path("docs/GITHUB-OIDC-DEPLOYMENT.md").read_text(encoding="utf-8")
           for required in ("dev-plan", "dev-apply", "prod-plan", "prod-apply", "billing-plan", "billing-apply",
-                           "prevent self-review", "TF_PLAN_AGE_RECIPIENT",
+                           "self-review is allowed", "TF_PLAN_AGE_RECIPIENT",
                            "TF_PLAN_AGE_IDENTITY", "CODEOWNERS"):
               if required not in docs:
                   raise SystemExit(f"OIDC deployment guide missing: {required}")
@@ -680,7 +680,7 @@ jobs:
               "EXECUTION_ROLE_BOUNDARY_ARN", "TF_STATE_BUCKET",
               "COGNITO_CALLBACK_URLS", "COGNITO_LOGOUT_URLS", "ALLOWED_ORIGINS",
               "TF_PLAN_AGE_RECIPIENT", "TF_PLAN_AGE_IDENTITY",
-              "prevent self-review", "Require pull requests", "Python",
+              "self-review is allowed", "Required approvals: 0", "Require pull requests", "Python",
               "terraform-fmt", "cannot be verified from this session",
           ):
               if required not in docs:
