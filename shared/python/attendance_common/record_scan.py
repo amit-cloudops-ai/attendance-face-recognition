@@ -30,7 +30,7 @@ def _guarded_transaction(employees, attendance, employee_id: str, action: dict) 
         "TableName": employees.name,
         "Key": {"employee_id": employee_id},
         "ConditionExpression": "active = :active",
-        "ExpressionAttributeValues": {":active": {"BOOL": True}},
+        "ExpressionAttributeValues": {":active": True},
     }}
     try:
         attendance.meta.client.transact_write_items(TransactItems=[check, action])
