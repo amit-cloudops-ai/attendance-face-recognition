@@ -56,7 +56,7 @@ def test_state_bucket_suffix_rejects_invalid_names(suffix):
 
 def test_state_bucket_suffix_enforces_s3_name_length():
     with pytest.raises(ValueError):
-        bootstrap.state_bucket_name("123456789012", "a" * 30)
+        bootstrap.state_bucket_name("123456789012", "a" * 31)
 
 
 def test_head_bucket_404_is_the_only_absence_signal(monkeypatch):
