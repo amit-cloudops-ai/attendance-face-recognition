@@ -794,6 +794,35 @@ jobs:
                   raise SystemExit(f"Billing deployment guide missing: {required}")
           PY
 
+
+      - name: Enforce pinned actions and reproducible tool dependencies
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          workflow_files = list(Path(".github/workflows").glob("*.yml")) + list(Path(".github/workflows").glob("*.yaml"))
+          for path in workflow_files:
+              for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                  if "uses:" not in line:
+                      continue
+                  match = re.search(r"uses:\\s*[^@\\s]+@([0-9a-f]{40})(?:\\s+#\\s*.+)?$", line.strip())
+                  if not match:
+                      raise SystemExit(f"{path}:{number}: action must be pinned to a full 40-character commit SHA")
+
+          requirements = Path("requirements-dev.txt").read_text(encoding="utf-8").splitlines()
+          for number, line in enumerate(requirements, 1):
+              stripped = line.strip()
+              if stripped and not stripped.startswith("#") and "==" not in stripped:
+                  raise SystemExit(f"requirements-dev.txt:{number}: dependency is not exactly pinned")
+
+          deploy = Path(".github/workflows/deploy.yml").read_text(encoding="utf-8")
+          if "age=1.2.1-1build1" not in deploy or "runs-on: ubuntu-26.04" not in deploy:
+              raise SystemExit("Deployment runner and age package must remain pinned")
+          if "python-version: '3.12.16'" not in Path(".github/workflows/ci.yml").read_text(encoding="utf-8"):
+              raise SystemExit("CI Python patch version must remain pinned")
+          PY
+
   terraform-fmt:
     runs-on: ubuntu-26.04
     steps:
