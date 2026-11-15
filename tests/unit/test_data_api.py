@@ -221,3 +221,91 @@ def test_attendance_query_by_date_index_and_multi_day_cursor(data_tables):
 def test_attendance_query_rejects_invalid_filters(data_tables, query):
     response = attendance_query.lambda_handler(admin_event(query=query), None)
     assert response["statusCode"] == 400
+
+
+
+def test_employee_create_uses_one_transaction_for_employee_and_audit(data_tables, monkeypatch):
+    employees, audit, _ = data_tables
+    client = employees.meta.client
+    original = client.transact_write_items
+    captured = []
+
+    def recording_transaction(**kwargs):
+        captured.append(kwargs["TransactItems"])
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", recording_transaction)
+    response = employees_handler.lambda_handler(
+        admin_event("POST", employee_payload()), None
+    )
+    assert response["statusCode"] == 201
+    assert len(captured) == 1
+    assert [next(iter(action)) for action in captured[0]] == ["Put", "Put"]
+    assert captured[0][0]["Put"]["TableName"] == employees.name
+    assert captured[0][1]["Put"]["TableName"] == audit.name
+    assert len(audit.scan()["Items"]) == 1
+
+
+def test_employee_create_transaction_failure_leaves_no_employee_or_audit(data_tables, monkeypatch):
+    from botocore.exceptions import ClientError
+
+    employees, audit, _ = data_tables
+
+    def fail_transaction(**kwargs):
+        raise ClientError(
+            {"Error": {"Code": "InternalServerError", "Message": "simulated failure"}},
+            "TransactWriteItems",
+        )
+
+    monkeypatch.setattr(employees.meta.client, "transact_write_items", fail_transaction)
+    response = employees_handler.lambda_handler(
+        admin_event("POST", employee_payload()), None
+    )
+    assert response["statusCode"] == 500
+    assert employees.get_item(Key={"employee_id": "EMP001"}).get("Item") is None
+    assert audit.scan()["Items"] == []
+
+
+def test_employee_deactivation_uses_one_transaction_for_employee_and_audit(data_tables, monkeypatch):
+    employees, audit, _ = data_tables
+    employees.put_item(Item={"employee_id": "EMP001", "name": "Priya", "active": True})
+    client = employees.meta.client
+    original = client.transact_write_items
+    captured = []
+
+    def recording_transaction(**kwargs):
+        captured.append(kwargs["TransactItems"])
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", recording_transaction)
+    response = employees_handler.lambda_handler(
+        admin_event("DELETE", employee_id="EMP001"), None
+    )
+    assert response["statusCode"] == 200
+    assert len(captured) == 1
+    assert [next(iter(action)) for action in captured[0]] == ["Update", "Put"]
+    assert captured[0][0]["Update"]["TableName"] == employees.name
+    assert captured[0][1]["Put"]["TableName"] == audit.name
+    assert employees.get_item(Key={"employee_id": "EMP001"})["Item"]["active"] is False
+    assert len(audit.scan()["Items"]) == 1
+
+
+def test_employee_deactivation_transaction_failure_preserves_active_state(data_tables, monkeypatch):
+    from botocore.exceptions import ClientError
+
+    employees, audit, _ = data_tables
+    employees.put_item(Item={"employee_id": "EMP001", "name": "Priya", "active": True})
+
+    def fail_transaction(**kwargs):
+        raise ClientError(
+            {"Error": {"Code": "InternalServerError", "Message": "simulated failure"}},
+            "TransactWriteItems",
+        )
+
+    monkeypatch.setattr(employees.meta.client, "transact_write_items", fail_transaction)
+    response = employees_handler.lambda_handler(
+        admin_event("DELETE", employee_id="EMP001"), None
+    )
+    assert response["statusCode"] == 500
+    assert employees.get_item(Key={"employee_id": "EMP001"})["Item"]["active"] is True
+    assert audit.scan()["Items"] == []
