@@ -47,13 +47,13 @@ The role ARNs are non-secret configuration values. The account ID, bucket name a
 
 For `main`, `develop` and `solo/amit-monday`, configure:
 - Require pull requests before merging.
-- Set mandatory approvals to zero during the solo-owner phase; the repository owner may merge their own PR after all required CI checks pass.
+- Required approvals: 0 (solo-owner model); the repository owner may merge their own PR after all required CI checks pass, and self-review is allowed.
 - Require the Python and terraform-fmt status checks.
 - Require conversation resolution.
 - Block force pushes and branch deletion.
 - Optional independent CODEOWNERS review can be introduced when another trusted code owner is available; it is not a current release gate.
 
-Require reviews for changes to .github/workflows/**, infra/**, infra/policies/** and docs/security/**. The person who authors a deployment workflow or policy change must not be the only reviewer of that change.
+During the solo-owner phase, do not require an external reviewer or CODEOWNERS approval. The owner may merge after required CI checks pass. When a second trusted maintainer is added, introduce CODEOWNERS review for .github/workflows/**, infra/**, infra/policies/** and docs/security/** as an additional gate.
 
 ## Preflight checklist before any AWS bootstrap
 
