@@ -24,5 +24,12 @@ locals {
 }
 
 provider "aws" {
+  default_tags {
+    tags = {
+      Project     = "attendance"
+      Environment = "prod"
+    }
+  }
+
   region = local.deployment_region
 }
