@@ -61,6 +61,11 @@ def _timestamp(value, label: str, business_date: str) -> str | None:
     return normalized.isoformat(timespec="seconds")
 
 
+def _ddb_item(item: dict) -> dict:
+    serializer = TypeSerializer()
+    return {key: serializer.serialize(value) for key, value in item.items()}
+
+
 def lambda_handler(event, context):
     event = event or {}
     denied = require_group(event, "admin")
@@ -128,8 +133,6 @@ def lambda_handler(event, context):
             "reason": reason.strip(),
             "at": now,
         }
-        serializer = TypeSerializer()
-        marshal = lambda value: {key: serializer.serialize(entry) for key, entry in value.items()}
         if not old:
             condition = "attribute_not_exists(employee_id)"
             condition_values = None
@@ -141,7 +144,7 @@ def lambda_handler(event, context):
             condition_values = None
         put = {
             "TableName": attendance.name,
-            "Item": marshal(item),
+            "Item": _ddb_item(item),
             "ConditionExpression": condition,
         }
         if condition_values:
@@ -149,7 +152,7 @@ def lambda_handler(event, context):
         try:
             attendance.meta.client.transact_write_items(TransactItems=[
                 {"Put": put},
-                {"Put": {"TableName": audit.name, "Item": marshal(audit_item)}},
+                {"Put": {"TableName": audit.name, "Item": _ddb_item(audit_item)}},
             ])
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
