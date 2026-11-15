@@ -3,6 +3,7 @@ import json
 import boto3
 import pytest
 from moto import mock_aws
+from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
 from services.data.attendance_query import handler as attendance_query
 from services.data.employees import handler as employees_handler
@@ -64,6 +65,7 @@ def data_tables(monkeypatch):
             }],
             BillingMode="PAY_PER_REQUEST",
         )
+        install_transaction_emulator(monkeypatch, db)
         yield employee_table, audit_table, attendance_table
 
 
