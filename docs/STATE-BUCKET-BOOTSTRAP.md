@@ -62,9 +62,9 @@ The plan/apply templates include GetBucketLocation and GetBucketVersioning on th
 3. Choose a globally unique bucket suffix. Run `python scripts/render_bootstrap_inventory.py --suffix <suffix> --api-id <api-id> --profile <approved-profile> --output-dir .local/bootstrap-rendered-<suffix>` to derive the account ID from STS, check the candidate with S3 HeadBucket, and render all account-specific IAM and bucket policy JSON locally. A 404 is only a point-in-time absence signal, not a reservation.
 4. Review the generated manifest, all 37 JSON policy documents, bucket settings and bootstrap IAM permissions. Confirm the exact API ID appears in every API Gateway plan/apply policy and that temporary CloudFront bootstrap policies are create-only. Present the exact bucket name, configuration, policy JSON and bootstrap IAM permissions to the owner for approval.
 5. Only after approval, create the bucket and apply ownership controls, all four public-access-block settings, versioning, default SSE-S3 encryption and the TLS-only bucket policy.
-5. Verify with read-only S3 API calls: bucket location, ownership controls, public access block, versioning, encryption and policy.
-6. Render the dev/prod plan/apply state policies with the final bucket name; validate JSON and exact state/lock paths.
-7. Configure TF_STATE_BUCKET in all six GitHub environments (`dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan`, `billing-apply`). Only after the owner separately approves deployment preparation may remote terraform init be run.
+6. Verify with read-only S3 API calls: bucket location, ownership controls, public access block, versioning, encryption and policy.
+7. Render the dev/prod plan/apply state policies with the final bucket name; validate JSON and exact state/lock paths.
+8. Configure TF_STATE_BUCKET in all six GitHub environments (`dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan`, `billing-apply`). Only after the owner separately approves deployment preparation may remote terraform init be run.
 
 The renderer performs only STS GetCallerIdentity and S3 HeadBucket reads plus local file writes. It does not create or modify AWS resources, initialize the remote backend, or execute Terraform.
 
