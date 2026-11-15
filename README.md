@@ -2,7 +2,7 @@
 
 Contactless, real-time employee clock-in / clock-out using face recognition on AWS. A kiosk browser captures a still image, uploads it to S3, and a Lambda matches the face against an Amazon Rekognition collection before writing attendance to DynamoDB. Scheduled jobs mark absences and publish daily and weekly summaries. The Cognito-authenticated admin app manages employees, attendance, settings and reports.
 
-<escape>**Production:**</escape> <Link url="https://d2l1fs6zsfo1ga.cloudfront.net/kiosk/" title="Kiosk"/> · <Link url="https://d2l1fs6zsfo1ga.cloudfront.net/admin/" title="Admin"/> · Region: `us-east-1` · AWS account: `924422830139`.
+**Production:** [Kiosk](https://d2l1fs6zsfo1ga.cloudfront.net/kiosk/) · [Admin](https://d2l1fs6zsfo1ga.cloudfront.net/admin/) · Region: `us-east-1` · AWS account: `924422830139`.
 
 **Release status:** Production is deployed and core acceptance (employee enrollment, kiosk recognition, daily/weekly reports, 20-scan and browser acceptance) has been operator-confirmed. Numeric p95 output and several operational/security evidence gates remain tracked in [docs/STATUS.md](docs/STATUS.md); do not treat operator confirmation as a substitute for attached test artifacts.
 
