@@ -123,6 +123,7 @@ function renderEnrollment() {
   enrollCaptureButton.disabled = enrollmentUploading || count >= enrollmentRemaining || !enrollmentStream;
   enrollRetakeButton.disabled = enrollmentUploading || count === 0;
   enrollSubmitButton.disabled = enrollmentUploading || count < enrollmentMinimum;
+  document.querySelector("#enroll-close").disabled = enrollmentUploading;
   enrollSubmitButton.textContent = enrollmentUploading ? "Uploading…" : "Upload " + count + " photo" + (count === 1 ? "" : "s");
 }
 
