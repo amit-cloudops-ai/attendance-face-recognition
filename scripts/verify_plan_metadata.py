@@ -16,6 +16,7 @@ EXPECTED_FIELDS = (
     "branch",
     "terraform_root",
     "account_id",
+    "state_bucket",
     "api_id",
     "region",
 )
@@ -64,6 +65,7 @@ def main() -> int:
         "branch",
         "terraform-root",
         "account-id",
+        "state-bucket",
         "api-id",
         "region",
     ):
@@ -79,6 +81,7 @@ def main() -> int:
         "branch": args.branch,
         "terraform_root": args.terraform_root,
         "account_id": args.account_id,
+        "state_bucket": args.state_bucket,
         "api_id": args.api_id,
         "region": args.region,
     }
