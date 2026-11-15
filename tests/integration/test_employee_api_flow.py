@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 
 import boto3
+from botocore.exceptions import ClientError
 from botocore.stub import Stubber
 
 from services.data.employees import handler
@@ -50,6 +51,31 @@ def test_employee_api_uses_atomic_dynamodb_transactions_and_hides_face_ids(monke
         capture_transaction,
     )
 
+    original_transact_write_items = client.transact_write_items
+    transaction_call_count = 0
+
+    def transact_write_items(**kwargs):
+        nonlocal transaction_call_count
+        transaction_call_count += 1
+        if transaction_call_count == 2:
+            capture_transaction(kwargs)
+            raise ClientError(
+                {
+                    "Error": {
+                        "Code": "TransactionCanceledException",
+                        "Message": "Transaction cancelled",
+                    },
+                    "CancellationReasons": [
+                        {"Code": "ConditionalCheckFailed", "Message": "Employee already exists"},
+                        {"Code": "None"},
+                    ],
+                },
+                "TransactWriteItems",
+            )
+        return original_transact_write_items(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", transact_write_items)
+
     existing_item = {
         "employee_id": {"S": "EMP901"},
         "name": {"S": "Integration Employee"},
@@ -77,18 +103,6 @@ def test_employee_api_uses_atomic_dynamodb_transactions_and_hides_face_ids(monke
 
     with Stubber(client) as stubber:
         stubber.add_response("transact_write_items", {})
-        stubber.add_client_error(
-            "transact_write_items",
-            service_error_code="TransactionCanceledException",
-            service_message="Transaction cancelled",
-            http_status_code=400,
-            service_error_meta={
-                "CancellationReasons": [
-                    {"Code": "ConditionalCheckFailed", "Message": "Employee already exists"},
-                    {"Code": "None"},
-                ]
-            },
-        )
         stubber.add_response(
             "get_item",
             {"Item": existing_item},
