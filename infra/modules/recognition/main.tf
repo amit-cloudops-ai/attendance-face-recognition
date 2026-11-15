@@ -247,7 +247,7 @@ locals {
       },
       {
         Effect = "Allow"
-        Action = ["dynamodb:Query"]
+        Action = ["dynamodb:Query", "dynamodb:Scan"]
         Resource = [
           var.tables.attendance.arn,
           "${var.tables.attendance.arn}/index/date-index"
