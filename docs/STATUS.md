@@ -4,7 +4,7 @@
 
 ## Live AWS bootstrap progress — 15 November 2026
 
-**Current phase: approved dev AWS bootstrap; API Gateway verified; IAM boundary and Terraform state bucket awaiting owner-operated creation and read-only verification.**
+**Current phase: dev bootstrap resources created; IAM boundary and state bucket controls verified; final live policy-document comparison and local Terraform preparation remain.**
 
 - Authenticated WSL AWS CLI profile: `default` (profiles present: `default`, `pdp`; no profile named `Amit-admin`). STS returned `arn:aws:iam::924422830139:user/Amit-admin`, account `924422830139`; canonical region `us-east-1`.
 - The read-only preflight completed. GitHub OIDC provider and six GitHub plan/apply roles returned `NoSuchEntity`; no matching dev/prod execution boundary policies were returned; no account-prefixed Terraform state bucket was found. These are not blockers for the local first-dev deployment path.
@@ -14,9 +14,9 @@
 - The rendered dev execution boundary passed IAM Access Analyzer `validate-policy` with `findings: []`. `iam list-policies --scope Local` returned no matching `attendance-dev-execution-boundary` policy. The generated state-bucket policy JSON parsed successfully and contains the TLS-only deny statement.
 - Local preflight initially failed because WSL lacks a `python` command; the local copy was changed to `python3`, and the repository script is now corrected to use `python3`.
 - Repository tracking: current head before this status update is `d810e4618a4a6567a12b2ff25f9a13d8677d925c` on `release/aws-readiness-candidate` (PR #33). Exact-head GitHub Actions CI run [43693544631](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43693544631), workflow run #1231, completed successfully on that exact commit. This supersedes the earlier CI caveat; subsequent documentation-only status updates still require their own exact-head CI evidence before any release promotion.
-- **No IAM policy or S3 bucket has been created in this sequence.** No remote backend initialization, Terraform plan or apply has run. The API already existed and was only inspected. The first dev deployment follows the local AWS CLI path; GitHub OIDC setup is optional and deferred.
+- **Dev IAM boundary and Terraform state bucket were created by the owner on 15 November 2026 after explicit approval.** The boundary ARN is `arn:aws:iam::924422830139:policy/attendance-dev-execution-boundary` (policy ID `ANPA5OO7E7A5XXNJSF5ZB`, version `v1`). The bucket is `attendance-tf-state-924422830139-amit-2026-1115`; read-only checks confirmed us-east-1, BucketOwnerEnforced, all four public-access blocks, versioning, AES256 default encryption and the TLS-only deny policy. The pasted policy-version output was truncated, so a complete live-vs-rendered policy document comparison remains. No remote backend initialization, Terraform plan or apply has run. The API already existed and was only inspected. GitHub OIDC setup remains optional and deferred.
 
-**Owner approval recorded:** the owner approved the exact two-resource dev bootstrap: create `attendance-dev-execution-boundary` from the validated rendered JSON and create `attendance-tf-state-924422830139-amit-2026-1115` with the specified private, versioned, SSE-S3 and TLS-only controls. This does not authorize OIDC setup, backend initialization, Terraform plan or apply. Next: owner executes the two-resource sequence from the runbook, rechecks bucket availability immediately before create, then verifies every setting read-only. Backend initialization and each plan/apply remain separate approval gates.
+**Bootstrap completed:** owner created the approved IAM boundary and state bucket. Bucket controls are verified read-only. Next: compare the complete live IAM boundary document with the rendered source, prepare ignored local backend/tfvars files, then request separate approval for remote backend initialization. Terraform plan and apply remain separately gated.
 
 
 ## AWS readiness follow-up — PR #34
