@@ -32,6 +32,23 @@ export async function uploadPresigned(upload, file) {
   const form = new FormData();
   for (const [key, value] of Object.entries(upload.fields || {})) form.append(key, value);
   form.append("file", file);
-  const response = await fetch(upload.url, { method: "POST", body: form });
-  if (!response.ok) throw new Error("The image upload failed. Please try again.");
+
+  let response;
+  try {
+    response = await fetch(upload.url, { method: "POST", body: form });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("The browser could not reach the secure image-upload endpoint. Check the site's security policy, S3 CORS and network connection; no upload was confirmed.");
+    }
+    throw error;
+  }
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    const code = body.match(/<Code>([^<]+)<\\/Code>/)?.[1];
+    throw new Error(
+      "S3 rejected the image upload (HTTP " + response.status +
+      (code ? ", " + code : "") + "). Check the upload configuration before retrying."
+    );
+  }
 }
