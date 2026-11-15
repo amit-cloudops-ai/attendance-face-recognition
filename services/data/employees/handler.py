@@ -45,10 +45,13 @@ def _body(event: dict) -> dict:
 
 def _public_employee(item: dict) -> dict:
     internal = {"face_ids", "enrollment_lock_request", "enrollment_lock_until", "last_faces_delete_audit_id"}
-    return {
+    public = {
         key: value for key, value in item.items()
         if key not in internal and not key.startswith("enrollment_")
     }
+    # Expose cleanup state without returning biometric identifiers.
+    public["has_face_templates"] = bool(item.get("face_ids")) or bool(item.get("photo_count", 0))
+    return public
 
 
 def _ddb_item(item: dict) -> dict:
