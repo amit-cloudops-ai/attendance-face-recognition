@@ -12,6 +12,19 @@ def fail(message: str) -> None:
     raise SystemExit(f"Frontend/Terraform contract check failed: {message}")
 
 
+def quoted_value(example: str, path: Path, name: str) -> str:
+    line = next(
+        (line for line in example.splitlines() if line.strip().startswith(f"{name} ")),
+        None,
+    )
+    if line is None or "=" not in line:
+        fail(f"{path.relative_to(ROOT)} must define {name}")
+    raw = line.split("=", 1)[1].split("#", 1)[0].strip()
+    if len(raw) < 2 or raw[0] != '"' or raw[-1] != '"':
+        fail(f"{path.relative_to(ROOT)} {name} must be a quoted string")
+    return raw[1:-1]
+
+
 auth = (ROOT / "web/shared/auth.js").read_text(encoding="utf-8")
 redirect = "redirect_uri: `${location.origin}/callback.html`"
 if auth.count(redirect) != 2:
@@ -21,21 +34,9 @@ for environment in ("dev", "prod"):
     path = ROOT / f"infra/envs/{environment}/terraform.tfvars.example"
     example = path.read_text(encoding="utf-8")
 
-    def value(name: str) -> str:
-        line = next(
-            (line for line in example.splitlines() if line.strip().startswith(f"{name} ")),
-            None,
-        )
-        if line is None or "=" not in line:
-            fail(f"{path.relative_to(ROOT)} must define {name}")
-        raw = line.split("=", 1)[1].split("#", 1)[0].strip()
-        if len(raw) < 2 or raw[0] != '"' or raw[-1] != '"':
-            fail(f"{path.relative_to(ROOT)} {name} must be a quoted string")
-        return raw[1:-1]
-
-    account_id = value("account_id")
-    api_id = value("api_id")
-    boundary_arn = value("execution_role_boundary_arn")
+    account_id = quoted_value(example, path, "account_id")
+    api_id = quoted_value(example, path, "api_id")
+    boundary_arn = quoted_value(example, path, "execution_role_boundary_arn")
     callback_line = next(
         (line for line in example.splitlines() if line.strip().startswith("callback_urls")),
         None,
