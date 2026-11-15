@@ -10,6 +10,7 @@ from attendance_common.record_scan import record_scan
 from attendance_common.responses import error, ok
 from attendance_common.tz import IST, now_ist, parse_hhmm, to_iso, today_ist
 from moto import mock_aws
+from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
 UTC = ZoneInfo("UTC")
 
@@ -31,6 +32,7 @@ def aws_tables(monkeypatch):
             {"AttributeName": "date", "AttributeType": "S"}], BillingMode="PAY_PER_REQUEST")
         employees.put_item(Item={"employee_id": "EMP001", "name": "Test Employee", "active": True,
                                  "shift_start": "09:00", "shift_end": "18:00"})
+        install_transaction_emulator(monkeypatch, db)
         yield employees, attendance
         config._reset_cache()
 
