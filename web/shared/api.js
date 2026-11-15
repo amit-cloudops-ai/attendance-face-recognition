@@ -45,7 +45,7 @@ export async function uploadPresigned(upload, file) {
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    const code = body.match(/<Code>([^<]+)<\\/Code>/)?.[1];
+    const code = body.match(/<Code>([^<]+)<\/Code>/)?.[1];
     throw new Error(
       "S3 rejected the image upload (HTTP " + response.status +
       (code ? ", " + code : "") + "). Check the upload configuration before retrying."
