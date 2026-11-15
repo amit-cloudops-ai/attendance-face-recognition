@@ -26,7 +26,9 @@ The following functional results were explicitly confirmed by the operator on 15
 | Criterion | Result | Evidence / qualification |
 |---|---|---|
 | F01 employee creation and face enrollment | PASS | Operator confirmed employee registration, photo upload and enrollment verification. Do not include employee names or biometric images in evidence. |
-| F02–F06 kiosk capture, recognition and attendance transitions | PASS | Operator confirmed successful kiosk recognition. Clock-in/clock-out/duplicate behavior was included in the kiosk acceptance confirmation; retain sanitized request IDs/results if available. |
+| F02 kiosk capture and face recognition | PASS | Operator confirmed successful kiosk recognition. Retain a sanitized request ID/result code if available. |
+| F03–F04 clock-in, clock-out and debounce transitions | OPEN — not separately confirmed | Capture sanitized results for first scan, immediate duplicate/debounce scan and later clock-out. |
+| F05–F06 unknown-face and inactive-employee handling | OPEN — not separately confirmed | Verify no attendance write for an unknown face and an inactive employee; use approved test identities only. |
 | F07 daily absence report | PASS | Operator confirmed daily report acceptance. Attach the report period and sanitized S3 object key. |
 | F08 weekly analytics | PASS | Operator confirmed weekly report acceptance. Attach the ISO week and sanitized S3 object key. |
 | F09–F10 admin authentication, attendance and reports | PASS | Admin login and production admin workflow were confirmed working; daily and weekly reports confirmed. |
