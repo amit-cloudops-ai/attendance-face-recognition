@@ -5,19 +5,13 @@
       "Sid": "BillingBudgetManage",
       "Effect": "Allow",
       "Action": "budgets:ModifyBudget",
-      "Resource": [
-        "arn:aws:budgets::${account_id}:budget/attendance-dev-monthly-cost",
-        "arn:aws:budgets::${account_id}:budget/attendance-prod-monthly-cost"
-      ]
+      "Resource": "arn:aws:budgets::${account_id}:budget/attendance-project-monthly-cost"
     },
     {
       "Sid": "BillingBudgetRead",
       "Effect": "Allow",
       "Action": "budgets:ViewBudget",
-      "Resource": [
-        "arn:aws:budgets::${account_id}:budget/attendance-dev-monthly-cost",
-        "arn:aws:budgets::${account_id}:budget/attendance-prod-monthly-cost"
-      ]
+      "Resource": "arn:aws:budgets::${account_id}:budget/attendance-project-monthly-cost"
     },
     {
       "Sid": "BillingAccountModify",
@@ -29,6 +23,18 @@
       "Sid": "BillingAccountRead",
       "Effect": "Allow",
       "Action": "aws-portal:ViewBilling",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CostAllocationTagRead",
+      "Effect": "Allow",
+      "Action": "ce:ListCostAllocationTags",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CostAllocationTagActivate",
+      "Effect": "Allow",
+      "Action": "ce:UpdateCostAllocationTagsStatus",
       "Resource": "*"
     }
   ]
