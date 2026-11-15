@@ -35,6 +35,18 @@
 <div class="field"><label for="setting-weekends">Weekend ISO weekdays (comma-separated)</label><input id="setting-weekends" placeholder="6,7" required></div>
 <div class="actions span-all"><button type="submit">Save settings</button><button type="button" id="reload-settings" class="secondary">Reload</button></div>
 </form></section>
+<dialog id="enroll-dialog" class="override-dialog enroll-dialog">
+<div class="stack">
+<div class="row row-between"><h2>Camera enrollment</h2><button type="button" id="enroll-close" class="secondary">Close</button></div>
+<p id="enroll-instructions" class="muted">Position one face in the camera frame.</p>
+<div class="camera-frame"><video id="enroll-camera" autoplay muted playsinline aria-label="Live enrollment camera preview"></video></div>
+<canvas id="enroll-capture-canvas" class="hidden"></canvas>
+<p id="enroll-status" class="status" role="status" aria-live="polite">Requesting camera permission…</p>
+<div id="enroll-previews" class="enroll-previews" aria-label="Captured enrollment photos"></div>
+<div class="actions"><button type="button" id="enroll-retake" class="secondary" disabled>Retake last</button><button type="button" id="enroll-capture" disabled>Capture photo</button><button type="button" id="enroll-submit" disabled>Upload photos</button></div>
+<p class="muted tiny">Capture at least three varied angles for first-time enrollment. Images are uploaded securely for face indexing; the raw images are deleted by the enrollment workflow.</p>
+</div>
+</dialog>
 <dialog id="override-dialog" class="override-dialog"><form id="override-form" class="stack">
 <h2>Override attendance</h2><p class="muted">Every manual change is recorded in the audit log with your reason.</p>
 <input id="override-employee" type="hidden"><input id="override-date" type="hidden">
