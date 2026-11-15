@@ -24,7 +24,7 @@ OIDC subjects are exact:
 - repo:amit-cloudops-ai/attendance-face-recognition:environment:billing-plan
 - repo:amit-cloudops-ai/attendance-face-recognition:environment:billing-apply
 
-Both environments are restricted to main. The apply environment requires an independent reviewer and prevents self-review. The workflow maps billing to infra/billing and does not require runtime permissions-boundary or Cognito variables.
+Both environments are restricted to main. The solo-owner model requires zero external reviewers and allows owner self-review; branch restriction and explicit owner-controlled workflow approval remain in force. The workflow maps billing to infra/billing and does not require runtime permissions-boundary or Cognito variables.
 
 ## Billing IAM action sets
 
@@ -38,7 +38,7 @@ Apply role:
 - aws-portal:ModifyBilling and aws-portal:ViewBilling on Resource=* because these account-level billing actions do not support a budget resource ARN.
 - Billing state Get/Put; billing lockfile Get/Put/Delete; ListBucket restricted to the billing state/lock prefixes.
 
-The apply role does not receive broad IAM administration, PassRole, or permissions to manage dev/prod runtime resources. The dev/prod plan/apply roles do not receive budgets:* or aws-portal:*. The aws-portal:ModifyBilling permission is account-level and cannot be restricted to a single budget ARN in the provider action model; it is isolated to billing-apply, gated by the main branch and an independent GitHub environment reviewer, and must be explicitly approved in the bootstrap review.
+The apply role does not receive broad IAM administration, PassRole, or permissions to manage dev/prod runtime resources. The dev/prod plan/apply roles do not receive budgets:* or aws-portal:*. The aws-portal:ModifyBilling permission is account-level and cannot be restricted to a single budget ARN in the provider action model; it is isolated to billing-apply, gated by the main branch and explicit owner approval. No independent GitHub environment reviewer is mandatory in the solo-owner phase; add one if another trusted operator joins.
 
 ## GitHub environment configuration
 
