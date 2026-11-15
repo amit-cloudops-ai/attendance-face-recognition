@@ -108,7 +108,7 @@ If an OIDC deployment role or GitHub environment is suspected compromised, suspe
 - Review monthly budgets and unexpected Rekognition/API usage.
 - Verify employee offboarding requests have no remaining FaceIds.
 - Confirm S3 raw-image retention/deletion and DynamoDB PITR status.
-- Review GitHub environment reviewers, branch restrictions and role trust after repository governance changes.
+- Review GitHub environment branch restrictions, role trust and the configured approval policy after governance changes. In the solo-owner phase, no external reviewer is required and owner self-review is allowed.
 
 ## 8. Evidence still required before production
 
