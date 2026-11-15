@@ -105,7 +105,6 @@ jobs:
               rendered = rendered.replace("${account_id}", "123456789012")
               rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
               rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
-              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
               if "${account_id}" in rendered or "${state_bucket}" in rendered or "${api_id}" in rendered:
                   raise SystemExit(f"Unresolved template variable in {path}")
               policy = json.loads(rendered)
@@ -183,7 +182,6 @@ jobs:
               path = root / name
               rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
               rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
-              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
               rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
               if "${account_id}" in rendered or "${state_bucket}" in rendered or "${api_id}" in rendered:
                   raise SystemExit(f"Unresolved template variable in {path}")
@@ -353,7 +351,6 @@ jobs:
               rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
               rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
               rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
-              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
               if "${account_id}" in rendered or "${state_bucket}" in rendered or "${api_id}" in rendered:
                   raise SystemExit(f"Unresolved template variable: {path}")
               policy = json.loads(rendered)
@@ -439,7 +436,6 @@ jobs:
               path = root / name
               rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
               rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
-              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
               rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
               if "${account_id}" in rendered or "${state_bucket}" in rendered or "${api_id}" in rendered:
                   raise SystemExit(f"Unresolved template variable: {path}")
@@ -698,7 +694,6 @@ jobs:
               rendered = rendered.replace("${account_id}", "123456789012")
               rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
               rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
-              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
               if "${" in rendered:
                   raise SystemExit(f"Unresolved template variable in {path}")
               policy = json.loads(rendered)
@@ -757,7 +752,6 @@ jobs:
               path = root / name
               rendered = path.read_text(encoding="utf-8").replace("${account_id}", "123456789012")
               rendered = rendered.replace("${state_bucket}", "attendance-tf-state-123456789012-ci-test")
-              rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
               rendered = rendered.replace("${api_id}", "a1b2c3d4e5")
               policy = json.loads(rendered)
               if len(json.dumps(policy, separators=(",", ":"))) > 6144:
