@@ -12,6 +12,7 @@ def test_render_inventory_outputs_all_account_specific_policy_documents(tmp_path
         bootstrap.POLICY_DIR,
         output,
         "123456789012",
+        "a1b2c3d4e5",
         "unit-test",
         "us-east-1",
         "test-only",
@@ -21,6 +22,7 @@ def test_render_inventory_outputs_all_account_specific_policy_documents(tmp_path
     assert manifest["remote_backend_initialized"] is False
     assert manifest["terraform_plan_or_apply_run"] is False
     assert manifest["state_bucket"] == "attendance-tf-state-123456789012-unit-test"
+    assert manifest["api_id"] == "a1b2c3d4e5"
     assert manifest["template_counts"] == {"trust": 6, "boundary": 2, "managed": 26}
     assert len(manifest["rendered_files"]) == 35
 
@@ -31,6 +33,7 @@ def test_render_inventory_outputs_all_account_specific_policy_documents(tmp_path
         assert isinstance(policy["Statement"], list)
         assert "$" + "{account_id}" not in path.read_text(encoding="utf-8")
         assert "$" + "{state_bucket}" not in path.read_text(encoding="utf-8")
+        assert "$" + "{api_id}" not in path.read_text(encoding="utf-8")
 
     trust = json.loads(
         (output / "github-oidc-trust-dev-plan.json").read_text(encoding="utf-8")
@@ -86,3 +89,10 @@ def test_sts_account_id_must_be_12_digits(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="12-digit"):
         bootstrap.get_account_id("default", "us-east-1")
+
+
+def test_api_id_must_be_exactly_ten_lowercase_alphanumeric_characters():
+    assert bootstrap.validate_api_id("a1b2c3d4e5") == "a1b2c3d4e5"
+    for api_id in ("ABC1234567", "short", "a1b2c3d4e5f", "contains-dash"):
+        with pytest.raises(ValueError, match="10 lowercase alphanumeric"):
+            bootstrap.validate_api_id(api_id)
