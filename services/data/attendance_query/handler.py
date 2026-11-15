@@ -73,6 +73,24 @@ def _names(employees_table) -> dict:
     return names
 
 
+def _valid_page_key(
+    value: dict | None, *, date_text: str, employee_id: str | None = None
+) -> bool:
+    if not isinstance(value, dict) or set(value) != {"employee_id", "date"}:
+        return False
+    key_employee = value.get("employee_id")
+    key_date = value.get("date")
+    if not isinstance(key_employee, str) or not _EMPLOYEE_ID.fullmatch(key_employee):
+        return False
+    if employee_id is not None and key_employee != employee_id:
+        return False
+    try:
+        parsed = _date_value(key_date)
+    except (TypeError, ValueError):
+        return False
+    return parsed is not None and parsed.isoformat() == date_text
+
+
 def _public_record(item: dict, names: dict) -> dict:
     flags = item.get("flags", [])
     if isinstance(flags, set):
@@ -132,7 +150,18 @@ def lambda_handler(event, context):
         if employee_id:
             if cursor and (
                 cursor.get("mode") != "employee"
-                or not isinstance(cursor.get("last_key"), dict)
+                or not _valid_page_key(
+                    cursor.get("last_key"),
+                    date_text=cursor.get("last_key", {}).get("date")
+                    if isinstance(cursor.get("last_key"), dict) else "",
+                    employee_id=employee_id,
+                )
+                or (
+                    start and _date_value(cursor["last_key"]["date"]) < start
+                )
+                or (
+                    end and _date_value(cursor["last_key"]["date"]) > end
+                )
             ):
                 return error(400, "invalid_cursor", "cursor does not match the employee query.")
             kwargs = {
@@ -162,8 +191,10 @@ def lambda_handler(event, context):
                 return error(400, "invalid_cursor", "cursor date is invalid.")
             if cursor_date is None or cursor_date < start or cursor_date > end:
                 return error(400, "invalid_cursor", "cursor date is outside the requested range.")
-            if last_key is not None and not isinstance(last_key, dict):
-                return error(400, "invalid_cursor", "cursor key is invalid.")
+            if last_key is not None and not _valid_page_key(
+                last_key, date_text=current
+            ):
+                return error(400, "invalid_cursor", "cursor key is invalid for this date.");
             current = cursor_date.isoformat()
             items = []
             next_state = None
