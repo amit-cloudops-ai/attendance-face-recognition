@@ -307,3 +307,63 @@ def test_override_clockout_removes_stale_missing_clockout_flag(admin_resources):
     item = attendance.get_item(Key={"employee_id": "EMP001", "date": "2026-11-13"})["Item"]
     assert response["statusCode"] == 200
     assert "flags" not in item
+
+
+
+def test_override_version_prevents_same_second_lost_update(admin_resources, monkeypatch):
+    _, attendance, _, audit = admin_resources
+    same_time = "2026-11-13T09:00:00+05:30"
+    attendance.put_item(Item={
+        "employee_id": "EMP001", "date": "2026-11-13",
+        "status": "present", "clock_in": same_time,
+        "updated_at": same_time, "version": 4,
+    })
+    client = attendance.meta.client
+    original = client.transact_write_items
+
+    def same_second_race(**kwargs):
+        attendance.put_item(Item={
+            "employee_id": "EMP001", "date": "2026-11-13",
+            "status": "late", "clock_in": "2026-11-13T09:30:00+05:30",
+            "updated_at": same_time, "version": 5,
+        })
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", same_second_race)
+    response = override_handler.lambda_handler(admin_event({
+        "employee_id": "EMP001", "date": "2026-11-13", "status": "late",
+        "clock_in": "2026-11-13T10:00:00+05:30", "reason": "Verified.",
+    }), None)
+    current = attendance.get_item(Key={"employee_id": "EMP001", "date": "2026-11-13"})["Item"]
+    assert response["statusCode"] == 409
+    assert current["version"] == 5
+    assert current["clock_in"] == "2026-11-13T09:30:00+05:30"
+    assert audit.scan()["Items"] == []
+
+
+def test_settings_version_prevents_same_second_lost_update(admin_resources, monkeypatch):
+    _, _, settings, audit = admin_resources
+    same_time = "2026-11-15T09:00:00+05:30"
+    settings.put_item(Item={
+        "pk": "SETTINGS", "grace_minutes": 5,
+        "updated_at": same_time, "version": 7,
+    })
+    client = settings.meta.client
+    original = client.transact_write_items
+
+    def same_second_race(**kwargs):
+        settings.put_item(Item={
+            "pk": "SETTINGS", "grace_minutes": 8,
+            "updated_at": same_time, "version": 8,
+        })
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", same_second_race)
+    response = settings_handler.lambda_handler(
+        admin_event({"debounce_minutes": 15}, method="PUT"), None
+    )
+    current = settings.get_item(Key={"pk": "SETTINGS"})["Item"]
+    assert response["statusCode"] == 409
+    assert current["version"] == 8
+    assert current["grace_minutes"] == 8
+    assert audit.scan()["Items"] == []
