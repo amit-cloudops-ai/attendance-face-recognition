@@ -83,6 +83,11 @@ def lambda_handler(event, context):
 
         face_ids = list(employee.get("face_ids", []))
         if not face_ids:
+            if int(employee.get("photo_count", 0)) > 0:
+                return error(
+                    409, "face_state_inconsistent",
+                    "The employee has enrolled photos recorded but no face identifiers. Manual review is required.",
+                )
             return ok({"deleted": 0, "already_deleted": True})
 
         audit_id = _audit_id(employee_id, face_ids)
