@@ -35,6 +35,31 @@ jobs:
             echo "Inline styles conflict with the strict Content-Security-Policy."
             exit 1
           fi
+      - name: Enforce camera-first enrollment and exact S3 CSP scope
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          admin = Path("web/admin.js").read_text(encoding="utf-8")
+          admin_html = Path("web/admin/index.html").read_text(encoding="utf-8")
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          if "navigator.mediaDevices?.getUserMedia" not in admin:
+              raise SystemExit("Admin enrollment must request browser camera access.")
+          if 'id="enroll-camera"' not in admin_html or 'id="enroll-capture"' not in admin_html:
+              raise SystemExit("Admin enrollment camera and capture controls are required.")
+          if 'picker.type = "file"' in admin or "picker.click()" in admin:
+              raise SystemExit("Gallery-first enrollment is not permitted.")
+          if 'https://${var.raw_bucket_name}.s3.amazonaws.com' not in access:
+              raise SystemExit("CSP must allow the exact virtual-hosted raw S3 upload endpoint.")
+          if "style-src 'self'" not in access:
+              raise SystemExit("Keep stylesheets restricted to the same origin.")
+          for path in Path("web").rglob("*"):
+              if path.is_file() and path.suffix.lower() in {".html", ".js", ".css"}:
+                  content = path.read_text(encoding="utf-8")
+                  if "fonts.googleapis.com" in content or "cdn.jsdelivr.net" in content:
+                      raise SystemExit(f"External stylesheet dependency must be self-hosted: {path}")
+          PY
+
       - name: Check shell script syntax
         run: |
           for script in scripts/*.sh; do
