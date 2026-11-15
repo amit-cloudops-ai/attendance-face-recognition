@@ -745,7 +745,7 @@ jobs:
               "attendance-dev-execution-boundary", "attendance-prod-execution-boundary",
               "docs/STATE-BUCKET-BOOTSTRAP.md", "docs/GITHUB-ENVIRONMENT-SETUP.md",
               "explicitly approves", "No action may proceed",
-              "billing-plan", "billing-apply", "26 managed policies",
+              "billing-plan", "billing-apply", "28 managed policy documents",
           ):
               if required not in plan:
                   raise SystemExit(f"Manual bootstrap plan missing: {required}")
