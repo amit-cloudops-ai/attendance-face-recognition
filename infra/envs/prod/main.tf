@@ -26,6 +26,10 @@ module "data" {
   layer_arn                   = module.foundation.layer_arn
   alerts_topic_arn            = module.foundation.alerts_topic_arn
   common_env                  = module.foundation.common_env
+  reserved_concurrency = {
+    daily  = var.lambda_reserved_concurrency.daily
+    weekly = var.lambda_reserved_concurrency.weekly
+  }
 }
 
 module "recognition" {
@@ -41,6 +45,11 @@ module "recognition" {
   layer_arn                   = module.foundation.layer_arn
   alerts_topic_arn            = module.foundation.alerts_topic_arn
   common_env                  = module.foundation.common_env
+  reserved_concurrency = {
+    recognize = var.lambda_reserved_concurrency.recognize
+    enroll    = var.lambda_reserved_concurrency.enroll
+    failure   = var.lambda_reserved_concurrency.failure
+  }
 }
 
 module "access" {
