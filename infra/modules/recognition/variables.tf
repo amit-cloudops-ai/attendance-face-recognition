@@ -76,7 +76,7 @@ variable "reserved_concurrency" {
   validation {
     condition = alltrue([
       for value in values(var.reserved_concurrency) :
-      value == null || (value >= 1 && floor(value) == value)
+      value == null ? true : (value >= 1 && floor(value) == value)
     ])
     error_message = "Reserved concurrency values must be null or positive whole numbers."
   }
