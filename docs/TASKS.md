@@ -36,7 +36,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T21 | Deploy and validate dev environment | TODO | Explicit apply approval; smoke/integration checks, Cognito/CORS/CloudFront validation and rollback readiness evidenced |
 | T22 | Complete privacy, deletion, latency and browser acceptance | TODO | Raw-image deletion evidence, consent checks, 20-scan p95, Chrome/Android and Safari/iOS checks |
 | T23 | Prepare production release review | TODO | Dev acceptance complete, security/cost evidence, rollback plan and separate production approval |
-| T24 | Deploy production after explicit approval | TODO | Exact production plan reviewed and approved; production apply and post-deploy checks evidenced |
+| T24 | Deploy production after explicit approval | TODO | Exact production plan reviewed and approved; production apply and post-deploy checks evidenced |\n| T39 | Replace hosted sign-in redirect with first-party Cognito SRP authentication | IN_PROGRESS | Branded credential form; SRP proof exchange; MFA and password-recovery challenge handling; validated token/session and admin-only redirect; unit/contract tests and CI pass; no hosted-login redirect in normal flow |
 
 ## Phase B cross-cutting hardening
 
