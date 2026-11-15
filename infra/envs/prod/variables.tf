@@ -19,6 +19,16 @@ variable "account_id" {
   }
 }
 
+variable "api_id" {
+  description = "Pre-created, owner-approved API Gateway HTTP API ID imported into this environment's Terraform state."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9]{10}$", var.api_id))
+    error_message = "api_id must be exactly 10 lowercase alphanumeric characters."
+  }
+}
+
 variable "alert_email" {
   description = "Email address for SNS and budget notifications."
   type        = string
