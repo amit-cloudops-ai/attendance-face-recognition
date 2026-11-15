@@ -9,11 +9,11 @@ Create these exact repository environments:
 | Environment | Allowed branch | Review requirement |
 |---|---|---|
 | dev-plan | develop only | No required reviewer |
-| dev-apply | develop only | At least one independent reviewer; prevent self-review |
-| prod-plan | main only | At least one reviewer recommended |
-| prod-apply | main only | At least one independent reviewer; prevent self-review |
-| billing-plan | main only | At least one reviewer recommended |
-| billing-apply | main only | At least one independent reviewer; prevent self-review |
+| dev-apply | develop only | No required reviewer; owner self-review allowed |
+| prod-plan | main only | No required reviewer |
+| prod-apply | main only | No required reviewer; owner self-review allowed |
+| billing-plan | main only | No required reviewer |
+| billing-apply | main only | No required reviewer; owner self-review allowed |
 
 Use deployment branch restrictions, not only the workflow's if-condition. The workflow's OIDC subject is bound to the exact environment name, so the environment names must match exactly. Do not create generic dev/prod environments for this workflow.
 
@@ -47,12 +47,11 @@ The role ARNs are non-secret configuration values. The account ID, bucket name a
 
 For `main`, `develop` and `solo/amit-monday`, configure:
 - Require pull requests before merging.
-- Require at least one approving review from someone other than the PR author.
-- Dismiss stale approvals after new commits.
+- Set mandatory approvals to zero during the solo-owner phase; the repository owner may merge their own PR after all required CI checks pass.
 - Require the Python and terraform-fmt status checks.
 - Require conversation resolution.
 - Block force pushes and branch deletion.
-- Require CODEOWNERS review if a suitable CODEOWNERS file and independent code owner are configured.
+- Optional independent CODEOWNERS review can be introduced when another trusted code owner is available; it is not a current release gate.
 
 Require reviews for changes to .github/workflows/**, infra/**, infra/policies/** and docs/security/**. The person who authors a deployment workflow or policy change must not be the only reviewer of that change.
 
@@ -60,7 +59,7 @@ Require reviews for changes to .github/workflows/**, infra/**, infra/policies/**
 
 - All six environments exist with exact names.
 - Allowed deployment branches match the table above.
-- Apply environments have independent reviewers and prevent self-review.
+- Apply environments have no required external reviewers; owner self-review is allowed.
 - AWS_ROLE_ARN points to the matching role only.
 - Account ID, state bucket and boundary ARN match the approved AWS account/environment.
 - Age recipients and private identities are different per environment and the private identities exist only as apply-environment secrets.
@@ -70,4 +69,4 @@ Require reviews for changes to .github/workflows/**, infra/**, infra/policies/**
 
 ## Verification limitation
 
-GitHub branch protection API reads returned 403 Resource not accessible by integration, and the repository connector does not expose GitHub Actions environment settings. Therefore the environment list, variable values, secret presence, reviewer configuration and branch restrictions cannot be verified from this session. This task remains blocked until a repository administrator configures the six environments and provides confirmation or an authorized read-only verification path.
+GitHub branch protection API reads returned 403 Resource not accessible by integration, and the repository connector does not expose GitHub Actions environment settings. Therefore the environment list, variable values, secret presence, reviewer configuration (intentionally not required in the solo-owner model) and branch restrictions cannot be verified from this session. This task remains blocked until a repository administrator configures the six environments and provides confirmation or an authorized read-only verification path.
