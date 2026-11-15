@@ -7,7 +7,7 @@ This directory contains environment-specific AWS IAM permissions-boundary templa
 - `execution-role-boundary-dev.json.tftpl` — dev-only resource ARNs and KMS alias.
 - `execution-role-boundary-prod.json.tftpl` — prod-only resource ARNs and KMS alias.
 
-The templates use Terraform template interpolation for `${account_id}`. They are not attachable until rendered with the verified 12-digit AWS account ID. All regional ARNs must match the canonical region in `config/deployment.json` (`us-east-1`); CI checks regional ARNs and service endpoints for drift.
+The templates use Terraform template interpolation for `${account_id}`, `${state_bucket}` and `${api_id}`. They are not attachable until rendered with the verified 12-digit AWS account ID, exact state bucket name and pre-created environment API ID. All regional ARNs must match the canonical region in `config/deployment.json` (`us-east-1`); CI checks regional ARNs and service endpoints for drift.
 
 ## Security model
 
@@ -65,9 +65,9 @@ The plan role receives no infrastructure create/update/delete permissions. The o
 
 The plan policies intentionally include `s3:ListBucket` on the three dev application buckets because the reviewed AWS provider v6.73.0 `aws_s3_bucket` refresh path performs HeadBucket, which is authorized by `s3:ListBucket`. This reveals object-key metadata, not object contents; no raw-bucket object read permission is granted to the plan role.
 
-Cognito pool IDs and CloudFront distribution IDs are service-generated. The templates use service-supported resource ARN patterns and tag conditions where available. Some CloudFront policy families do not support resource tags; their read actions are restricted to the corresponding CloudFront resource family and remain read-only. API Gateway v2 IDs are also service-generated, and the provider configuration does not tag each authorizer/integration/route/stage child independently. The dev plan policy therefore grants only the `apigateway:GET` verb over the `/apis` resource family; this is read-only but can expose metadata for other APIs in the account/region. A post-bootstrap tightening task should replace the wildcard API ID with the generated dev API ID where operationally practical.
+Cognito user-pool create calls require attendance/project and environment request tags; subsequent pool/client/domain/group operations require matching resource tags. CloudFront distribution create calls require attendance/project and environment request tags, and distribution/function management requires matching resource tags. API Gateway v2 IDs are service-generated: the owner-approved bootstrap script creates one tagged API per environment, Terraform imports it, and all plan/apply API Gateway permissions are rendered against the exact `${api_id}` and child paths. The API ID wildcard is not permitted in the final deployment roles. CloudFront OAC/cache/origin-request/response-header policies do not support the required resource-tag controls in this provider configuration: permanent apply policies are read-only for these resource families, while a separate temporary policy grants only Create actions for the first approved deployment and must be detached immediately afterward.
 
-The templates are policy source, not an AWS deployment. CI renders them with a dummy account/bucket, validates JSON, checks the 6,144-character managed-policy limit, rejects infrastructure mutation actions from core/edge policies, and ensures dev state permissions cannot reach prod keys. The exact account and state bucket values must be reviewed before bootstrap.
+The two temporary CloudFront bootstrap policies are create-only and must be detached immediately after first creation. The templates are policy source, not an AWS deployment. CI renders them with a dummy account/bucket, validates JSON, checks the 6,144-character managed-policy limit, rejects infrastructure mutation actions from core/edge policies, and ensures dev state permissions cannot reach prod keys. The exact account and state bucket values must be reviewed before bootstrap.
 
 
 ## DynamoDB customer-managed KMS key deployment permissions
@@ -94,7 +94,7 @@ The dev apply role is intentionally split into multiple customer-managed policie
 - `github-apply-dev-state.json.tftpl` — dev state read/write and dev lockfile lifecycle only.
 - `github-apply-dev-dynamodb-kms.json.tftpl` — DynamoDB customer-managed-key crypto and grant permissions via DynamoDB.
 
-All templates use `account_id` and the state policy uses `state_bucket`. Each rendered policy is checked against the 6,144-character IAM managed-policy limit. CI rejects production ARNs/state paths and account billing permissions in the dev apply set.
+Templates use `account_id`, `state_bucket` and the environment-specific `api_id` where required. Each rendered policy is checked against the 6,144-character IAM managed-policy limit. CI rejects production ARNs/state paths and account billing permissions in the dev apply set.
 
 **Least-privilege caveats requiring explicit bootstrap review:**
 
