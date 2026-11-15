@@ -1,10 +1,10 @@
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from moto import mock_aws
 
-from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
-
 from services.recognition.faces_delete import handler as faces_delete
+from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
 
 class FakeRekognition:
@@ -163,7 +163,6 @@ def test_face_deletion_transaction_failure_preserves_employee_and_audit_for_retr
             "TransactWriteItems",
         )
 
-    from botocore.exceptions import ClientError
     monkeypatch.setattr(employees.meta.client, "transact_write_items", fail_transaction)
     failed = faces_delete.lambda_handler(admin_event(), None)
     item = employees.get_item(Key={"employee_id": "EMP001"})["Item"]
