@@ -2,6 +2,22 @@
 
 ## Executive status
 
+## Live AWS bootstrap progress — 15 November 2026
+
+**Current phase: dev AWS bootstrap; API Gateway verified; IAM boundary and Terraform state bucket not yet created.**
+
+- Authenticated WSL AWS CLI profile: `default` (profiles present: `default`, `pdp`; no profile named `Amit-admin`). STS returned `arn:aws:iam::924422830139:user/Amit-admin`, account `924422830139`; canonical region `us-east-1`.
+- The read-only preflight completed. GitHub OIDC provider and six GitHub plan/apply roles returned `NoSuchEntity`; no matching dev/prod execution boundary policies were returned; no account-prefixed Terraform state bucket was found. These are not blockers for the local first-dev deployment path.
+- Existing API Gateway HTTP API `attendance-dev-http-api`, ID `7nii6lm2z2`, was verified in `us-east-1`. Its `Project=attendance`, `Environment=dev`, `Component=access` tags match. It has no stages, routes or integrations. The bootstrap script failed closed and created no duplicate.
+- Account Lambda concurrency quota was previously verified as 10 with 10 unreserved executions and zero functions. The first dev `terraform.tfvars` must set all five `lambda_reserved_concurrency` values to `null` unless the quota changes; preserve the 10-unreserved-execution margin.
+- The local inventory renderer succeeded using suffix `amit-2026-1115` and API ID `7nii6lm2z2`: 6 OIDC trust documents, 2 boundaries, 28 managed policy documents and 1 TLS-only bucket policy (37 total). Candidate state bucket: `attendance-tf-state-924422830139-amit-2026-1115`. Its initial `HeadBucket` returned 404; this is not a reservation and must be rechecked before creation.
+- The rendered dev execution boundary passed IAM Access Analyzer `validate-policy` with `findings: []`. `iam list-policies --scope Local` returned no matching `attendance-dev-execution-boundary` policy. The generated state-bucket policy JSON parsed successfully and contains the TLS-only deny statement.
+- Local preflight initially failed because WSL lacks a `python` command; the local copy was changed to `python3`, and the repository script is now corrected to use `python3`.
+- **No IAM policy or S3 bucket has been created in this sequence.** No remote backend initialization, Terraform plan or apply has run. The API already existed and was only inspected. The first dev deployment follows the local AWS CLI path; GitHub OIDC setup is optional and deferred.
+
+**Next execution:** review the exact dev boundary and S3 bucket bootstrap operations, create only those approved resources, verify their settings read-only, then prepare the ignored backend file and dev variables. Do not initialize the remote backend or run Terraform plan/apply until separately reviewed and approved.
+
+
 ## AWS readiness follow-up — PR #34
 
 **Status: IMPLEMENTATION MERGED INTO THE RELEASE CANDIDATE; POST-MERGE CI PASSED. A final status-only recheck is triggered by this update.**
@@ -15,7 +31,7 @@
 
 **CI evidence:** pre-merge exact-head workflow run [43689383499](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43689383499) passed both jobs on commit `8ca4031077c0653826ffceb9b1ef8df26cd648cc`. Python: **137 passed, zero skipped**; Ruff, region consistency, frontend/Terraform contract checks, JavaScript/CSP, syntax checks for every `scripts/*.sh`, workflow YAML, IAM/security policy validation, encrypted-plan and bootstrap-plan checks all passed. Terraform formatting passed, and backend-free init/validate passed for recognition, data, foundation, access, dev, prod and billing. Post-merge exact-head run [43689694957](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43689694957) passed both jobs on release head `9a49c05d579ed1c404e54c61bb7b119acef2c803`. Python: **137 passed in 13.77s, zero skipped**. Ruff, region/frontend contracts, JavaScript/CSP, all shell syntax checks, IAM/workflow/bootstrap checks, Terraform formatting and backend-free init/validate for all four modules and all three roots passed. This status-only evidence update will trigger a final CI recheck on its resulting commit; see PR #33 checks for that run.
 
-**AWS boundary:** no AWS resource creation, IAM mutation, remote backend initialization, Terraform plan or apply has been performed. The owner-provided account ID `924422830139` has not been verified against STS in this session. IAM policy effectiveness, live Cognito/Rekognition behavior and deployed browser/camera performance remain unverified.
+**Historical AWS boundary note:** the statements in this earlier readiness snapshot predate the live AWS bootstrap progress above. Current STS identity and the existing API have now been verified. IAM policy effectiveness beyond static Access Analyzer validation, live Cognito/Rekognition behavior and deployed browser/camera performance remain unverified.
 
 **Next action:** owner review of PR #33. Do not merge PR #33 into `solo/amit-monday`, `develop` or `main` without separate approval. Once approved, the owner can begin the separately approved local dev bootstrap in `docs/DEPLOYMENT-RUNBOOK.md`.
 ## Application correctness release gate — 15 November 2026
