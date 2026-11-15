@@ -8,11 +8,11 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import boto3
-from boto3.dynamodb.types import TypeSerializer
-from botocore.exceptions import ClientError
 from attendance_common.auth import get_username, require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist, to_iso
+from boto3.dynamodb.types import TypeSerializer
+from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
