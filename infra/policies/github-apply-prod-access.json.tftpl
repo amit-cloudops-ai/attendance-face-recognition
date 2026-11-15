@@ -2,10 +2,23 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "CognitoUserPoolLifecycle",
+      "Sid": "CognitoUserPoolCreate",
       "Effect": "Allow",
       "Action": [
-        "cognito-idp:CreateUserPool",
+        "cognito-idp:CreateUserPool"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-east-1:${account_id}:userpool/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "attendance",
+          "aws:RequestTag/Environment": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "CognitoUserPoolManage",
+      "Effect": "Allow",
+      "Action": [
         "cognito-idp:DescribeUserPool",
         "cognito-idp:UpdateUserPool",
         "cognito-idp:DeleteUserPool",
@@ -16,7 +29,13 @@
         "cognito-idp:UntagResource",
         "cognito-idp:ListTagsForResource"
       ],
-      "Resource": "arn:aws:cognito-idp:us-east-1:${account_id}:userpool/*"
+      "Resource": "arn:aws:cognito-idp:us-east-1:${account_id}:userpool/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "attendance",
+          "aws:ResourceTag/Environment": "prod"
+        }
+      }
     },
     {
       "Sid": "CognitoClientDomainGroups",
@@ -35,7 +54,13 @@
         "cognito-idp:UpdateGroup",
         "cognito-idp:DeleteGroup"
       ],
-      "Resource": "arn:aws:cognito-idp:us-east-1:${account_id}:userpool/*"
+      "Resource": "arn:aws:cognito-idp:us-east-1:${account_id}:userpool/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "attendance",
+          "aws:ResourceTag/Environment": "prod"
+        }
+      }
     },
     {
       "Sid": "ApiGatewayCreateApi",
@@ -43,10 +68,21 @@
       "Action": [
         "apigateway:POST"
       ],
-      "Resource": [
-        "arn:aws:apigateway:us-east-1::/apis",
-        "arn:aws:apigateway:us-east-1::/apis/*/*"
-      ]
+      "Resource": "arn:aws:apigateway:us-east-1::/apis",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "attendance",
+          "aws:RequestTag/Environment": "prod"
+        }
+      }
+    },
+    {
+      "Sid": "ApiGatewayCreateChildResources",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:POST"
+      ],
+      "Resource": "arn:aws:apigateway:us-east-1::/apis/*/*"
     },
     {
       "Sid": "ApiGatewayManageApi",
@@ -57,7 +93,13 @@
         "apigateway:PUT",
         "apigateway:DELETE"
       ],
-      "Resource": "arn:aws:apigateway:us-east-1::/apis/*"
+      "Resource": "arn:aws:apigateway:us-east-1::/apis/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "attendance",
+          "aws:ResourceTag/Environment": "prod"
+        }
+      }
     },
     {
       "Sid": "CloudFrontDistributionCreate",
@@ -85,7 +127,13 @@
         "cloudfront:UntagResource",
         "cloudfront:ListTagsForResource"
       ],
-      "Resource": "arn:aws:cloudfront::${account_id}:distribution/*"
+      "Resource": "arn:aws:cloudfront::${account_id}:distribution/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "attendance",
+          "aws:ResourceTag/Environment": "prod"
+        }
+      }
     },
     {
       "Sid": "CloudFrontOAC",
@@ -141,7 +189,13 @@
         "cloudfront:DeleteFunction",
         "cloudfront:PublishFunction"
       ],
-      "Resource": "arn:aws:cloudfront::${account_id}:function/attendance-prod-directory-index"
+      "Resource": "arn:aws:cloudfront::${account_id}:function/attendance-prod-directory-index",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "attendance",
+          "aws:ResourceTag/Environment": "prod"
+        }
+      }
     },
     {
       "Sid": "S3WebObjects",
