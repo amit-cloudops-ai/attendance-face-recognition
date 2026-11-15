@@ -1,7 +1,7 @@
 name: CI
 on:
   pull_request:
-    branches: [solo/amit-monday, develop, main]
+    branches: [solo/amit-monday, develop, main, "release/**"]
   push:
     branches: [solo/amit-monday, develop, main, "ai/**", "release/**"]
 
@@ -23,6 +23,8 @@ jobs:
       - run: pytest -q
       - name: Enforce canonical AWS region across contracts, code and infrastructure
         run: python scripts/check_region_consistency.py
+      - name: Check frontend and Terraform configuration contracts
+        run: python scripts/check_frontend_terraform_contract.py
       - name: Check browser JavaScript syntax and HTML CSP hygiene
         run: |
           for file in web/*.js web/shared/*.js web/admin/*.js; do
