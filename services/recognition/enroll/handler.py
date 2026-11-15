@@ -81,6 +81,13 @@ def _finish(s3, bucket: str, key: str, results, request_id: str, code: str,
     s3.delete_object(Bucket=bucket, Key=key)
 
 
+def _external_employee_id(value: str) -> str:
+    """Return the employee prefix from current or legacy Rekognition IDs."""
+    # Employee IDs cannot contain either delimiter. Accept legacy "#" values
+    # for compatibility, but only create new IDs with Rekognition-safe ":".
+    return re.split(r"[#:]", value, maxsplit=1)[0]
+
+
 def _request_marker(request_id: str) -> str:
     return f"enrollment_{request_id}"
 
@@ -190,7 +197,7 @@ def _process_record(record: dict) -> None:
     employees = _table("TABLE_EMPLOYEES")
     rekognition = boto3.client("rekognition", region_name=_region())
     image = {"S3Object": {"Bucket": bucket, "Name": key}}
-    request_external_id = f"{employee_id}#{request_id}"
+    request_external_id = f"{employee_id}:{request_id}"
     marker = _request_marker(request_id)
     employee = employees.get_item(
         Key={"employee_id": employee_id}, ConsistentRead=True
@@ -272,7 +279,7 @@ def _process_record(record: dict) -> None:
             QualityFilter="AUTO",
         ).get("FaceMatches", [])
         if any(
-            ((match.get("Face") or {}).get("ExternalImageId") or "").split("#", 1)[0]
+            _external_employee_id((match.get("Face") or {}).get("ExternalImageId") or "")
             not in ("", employee_id)
             for match in matches
         ):
