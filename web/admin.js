@@ -247,6 +247,8 @@ enrollSubmitButton.addEventListener("click", async () => {
   }
 });
 
+document.querySelector("#enroll-close").addEventListener("click", () => enrollDialog.close());
+
 enrollDialog.addEventListener("cancel", event => {
   if (enrollmentUploading) event.preventDefault();
 });
