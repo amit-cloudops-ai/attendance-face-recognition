@@ -74,11 +74,31 @@ All steps below are instructions for the repository owner. They are not executed
    print(output)
    PY
    python3 -m json.tool /tmp/attendance-dev-execution-boundary.json >/dev/null
+   aws accessanalyzer validate-policy --policy-document file:///tmp/attendance-dev-execution-boundary.json --policy-type IDENTITY_POLICY --region us-east-1 --output json
    ```
 
    In AWS Console, open **IAM → Policies → Create policy → JSON**, paste the rendered JSON, and create a customer-managed policy named exactly `attendance-dev-execution-boundary`. Verify its ARN is `arn:aws:iam::924422830139:policy/attendance-dev-execution-boundary`. Do not attach this boundary to the deployment user; Terraform attaches it to the application execution roles.
 
-4. **Create the Terraform state bucket.** The selected candidate is `attendance-tf-state-924422830139-amit-2026-1115`. The renderer's initial read-only `HeadBucket` check returned 404 on 15 November 2026; this is only a point-in-time absence signal, not a reservation. Recheck immediately before creation. Create this exact bucket in `us-east-1` only after reviewing and approving the bootstrap operation. Follow every control in [STATE-BUCKET-BOOTSTRAP.md](STATE-BUCKET-BOOTSTRAP.md): BucketOwnerEnforced object ownership, all four S3 Block Public Access settings, versioning enabled, default SSE-S3 encryption, and a bucket policy denying all non-TLS requests. Do not enable Object Lock or automatic state-version expiration. Verify the final bucket name and settings before continuing.
+4. **Create the Terraform state bucket.** The selected candidate is `attendance-tf-state-924422830139-amit-2026-1115`. The renderer's initial read-only `HeadBucket` check returned 404 on 15 November 2026; this is only a point-in-time absence signal, not a reservation. Recheck immediately before creation. A successful HEAD means stop and inspect; 403, 301, timeout or any response other than a clear 404 means availability is unknown and must stop. Create this exact bucket in `us-east-1` only after reviewing and approving the bootstrap operation. For `us-east-1`, omit `--create-bucket-configuration` from `create-bucket`. Follow every control in [STATE-BUCKET-BOOTSTRAP.md](STATE-BUCKET-BOOTSTRAP.md): BucketOwnerEnforced object ownership, all four S3 Block Public Access settings, versioning enabled, default SSE-S3 encryption, and a bucket policy denying all non-TLS requests. Do not enable Object Lock or automatic state-version expiration. The exact owner-operated AWS CLI sequence is:
+
+   ```bash
+   export AWS_PROFILE=default
+   export AWS_REGION=us-east-1
+   BUCKET=attendance-tf-state-924422830139-amit-2026-1115
+
+   # Recheck immediately before creation. Continue only if AWS returns a clear 404.
+   aws s3api head-bucket --bucket "$BUCKET" --region "$AWS_REGION"
+
+   # Run only after the approved 404 absence check.
+   aws s3api create-bucket --bucket "$BUCKET" --region "$AWS_REGION"
+   aws s3api put-bucket-ownership-controls --bucket "$BUCKET" --ownership-controls 'Rules=[{ObjectOwnership=BucketOwnerEnforced}]' --region "$AWS_REGION"
+   aws s3api put-public-access-block --bucket "$BUCKET" --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true --region "$AWS_REGION"
+   aws s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled --region "$AWS_REGION"
+   aws s3api put-bucket-encryption --bucket "$BUCKET" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' --region "$AWS_REGION"
+   aws s3api put-bucket-policy --bucket "$BUCKET" --policy file://.local/bootstrap-rendered/state-bucket-policy.json --region "$AWS_REGION"
+   ```
+
+   Verify the final bucket name and every setting using read-only calls before continuing.
 
 5. **Write the local backend configuration.** Copy the example and replace its bucket value with the exact bucket name created in step 4:
 
@@ -117,7 +137,7 @@ All steps below are instructions for the repository owner. They are not executed
    AWS_PROFILE=default bash scripts/terraform.sh -chdir=infra/envs/dev apply /tmp/attendance-dev-first.tfplan
    ```
 
-   Do not use `-auto-approve`. The first apply creates the dev stack and imports the API created in step 2. The deployed Cognito login and browser-to-S3 upload flow are not ready until step 7.
+   Do not use `-auto-approve`. The first apply creates the dev stack and imports the existing API adopted in step 2. The deployed Cognito login and browser-to-S3 upload flow are not ready until step 7.
 
 7. **Perform the required second apply for the CloudFront origin.** Read the exact CloudFront URL from Terraform output:
 
