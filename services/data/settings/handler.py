@@ -104,6 +104,7 @@ def lambda_handler(event, context):
             **new,
             "updated_at": now,
             "updated_by": username,
+            "version": int(stored.get("version", 0) if stored else 0) + 1,
         }
         audit_item = {
             "audit_id": str(uuid.uuid4()),
@@ -114,11 +115,20 @@ def lambda_handler(event, context):
             "reason": "Attendance settings updated by administrator.",
             "at": now,
         }
-        if stored and "updated_at" in stored:
-            condition = "attribute_exists(pk) AND updated_at=:old_updated"
-            condition_values = {":old_updated": _ddb_item({"v": stored["updated_at"]})["v"]}
+        if stored and "version" in stored:
+            condition = "attribute_exists(pk) AND #version=:old_version"
+            condition_values = _ddb_item({"v": int(stored["version"])})
+        elif stored and "updated_at" in stored:
+            condition = (
+                "attribute_exists(pk) AND attribute_not_exists(#version) "
+                "AND updated_at=:old_updated"
+            )
+            condition_values = _ddb_item({"v": stored["updated_at"]})
         elif stored:
-            condition = "attribute_exists(pk) AND attribute_not_exists(updated_at)"
+            condition = (
+                "attribute_exists(pk) AND attribute_not_exists(#version) "
+                "AND attribute_not_exists(updated_at)"
+            )
             condition_values = None
         else:
             condition = "attribute_not_exists(pk)"
@@ -130,6 +140,8 @@ def lambda_handler(event, context):
         }
         if condition_values:
             put_config["ExpressionAttributeValues"] = condition_values
+        if stored:
+            put_config["ExpressionAttributeNames"] = {"#version": "version"}
         try:
             config.meta.client.transact_write_items(TransactItems=[
                 {"Put": put_config},
