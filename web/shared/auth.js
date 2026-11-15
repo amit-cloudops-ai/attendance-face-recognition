@@ -54,14 +54,18 @@ export function clearSession() {
   sessionStorage.removeItem(RETURN_TO);
 }
 
-export async function login() {
+export async function login(returnTo = null, options = {}) {
+  const destination = returnTo === "/admin/" || (!returnTo && location.pathname.startsWith("/admin")) ? "/admin/" : "/";
+  if (!options.hosted) {
+    location.assign("/signin/?returnTo=" + encodeURIComponent(destination));
+    return;
+  }
   const config = await getConfig();
   const state = randomString();
   const nonce = randomString();
   const verifier = randomString(48);
-  const requestedPath = location.pathname === "/admin" ? "/admin/" : location.pathname;
-  const returnTo = requestedPath === "/admin/" ? "/admin/" : "/";
-  sessionStorage.setItem(RETURN_TO, returnTo);
+  const safeReturnTo = destination;
+  sessionStorage.setItem(RETURN_TO, safeReturnTo);
   sessionStorage.setItem(STATE, state);
   sessionStorage.setItem(NONCE, nonce);
   sessionStorage.setItem(VERIFIER, verifier);
