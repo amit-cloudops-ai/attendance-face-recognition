@@ -1,4 +1,5 @@
 import json
+import re
 import time
 import uuid
 
@@ -102,6 +103,7 @@ class FakeRekognition:
         self.face_id = face_id
         self.deleted = []
         self.index_calls = 0
+        self.index_args = []
 
     def detect_faces(self, **kwargs):
         return {"FaceDetails": self.faces}
@@ -111,6 +113,7 @@ class FakeRekognition:
 
     def index_faces(self, **kwargs):
         self.index_calls += 1
+        self.index_args.append(kwargs)
         return {"FaceRecords": [{"Face": {"FaceId": self.face_id}}]}
 
     def delete_faces(self, **kwargs):
@@ -153,6 +156,9 @@ def test_enroll_indexes_face_updates_employee_and_deletes_raw_image(aws_env, mon
     employee = employees.get_item(Key={"employee_id": "EMP001"})["Item"]
     result = scans.get_item(Key={"request_id": request_id})["Item"]
     assert employee["photo_count"] == 1 and employee["face_ids"] == ["face-001"]
+    external_id = fake_rekognition.index_args[0]["ExternalImageId"]
+    assert external_id == f"EMP001:{request_id}"
+    assert re.fullmatch(r"[a-zA-Z0-9_.\\-:]+", external_id)
     assert result["code"] == "enrolled" and result["employee_id"] == "EMP001"
     assert fake_s3.deleted == [f"enroll/EMP001/{request_id}.jpg"]
 
@@ -294,7 +300,7 @@ def test_enrollment_retry_recovers_face_indexed_for_same_request(aws_env, monkey
     fake_rekognition = FakeRekognition(matches=[{
         "Similarity": 99,
         "Face": {
-            "ExternalImageId": "EMP001#" + request_id,
+            "ExternalImageId": "EMP001:" + request_id,
             "FaceId": recovered_id,
         },
     }])
@@ -334,7 +340,7 @@ def test_terminal_enrollment_rejection_cleans_up_request_scoped_orphan(
     fake_rekognition = FakeRekognition(matches=[{
         "Similarity": 99.9,
         "Face": {
-            "ExternalImageId": "EMP001#" + request_id,
+            "ExternalImageId": "EMP001:" + request_id,
             "FaceId": "orphan-face",
         },
     }])
