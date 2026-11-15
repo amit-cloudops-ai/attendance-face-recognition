@@ -143,13 +143,13 @@ def lambda_handler(event, context):
             condition_values = None
         elif "version" in old:
             condition = "attribute_exists(employee_id) AND #version=:old_version"
-            condition_values = _ddb_item({"v": int(old["version"])})
+            condition_values = {":old_version": _ddb_item({"v": int(old["version"])})["v"]}
         elif "updated_at" in old:
             condition = (
                 "attribute_exists(employee_id) AND attribute_not_exists(#version) "
                 "AND updated_at=:old_updated"
             )
-            condition_values = _ddb_item({"v": old["updated_at"]})
+            condition_values = {":old_updated": _ddb_item({"v": old["updated_at"]})["v"]}
         else:
             condition = (
                 "attribute_exists(employee_id) AND attribute_not_exists(#version) "
