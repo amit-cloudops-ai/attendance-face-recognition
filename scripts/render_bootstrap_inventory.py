@@ -17,6 +17,7 @@ REGION_FILE = ROOT / "config" / "deployment.json"
 EXPECTED_TEMPLATE_COUNTS = {"trust": 6, "boundary": 2, "managed": 26}
 ACCOUNT_PLACEHOLDER = "$" + "{account_id}"
 BUCKET_PLACEHOLDER = "$" + "{state_bucket}"
+API_ID_PLACEHOLDER = "$" + "{api_id}"
 UNRESOLVED_PATTERN = re.compile(re.escape("$") + r"\{[^}]+\}")
 
 
@@ -36,6 +37,12 @@ def validate_suffix(suffix: str) -> str:
     if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?", suffix):
         raise ValueError("suffix must be lowercase letters, digits or hyphens and start/end alphanumeric")
     return suffix
+
+
+def validate_api_id(api_id: str) -> str:
+    if not re.fullmatch(r"[a-z0-9]{10}", api_id):
+        raise ValueError("API Gateway API ID must be exactly 10 lowercase alphanumeric characters")
+    return api_id
 
 
 def state_bucket_name(account_id: str, suffix: str) -> str:
@@ -84,7 +91,7 @@ def require_bucket_name_unclaimed(bucket: str, profile: str, region: str) -> Non
 
 
 def _render_policy_templates(
-    policy_dir: Path, output_dir: Path, account_id: str, bucket: str
+    policy_dir: Path, output_dir: Path, account_id: str, bucket: str, api_id: str
 ) -> dict[str, list[str]]:
     templates = sorted(policy_dir.glob("*.json.tftpl"))
     groups: dict[str, list[str]] = {"trust": [], "boundary": [], "managed": []}
@@ -96,6 +103,7 @@ def _render_policy_templates(
             template.read_text(encoding="utf-8")
             .replace(ACCOUNT_PLACEHOLDER, account_id)
             .replace(BUCKET_PLACEHOLDER, bucket)
+            .replace(API_ID_PLACEHOLDER, api_id)
         )
         unresolved = UNRESOLVED_PATTERN.findall(rendered)
         if unresolved:
@@ -134,13 +142,15 @@ def render_inventory(
     policy_dir: Path,
     output_dir: Path,
     account_id: str,
+    api_id: str,
     suffix: str,
     region: str,
     bucket_check: str,
 ) -> dict[str, Any]:
     bucket = state_bucket_name(account_id, suffix)
+    validate_api_id(api_id)
     output_dir.mkdir(parents=True, exist_ok=False)
-    groups = _render_policy_templates(policy_dir, output_dir, account_id, bucket)
+    groups = _render_policy_templates(policy_dir, output_dir, account_id, bucket, api_id)
 
     bucket_policy = {
         "Version": "2012-10-17",
@@ -160,6 +170,7 @@ def render_inventory(
     manifest = {
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "account_id": account_id,
+        "api_id": api_id,
         "region": region,
         "state_bucket": bucket,
         "bucket_head_check": bucket_check,
@@ -177,6 +188,7 @@ def render_inventory(
         "# Rendered AWS bootstrap inventory",
         "",
         f"- Account: {account_id}",
+        f"- API Gateway API ID: {api_id}",
         f"- Region: {region}",
         f"- Candidate state bucket: {bucket}",
         f"- HeadBucket result: {bucket_check}",
@@ -202,6 +214,7 @@ def main() -> int:
         description="Render the account-specific bootstrap inventory using read-only AWS checks only."
     )
     parser.add_argument("--suffix", required=True, help="Owner-selected lowercase unique S3 bucket suffix")
+    parser.add_argument("--api-id", required=True, help="Pre-created, owner-approved API Gateway HTTP API ID for this environment")
     parser.add_argument("--profile", default=os.environ.get("AWS_PROFILE", "default"))
     parser.add_argument(
         "--output-dir",
@@ -214,6 +227,7 @@ def main() -> int:
     try:
         region = canonical_region()
         validate_suffix(args.suffix)
+        validate_api_id(args.api_id)
         account_id = get_account_id(args.profile, region)
         bucket = state_bucket_name(account_id, args.suffix)
         require_bucket_name_unclaimed(bucket, args.profile, region)
@@ -221,6 +235,7 @@ def main() -> int:
             POLICY_DIR,
             args.output_dir,
             account_id,
+            args.api_id,
             args.suffix,
             region,
             "HeadBucket returned 404 (candidate appeared absent at check time)",
