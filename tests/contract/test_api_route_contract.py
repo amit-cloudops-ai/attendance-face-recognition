@@ -18,7 +18,7 @@ def _terraform_routes() -> dict[str, tuple[str, str]]:
         for line in path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if stripped.startswith('"') and stripped.endswith('" = {') and "/api/" in stripped:
-                current_route = stripped[1:-4]
+                current_route = stripped[1:-5]
                 function = None
                 group = None
             elif current_route is not None and stripped.startswith("function_name = aws_lambda_function.lambda["):
