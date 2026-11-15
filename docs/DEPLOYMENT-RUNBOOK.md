@@ -18,11 +18,12 @@ The workflow uses short-lived GitHub OIDC credentials, an account-specific S3 st
 
 ## 2. Before any deployment
 
-1. Verify the release commit and the full CI run on that exact commit. Required evidence includes Python unit/contract/integration/security tests, Ruff, region consistency, browser JavaScript/CSP checks, shell syntax, policy/template checks, Terraform formatting, provider lockfiles and validation of all modules and roots.
-2. Verify the six GitHub environments, exact branch restrictions, environment variables, plan-only public age recipients, apply-only private age identity secrets, independent reviewers and self-review prevention. Protect workflow, Terraform and policy paths with CODEOWNERS review.
+1. Verify the release commit and full CI run on that exact commit. Required evidence includes Python unit/contract/integration/security tests, Ruff, pip-audit, immutable action pins, region consistency, browser JavaScript/CSP checks, shell syntax, policy/template checks, Terraform formatting, provider lockfiles and validation of all modules and roots.
+2. Verify the six GitHub environments, exact branch restrictions, environment variables, plan-only public age recipients, apply-only private age identity secrets, independent reviewers and self-review prevention. Dev/prod require their own `API_ID` variable. Protect workflow, Terraform and policy paths with CODEOWNERS review.
 3. Run `bash scripts/aws_preflight_readonly.sh` using an explicitly approved read-only AWS profile. Confirm the 12-digit STS account ID, `us-east-1`, OIDC provider, two runtime boundaries, six role trust/attachments and state bucket configuration. AccessDenied is an unknown state, not evidence of absence.
-4. Select a candidate state bucket suffix and run `python scripts/render_bootstrap_inventory.py --suffix <suffix> --profile default`. Review the generated account ID, bucket name, six OIDC trust policies, two boundaries, 26 managed policies and TLS-only bucket policy.
-5. Present the exact bootstrap resource/action plan for approval. Bootstrap approval, remote backend initialization, Terraform plan and Terraform apply are separate approvals. Never infer one approval from another.
+4. The API Gateway HTTP API must exist before the IAM inventory is rendered. The owner-approved bootstrap script creates only that one tagged API and fails closed if the expected name already exists.
+5. Render the account-specific IAM inventory with the verified API ID. Review all 37 JSON documents, including the 26 permanent managed policies and two temporary create-only CloudFront bootstrap policies.
+6. Present the exact API creation and IAM/state-bucket bootstrap resource/action plan for approval. API creation, IAM bootstrap, remote backend initialization, Terraform plan and Terraform apply are separate approvals. Never infer one approval from another.
 
 ## 3. Local reproducibility gate
 
@@ -69,18 +70,35 @@ The CI toolchain is pinned to Ubuntu 26.04, Python 3.12.16, Terraform 1.10.5 and
 After local access is intentionally connected, use the profile explicitly selected by the owner:
 
 ```bash
-aws sts get-caller-identity --profile default
+aws sts get-caller-identity --profile <approved-profile>
 bash scripts/aws_preflight_readonly.sh
-python scripts/render_bootstrap_inventory.py --suffix <owner-approved-suffix> --profile default
+
+# Dry-run only: no API is created.
+bash scripts/bootstrap_api_gateway.sh \
+  --env dev \
+  --account-id <verified-account-id> \
+  --profile <approved-profile>
 ```
 
-The preflight and renderer are read-only with respect to AWS. The renderer's S3 HeadBucket check is a point-in-time observation, not a bucket reservation. Inspect the complete output before any bootstrap action.
+The preflight and the bootstrap script's default mode are read-only. The renderer's S3 HeadBucket check is a point-in-time observation, not a bucket reservation. If an API with the expected name already exists, stop and verify its owner, tags and configuration; do not create a duplicate.
 
 ## 5. Bootstrap and backend initialization
 
-After separate explicit approval of the exact bootstrap plan, create only the approved missing resources and verify them read-only. The expected inventory is one state bucket, one OIDC provider if absent, two runtime boundaries, six plan/apply roles and their 26 managed policy attachments. Do not duplicate compatible existing resources.
+1. Review the API bootstrap dry-run. Obtain explicit approval for that exact API name, account, region and environment.
+2. Only after approval, rerun `scripts/bootstrap_api_gateway.sh` with `--apply`. Record the returned 10-character API ID and set it as `API_ID` in the matching GitHub environment. The dev and prod IDs must be distinct.
+3. Render the IAM inventory:
 
-Only after a separate backend-initialization approval should the remote backend be initialized. The workflow provides the state bucket, canonical region, encryption and native lockfile configuration. Never run an unreviewed `terraform apply`.
+   ```bash
+   python scripts/render_bootstrap_inventory.py \
+     --suffix <owner-approved-suffix> \
+     --api-id <environment-api-id> \
+     --profile <approved-profile>
+   ```
+
+   The renderer performs STS GetCallerIdentity and S3 HeadBucket only. It does not create AWS resources, initialize Terraform state or run a plan/apply. Review every rendered policy, confirm API Gateway paths contain only the exact API ID, and verify the CloudFront bootstrap policies contain Create actions only.
+4. After separate approval of the exact IAM/state-bucket bootstrap plan, create only approved missing resources and verify them read-only. The expected inventory is one state bucket, one OIDC provider if absent, two runtime boundaries, six plan/apply roles, 26 permanent managed policies and two temporary CloudFront create-only policies. Do not duplicate compatible existing resources.
+5. Attach the matching temporary CloudFront bootstrap policy only for the first approved environment deployment. It cannot update or delete existing CloudFront policy resources. Detach it immediately after the OAC/cache/origin-request/response-header policies are created. Future changes require a separately reviewed, time-bounded policy scoped to exact resource IDs.
+6. Only after a separate backend-initialization approval should the remote backend be initialized. The workflow provides the state bucket, canonical region, encryption and native lockfile configuration. Never run an unreviewed `terraform apply`.
 
 ## 6. Plan and apply procedure
 
