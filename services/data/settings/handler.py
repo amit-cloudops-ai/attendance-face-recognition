@@ -155,6 +155,7 @@ def lambda_handler(event, context):
                     for reason in exc.response.get("CancellationReasons", [])
                 )
             ):
+                _reset_cache()
                 return error(409, "settings_changed", "Settings changed concurrently. Reload and retry the update.")
             raise
         _reset_cache()
