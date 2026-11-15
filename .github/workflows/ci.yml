@@ -806,7 +806,7 @@ jobs:
               for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
                   if "uses:" not in line:
                       continue
-                  match = re.search(r"uses:\\s*[^@\\s]+@([0-9a-f]{40})(?:\\s+#\\s*.+)?$", line.strip())
+                  match = re.search(r"uses:\s*[^@\s]+@([0-9a-f]{40})(?:\s+#\s*.+)?$", line.strip())
                   if not match:
                       raise SystemExit(f"{path}:{number}: action must be pinned to a full 40-character commit SHA")
 
