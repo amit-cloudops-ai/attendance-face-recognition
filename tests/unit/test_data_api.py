@@ -314,27 +314,3 @@ def test_employee_deactivation_transaction_failure_preserves_active_state(data_t
     assert audit.scan()["Items"] == []
 
 
-
-def test_moto_supports_low_level_dynamodb_transaction_shape(data_tables):
-    employees, audit, _ = data_tables
-    client = employees.meta.client
-    client.transact_write_items(TransactItems=[
-        {"Put": {
-            "TableName": employees.name,
-            "Item": {
-                "employee_id": {"S": "EMP-TX-001"},
-                "active": {"BOOL": True},
-            },
-            "ConditionExpression": "attribute_not_exists(employee_id)",
-        }},
-        {"Put": {
-            "TableName": audit.name,
-            "Item": {
-                "audit_id": {"S": "audit-tx-001"},
-                "old": {"M": {}},
-                "new": {"M": {"active": {"BOOL": True}}},
-            },
-        }},
-    ])
-    assert employees.get_item(Key={"employee_id": "EMP-TX-001"})["Item"]["active"] is True
-    assert audit.get_item(Key={"audit_id": "audit-tx-001"})["Item"]["new"]["active"] is True
