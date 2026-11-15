@@ -135,13 +135,18 @@ locals {
         Resource = [var.tables.attendance.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem", "dynamodb:TransactWriteItems"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem"]
         Resource = [
           var.tables.employees.arn,
           var.tables.config.arn,
           var.tables.scan_results.arn
         ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:TransactWriteItems"]
+        Resource = [var.tables.employees.arn]
       },
       {
         Effect   = "Allow"
