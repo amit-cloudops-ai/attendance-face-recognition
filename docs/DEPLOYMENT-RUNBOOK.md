@@ -2,9 +2,31 @@
 
 **Status:** repository instructions only. This runbook does not authorize AWS writes, remote backend initialization, Terraform planning or applying.
 
+## Live AWS bootstrap snapshot — 15 November 2026
+
+This snapshot records verified state from the owner's WSL session. It supersedes generic placeholders and earlier pre-bootstrap assumptions below.
+
+| Item | Current verified value |
+|---|---|
+| AWS CLI profile | `default` (available profiles: `default`, `pdp`; no `Amit-admin` profile exists in WSL) |
+| STS identity | `arn:aws:iam::924422830139:user/Amit-admin` |
+| AWS account / region | `924422830139` / `us-east-1` |
+| Lambda concurrency | Account quota 10; unreserved 10; no functions existed at initial account check |
+| Dev API Gateway | Existing `attendance-dev-http-api`, ID `7nii6lm2z2`; tags match; no stages/routes/integrations |
+| GitHub OIDC provider | `NoSuchEntity`; optional for local first dev deployment |
+| GitHub deployment roles | Six expected roles returned `NoSuchEntity`; optional for local first dev deployment |
+| Dev execution boundary | No matching local managed policy returned by `iam list-policies --scope Local` |
+| Dev boundary validation | IAM Access Analyzer `validate-policy` returned `findings: []` for rendered JSON |
+| State bucket candidate | `attendance-tf-state-924422830139-amit-2026-1115`; initial `HeadBucket` returned 404; recheck before create |
+| Local rendered inventory | `.local/bootstrap-rendered/`; 37 JSON documents; ignored local output, do not commit |
+| Preflight compatibility | Repository preflight now uses `python3` |
+
+No IAM policy or S3 bucket has been created by this bootstrap sequence. No remote backend initialization, Terraform plan or apply has been run. The existing API was discovered and verified; this sequence did not create it. The first dev deployment uses the local AWS CLI path; OIDC roles/environments and the 37-document CI/CD IAM inventory are optional later work.
+
+
 ## 1. Solo local dev bootstrap (owner-operated path)
 
-**Recommended for the first development deployment.** This path uses the existing AWS account through the local AWS CLI profile `Amit-admin`. It does not require the OIDC provider, six deployment roles, six GitHub environments, or promotion to `develop`. It is a dev-only path; production remains separately gated.
+**Recommended for the first development deployment.** This path uses the existing AWS account through the local AWS CLI profile `default`. It does not require the OIDC provider, six deployment roles, six GitHub environments, or promotion to `develop`. It is a dev-only path; production remains separately gated.
 
 Target account: `924422830139`
 Target region: `us-east-1`
@@ -19,25 +41,28 @@ All steps below are instructions for the repository owner. They are not executed
 1. **Read-only identity and account preflight.** Confirm that the selected profile resolves to the expected account, then inspect existing resources. This step must not create or modify anything:
 
    ```bash
-   AWS_PROFILE=Amit-admin aws sts get-caller-identity --region us-east-1
-   AWS_PROFILE=Amit-admin bash scripts/aws_preflight_readonly.sh
+   AWS_PROFILE=default aws sts get-caller-identity --region us-east-1
+   AWS_PROFILE=default bash scripts/aws_preflight_readonly.sh
    ```
 
    Stop unless the returned account is `924422830139` and the region is `us-east-1`. Treat AccessDenied as unknown, not as proof that a resource is absent. Record existing OIDC, boundary, role and state-bucket resources so that none are duplicated. For this solo local path, the OIDC provider and six GitHub deployment roles may legitimately be absent; do not create them as part of the first dev bootstrap.
 
-2. **Create the dev API Gateway HTTP API.** First run the script in its default dry-run mode and inspect the exact account, region and API name. Only after approving that one API creation, run the second command:
+2. **Adopt the verified dev API Gateway HTTP API (already exists; do not create another).**
 
-   ```bash
-   bash scripts/bootstrap_api_gateway.sh --env dev --account-id 924422830139 --profile Amit-admin
-   bash scripts/bootstrap_api_gateway.sh --env dev --account-id 924422830139 --profile Amit-admin --apply
-   ```
+   Live read-only verification on 15 November 2026 confirmed:
+   - API ID: `7nii6lm2z2`
+   - Name/protocol: `attendance-dev-http-api` / HTTP
+   - Region/account: `us-east-1` / `924422830139`
+   - Tags: `Project=attendance`, `Environment=dev`, `Component=access`
+   - Stages, routes and integrations: all empty
+   - Endpoint: `https://7nii6lm2z2.execute-api.us-east-1.amazonaws.com`
 
-   Record the returned 10-character `API_ID`. If the script reports that the API already exists, stop and verify its owner, tags and configuration; do not create a duplicate. The Terraform root has an import block for this pre-created API.
+   The bootstrap script's dry-run found this existing API and its `--apply` invocation correctly failed closed without creating a duplicate. Set `api_id = "7nii6lm2z2"` in the local dev `terraform.tfvars`; the dev Terraform root has an import block for this API. No further API creation is required for dev.
 
 3. **Create the dev Lambda execution permissions boundary.** Render the account-specific JSON locally from the tracked template and validate it before using the IAM Console:
 
    ```bash
-   python - <<'PY'
+   python3 - <<'PY'
    from pathlib import Path
 
    template = Path("infra/policies/execution-role-boundary-dev.json.tftpl")
@@ -48,12 +73,12 @@ All steps below are instructions for the repository owner. They are not executed
    output.write_text(rendered + "\n", encoding="utf-8")
    print(output)
    PY
-   python -m json.tool /tmp/attendance-dev-execution-boundary.json >/dev/null
+   python3 -m json.tool /tmp/attendance-dev-execution-boundary.json >/dev/null
    ```
 
    In AWS Console, open **IAM → Policies → Create policy → JSON**, paste the rendered JSON, and create a customer-managed policy named exactly `attendance-dev-execution-boundary`. Verify its ARN is `arn:aws:iam::924422830139:policy/attendance-dev-execution-boundary`. Do not attach this boundary to the deployment user; Terraform attaches it to the application execution roles.
 
-4. **Create the Terraform state bucket.** Choose a globally unique suffix and create `attendance-tf-state-924422830139-<suffix>` in `us-east-1`. Follow every control in [STATE-BUCKET-BOOTSTRAP.md](STATE-BUCKET-BOOTSTRAP.md): BucketOwnerEnforced object ownership, all four S3 Block Public Access settings, versioning enabled, default SSE-S3 encryption, and a bucket policy denying all non-TLS requests. Do not enable Object Lock or automatic state-version expiration. Verify the final bucket name and settings before continuing.
+4. **Create the Terraform state bucket.** The selected candidate is `attendance-tf-state-924422830139-amit-2026-1115`. The renderer's initial read-only `HeadBucket` check returned 404 on 15 November 2026; this is only a point-in-time absence signal, not a reservation. Recheck immediately before creation. Create this exact bucket in `us-east-1` only after reviewing and approving the bootstrap operation. Follow every control in [STATE-BUCKET-BOOTSTRAP.md](STATE-BUCKET-BOOTSTRAP.md): BucketOwnerEnforced object ownership, all four S3 Block Public Access settings, versioning enabled, default SSE-S3 encryption, and a bucket policy denying all non-TLS requests. Do not enable Object Lock or automatic state-version expiration. Verify the final bucket name and settings before continuing.
 
 5. **Write the local backend configuration.** Copy the example and replace its bucket value with the exact bucket name created in step 4:
 
@@ -61,7 +86,7 @@ All steps below are instructions for the repository owner. They are not executed
    cp infra/envs/dev/backend.hcl.example infra/envs/dev/backend.hcl
    ```
 
-   The file must contain the final bucket name, `encrypt = true` and `use_lockfile = true`. Confirm it is ignored by Git:
+   The file must contain `bucket = "attendance-tf-state-924422830139-amit-2026-1115"`, `encrypt = true` and `use_lockfile = true`. The checked-in example uses a placeholder; replace it locally with the exact approved bucket name. Confirm it is ignored by Git:
 
    ```bash
    git check-ignore -v infra/envs/dev/backend.hcl
@@ -71,7 +96,7 @@ All steps below are instructions for the repository owner. They are not executed
 
 6. **Check Lambda concurrency, then initialize, plan and apply locally.** Before Terraform apply, open **AWS Console → Lambda → us-east-1 → Dashboard → Account-level concurrency**. The current defaults reserve 19 executions (recognize 10, enroll 5, failure 2, daily 1, weekly 1), and AWS must retain at least 10 unreserved executions. Therefore the account quota must be at least 29 to keep all defaults. If it is lower, set one or more values in `lambda_reserved_concurrency` in the local `terraform.tfvars` to `null` (all five may be `null` on a new account), or request a quota increase and wait for approval. Do not discover this limitation during apply.
 
-   Copy the dev example, then set the real API ID and alert email. Keep the boundary ARN and account ID exact:
+   Copy the dev example, then set `api_id = "7nii6lm2z2"` and your real alert email. Keep the boundary ARN and account ID exact. The verified account Lambda concurrency quota is 10 with 10 unreserved executions; therefore set all five initial dev `lambda_reserved_concurrency` values to `null` to avoid reserving the default 19 executions and violating the 10-unreserved-execution margin:
 
    ```bash
    cp infra/envs/dev/terraform.tfvars.example infra/envs/dev/terraform.tfvars
@@ -80,16 +105,16 @@ All steps below are instructions for the repository owner. They are not executed
    Run locally as the approved IAM user through the repository wrapper. The wrapper enforces the canonical region:
 
    ```bash
-   AWS_PROFILE=Amit-admin aws sts get-caller-identity --region us-east-1
-   AWS_PROFILE=Amit-admin bash scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-config=backend.hcl
-   AWS_PROFILE=Amit-admin bash scripts/terraform.sh -chdir=infra/envs/dev validate
-   AWS_PROFILE=Amit-admin bash scripts/terraform.sh -chdir=infra/envs/dev plan -input=false -var-file=terraform.tfvars -out=/tmp/attendance-dev-first.tfplan
+   AWS_PROFILE=default aws sts get-caller-identity --region us-east-1
+   AWS_PROFILE=default bash scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-config=backend.hcl
+   AWS_PROFILE=default bash scripts/terraform.sh -chdir=infra/envs/dev validate
+   AWS_PROFILE=default bash scripts/terraform.sh -chdir=infra/envs/dev plan -input=false -var-file=terraform.tfvars -out=/tmp/attendance-dev-first.tfplan
    ```
 
    Inspect the complete plan, especially IAM role/boundary attachments, S3 policies, KMS, Cognito, Lambda concurrency, API import and any replacement/deletion. If anything is unexpected, stop. Only after you explicitly approve that exact saved plan, apply it:
 
    ```bash
-   AWS_PROFILE=Amit-admin bash scripts/terraform.sh -chdir=infra/envs/dev apply /tmp/attendance-dev-first.tfplan
+   AWS_PROFILE=default bash scripts/terraform.sh -chdir=infra/envs/dev apply /tmp/attendance-dev-first.tfplan
    ```
 
    Do not use `-auto-approve`. The first apply creates the dev stack and imports the API created in step 2. The deployed Cognito login and browser-to-S3 upload flow are not ready until step 7.
@@ -97,7 +122,7 @@ All steps below are instructions for the repository owner. They are not executed
 7. **Perform the required second apply for the CloudFront origin.** Read the exact CloudFront URL from Terraform output:
 
    ```bash
-   AWS_PROFILE=Amit-admin bash scripts/terraform.sh -chdir=infra/envs/dev output -raw site_url
+   AWS_PROFILE=default bash scripts/terraform.sh -chdir=infra/envs/dev output -raw site_url
    ```
 
    Add that exact HTTPS origin to all three values in the local `terraform.tfvars`, preserving localhost entries if they are still useful for local browser testing:
@@ -108,13 +133,13 @@ All steps below are instructions for the repository owner. They are not executed
    Then create and inspect a fresh second plan and apply only that saved plan:
 
    ```bash
-   AWS_PROFILE=Amit-admin bash scripts/terraform.sh -chdir=infra/envs/dev plan -input=false -var-file=terraform.tfvars -out=/tmp/attendance-dev-cloudfront-url.tfplan
+   AWS_PROFILE=default bash scripts/terraform.sh -chdir=infra/envs/dev plan -input=false -var-file=terraform.tfvars -out=/tmp/attendance-dev-cloudfront-url.tfplan
    ```
 
    After reviewing and approving the second plan:
 
    ```bash
-   AWS_PROFILE=Amit-admin bash scripts/terraform.sh -chdir=infra/envs/dev apply /tmp/attendance-dev-cloudfront-url.tfplan
+   AWS_PROFILE=default bash scripts/terraform.sh -chdir=infra/envs/dev apply /tmp/attendance-dev-cloudfront-url.tfplan
    ```
 
    This second apply is required for Cognito Hosted UI redirects and browser-to-S3 presigned uploads from the deployed CloudFront origin. Do not skip it.
@@ -222,7 +247,7 @@ The preflight and the bootstrap script's default mode are read-only. The rendere
 3. Render the IAM inventory:
 
    ```bash
-   python scripts/render_bootstrap_inventory.py \
+   python3 scripts/render_bootstrap_inventory.py \
      --suffix <owner-approved-suffix> \
      --api-id <environment-api-id> \
      --profile <approved-profile>
