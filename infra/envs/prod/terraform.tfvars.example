@@ -10,12 +10,12 @@ callback_urls   = ["http://localhost:8000/callback.html"]
 logout_urls     = ["http://localhost:8000/"]
 allowed_origins = ["http://localhost:8000"]
 
-# Defaults reserve 19 concurrent executions across five Lambda functions.
-# Set individual values to null if the account quota cannot support reservations.
+# The target account currently has a concurrency quota of 10.
+# Keep reservations unset until AWS approves a higher quota and production capacity is sized.
 lambda_reserved_concurrency = {
-  recognize = 10
-  enroll    = 5
-  failure   = 2
-  daily     = 1
-  weekly    = 1
+  recognize = null
+  enroll    = null
+  failure   = null
+  daily     = null
+  weekly    = null
 }
