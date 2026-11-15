@@ -116,6 +116,27 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: attendance-${{ inputs.environment }}-${{ github.run_id }}
 
+      - name: Verify assumed AWS account and state-bucket scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_role_prefix="arn:aws:iam::${TF_VAR_account_id}:role/"
+          expected_bucket_prefix="attendance-tf-state-${TF_VAR_account_id}-"
+          if [[ "${AWS_ROLE_ARN}" != "${expected_role_prefix}"* ]]; then
+            echo "Configured deployment role ARN does not belong to TF_VAR_account_id."
+            exit 1
+          fi
+          if [[ "${TF_STATE_BUCKET}" != "${expected_bucket_prefix}"* ]]; then
+            echo "Terraform state bucket does not match the configured AWS account."
+            exit 1
+          fi
+          actual_account="$(aws sts get-caller-identity --query Account --output text)"
+          if [[ "${actual_account}" != "${TF_VAR_account_id}" ]]; then
+            echo "OIDC role resolved to AWS account ${actual_account}, expected ${TF_VAR_account_id}."
+            exit 1
+          fi
+          echo "Verified deployment account ${actual_account} in ${AWS_REGION}."
+
       - name: Initialize remote state
         run: |
           terraform -chdir="$TF_ROOT" init -input=false -lockfile=readonly \
