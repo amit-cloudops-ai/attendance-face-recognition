@@ -43,8 +43,13 @@ def _guarded_transaction(employees, attendance, employee_id: str, action: dict) 
         return True
     except ClientError as exc:
         if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
-            import logging
-            logging.getLogger(__name__).error("Attendance transaction canceled: %r", exc.response)
+            reasons = exc.response.get("CancellationReasons") or []
+            codes = {reason.get("Code") for reason in reasons}
+            retryable = bool(codes) and codes <= {
+                "None", "ConditionalCheckFailed", "TransactionConflict", "TransactionInProgress"
+            } and bool(codes - {"None"})
+            if not retryable:
+                raise
             latest = employees.get_item(Key={"employee_id": employee_id}, ConsistentRead=True).get("Item")
             if not latest:
                 raise ValueError(f"employee {employee_id} does not exist")
@@ -251,14 +256,15 @@ def record_scan(
             if request_id is None:
                 return outcome
             try:
-                attendance.update_item(
-                    Key={"employee_id": employee_id, "date": business_date},
-                    UpdateExpression="SET #events.#request=:outcome",
-                    ConditionExpression="attribute_not_exists(#events.#request)",
-                    ExpressionAttributeNames={"#events": "scan_events", "#request": request_id},
-                    ExpressionAttributeValues={":outcome": outcome},
-                )
-                return outcome
+                if _guarded_update(employees, attendance, employee_id, {
+                    "Key": {"employee_id": employee_id, "date": business_date},
+                    "UpdateExpression": "SET #events.#request=:outcome",
+                    "ConditionExpression": "attribute_not_exists(#events.#request)",
+                    "ExpressionAttributeNames": {"#events": "scan_events", "#request": request_id},
+                    "ExpressionAttributeValues": {":outcome": outcome},
+                }):
+                    return outcome
+                continue
             except ClientError as exc:
                 if _conditional_failure(exc):
                     continue
