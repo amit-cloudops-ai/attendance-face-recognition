@@ -67,6 +67,11 @@ def _validate_updates(body: dict) -> dict:
     return validated
 
 
+def _ddb_item(item: dict) -> dict:
+    serializer = TypeSerializer()
+    return {key: serializer.serialize(value) for key, value in item.items()}
+
+
 def lambda_handler(event, context):
     event = event or {}
     denied = require_group(event, "admin")
@@ -109,8 +114,6 @@ def lambda_handler(event, context):
             "reason": "Attendance settings updated by administrator.",
             "at": now,
         }
-        serializer = TypeSerializer()
-        marshal = lambda value: {key: serializer.serialize(entry) for key, entry in value.items()}
         if stored and "updated_at" in stored:
             condition = "attribute_exists(pk) AND updated_at=:old_updated"
             condition_values = {":old_updated": serializer.serialize(stored["updated_at"])}
@@ -122,7 +125,7 @@ def lambda_handler(event, context):
             condition_values = None
         put_config = {
             "TableName": config.name,
-            "Item": marshal(config_item),
+            "Item": _ddb_item(config_item),
             "ConditionExpression": condition,
         }
         if condition_values:
@@ -130,7 +133,7 @@ def lambda_handler(event, context):
         try:
             config.meta.client.transact_write_items(TransactItems=[
                 {"Put": put_config},
-                {"Put": {"TableName": audit.name, "Item": marshal(audit_item)}},
+                {"Put": {"TableName": audit.name, "Item": _ddb_item(audit_item)}},
             ])
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
