@@ -295,7 +295,7 @@ def test_override_clockout_removes_stale_missing_clockout_flag(admin_resources):
         "employee_id": "EMP001", "date": "2026-11-13",
         "status": "present", "source": "face",
         "clock_in": "2026-11-13T09:00:00+05:30",
-        "flags": {"missing_clock_out", "manual_review"},
+        "flags": {"missing_clock_out"},
         "updated_at": "2026-11-13T23:59:00+05:30",
     })
     response = override_handler.lambda_handler(admin_event({
@@ -306,4 +306,4 @@ def test_override_clockout_removes_stale_missing_clockout_flag(admin_resources):
     }), None)
     item = attendance.get_item(Key={"employee_id": "EMP001", "date": "2026-11-13"})["Item"]
     assert response["statusCode"] == 200
-    assert item["flags"] == {"manual_review"}
+    assert "flags" not in item
