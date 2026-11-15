@@ -104,7 +104,9 @@ def test_employee_create_persists_consent_and_audits(data_tables):
     assert item["active"] is True
     assert item["consent_at"].endswith("+05:30")
     assert item["photo_count"] == 0
+    assert item["has_face_templates"] is False
     assert "face_ids" not in item
+    assert item["has_face_templates"] is True
     audit_item = audit.scan()["Items"][0]
     assert audit_item["action"] == "employee_create"
     assert audit_item["actor"] == "hr-admin"
