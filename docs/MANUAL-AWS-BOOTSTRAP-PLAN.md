@@ -4,7 +4,7 @@
 
 ## Target account and region
 
-- AWS account: existing owner account; exact 12-digit account ID must be confirmed from the authenticated AWS identity before any mutation.
+- AWS account: owner-provided target `924422830139`; verify the authenticated STS identity matches this exact 12-digit ID before any mutation.
 - Region: `us-east-1`, sourced from `config/deployment.json`. Do not configure a second region value in local backend files or GitHub variables.
 - Repository: amit-cloudops-ai/attendance-face-recognition.
 - GitHub OIDC issuer: https://token.actions.githubusercontent.com.
@@ -39,7 +39,7 @@ The policy set counts are:
 - Temporary CloudFront bootstrap: one create-only policy for dev and one for prod (2 temporary managed policies; attach only for the first approved deployment and detach immediately after creation).
 - Runtime boundaries: one dev and one prod managed policy.
 
-Total: 28 managed policy documents (26 permanent plus 2 temporary create-only CloudFront bootstrap policies), plus the two runtime permissions-boundary policies.
+Total: 28 managed policy documents (26 permanent plus 2 temporary create-only CloudFront bootstrap policies), plus the two runtime permissions-boundary policies, six OIDC trust-policy documents and one generated TLS-only state-bucket policy. That is 37 policy documents in the full pipeline bootstrap inventory.
 
 Each policy template has CI checks for JSON validity, 6,144-character size, environment isolation and the service-specific constraints documented in infra/policies/README.md.
 
@@ -81,11 +81,11 @@ Every trust policy requires aud=sts.amazonaws.com and exact sub equality. Attach
 
 ### 6. GitHub environment configuration
 
-Complete docs/GITHUB-ENVIRONMENT-SETUP.md. Configure environment-scoped AWS_ROLE_ARN variables, account/bucket/boundary/configuration variables, plan age recipients and apply-only private age identity secrets. Enforce branch restrictions and independent apply reviewers. Verify actual settings before continuing.
+This step is for the optional OIDC/GitHub Actions pipeline, not the first solo local dev deployment. Complete docs/GITHUB-ENVIRONMENT-SETUP.md. Configure environment-scoped AWS_ROLE_ARN variables, account/bucket/boundary/configuration variables, plan age recipients and apply-only private age identity secrets. Enforce exact branch restrictions. The agreed solo-owner model uses zero mandatory external approvals and allows owner self-review; add independent reviewers only if another trusted operator joins. Verify actual settings before enabling the pipeline.
 
-### 7. First dev deployment
+### 7. First dev deployment through the OIDC pipeline
 
-Only after the bootstrap and GitHub environment configuration are confirmed:
+For the recommended first dev deployment, use the solo local bootstrap path in docs/DEPLOYMENT-RUNBOOK.md; it does not require the OIDC provider, six deployment roles or GitHub environments. Use this pipeline procedure only after the optional OIDC bootstrap and GitHub environment configuration are confirmed:
 1. Run the dev-plan workflow on develop.
 2. Review the encrypted plan artifact and its resource/action inventory.
 3. Present the exact Terraform plan and cost/resource changes to the owner.
@@ -121,7 +121,7 @@ Before performing any bootstrap write, present to the owner:
 3. Whether the OIDC provider already exists.
 4. Exact IAM resource inventory (one OIDC provider if absent, two boundaries, six roles, 26 permanent managed policies and two temporary create-only CloudFront bootstrap policies).
 5. Fully rendered trust policies, boundaries and all role policy documents.
-6. Exact GitHub environment names, variables, secrets and branch/reviewer controls.
+6. Exact GitHub environment names, variables, secrets and branch restrictions; owner self-review is allowed and no independent reviewer is mandatory.
 7. Planned first Terraform backend init and dev plan scope.
 
 No action may proceed from this plan until the owner explicitly approves the presented resource inventory and permissions. AWS resource creation and Terraform plan/apply remain separate approvals.
