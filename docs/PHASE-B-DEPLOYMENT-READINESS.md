@@ -6,7 +6,7 @@
 
 ## Verified deployment baseline
 
-- Target AWS account: the owner's existing account; exact 12-digit account ID remains unverified.
+- Target AWS account ID provided by the owner: `924422830139`; the authenticated STS identity still must be verified before any AWS mutation.
 - Canonical deployment region: `us-east-1`, declared only in `config/deployment.json`.
 - Dev, prod and billing state keys are isolated: `attendance/dev/terraform.tfstate`, `attendance/prod/terraform.tfstate`, `attendance/billing/terraform.tfstate`.
 - Terraform S3 native lock files are enabled (`use_lockfile = true`); Terraform is pinned to 1.10.5 in CI.
@@ -29,7 +29,7 @@ The task chain T01–T15, T17 and T31–T38 has implementation/documentation and
 - Terraform policy-template validation and provider lockfiles.
 - Scheduler trust hardening, CloudFront KMS scope, DynamoDB KMS ViaService access and isolated billing roles.
 
-T16 and T18 remain blocked on actions that cannot be completed by repository code changes alone. The application baseline and original region guard are on `solo/amit-monday`; the access-module/KMS follow-up is isolated in PR #33 until combined CI passes.
+T16 and T18 remain owner/admin tasks for the optional OIDC/GitHub Actions pipeline. The first dev deployment can use the solo local bootstrap in `docs/DEPLOYMENT-RUNBOOK.md`; it does not require the OIDC provider, six deployment roles, six GitHub environments or promotion to `develop`. The access-module/KMS follow-up and readiness fixes are isolated in PR #34 targeting `release/aws-readiness-candidate`.
 
 ## Security design requirements
 
@@ -39,7 +39,7 @@ T16 and T18 remain blocked on actions that cannot be completed by repository cod
 4. `iam:PassRole` must be limited to exact application execution-role ARNs and the correct service principal.
 5. Every Terraform-created Lambda and Scheduler role must receive the exact pre-created environment permissions boundary. Apply roles may attach the boundary but must not edit/delete its policy or create an unbounded role.
 6. The public repository must not upload cleartext Terraform plans. Plans are encrypted with environment-specific age recipients; private identities exist only as matching apply-environment secrets.
-7. GitHub environments must enforce exact branch restrictions and independent reviewer approval for apply operations.
+7. GitHub environments must enforce exact branch restrictions. The agreed solo-owner model has zero mandatory external approvals and allows owner self-review; independent reviewers can be added if another trusted operator joins.
 8. Billing actions remain isolated to the billing role pair. In particular, account-level `aws-portal:ModifyBilling` must never be attached to dev/prod roles.
 9. No AWS write, role assumption, backend initialization, plan or apply may occur before the corresponding owner approval.
 
@@ -47,13 +47,13 @@ T16 and T18 remain blocked on actions that cannot be completed by repository cod
 
 ### T16 — GitHub environment configuration
 
-Create and verify six exact environments: `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan`, `billing-apply`. Configure environment-scoped `AWS_ROLE_ARN`, account/state bucket values, separate age recipients and apply-only private age identity secrets. Restrict dev environments to `develop`; restrict prod and billing to `main`. Apply environments require an independent reviewer and self-review prevention.
+For the optional OIDC pipeline, create and verify six exact environments: `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan`, `billing-apply`. Configure environment-scoped `AWS_ROLE_ARN`, account/state bucket values, separate age recipients and apply-only private age identity secrets. Restrict dev environments to `develop`; restrict prod and billing to `main`. In the solo-owner phase, require zero external approvals and allow owner self-review. This step is not needed for the first local dev deployment.
 
-The current GitHub connection cannot inspect or configure environment settings/secrets or branch protection. This remains an explicit repository-admin task.
+The current GitHub connection cannot inspect or configure environment settings/secrets or branch protection. These settings remain an explicit repository-admin task for the optional pipeline path.
 
 ### T18 — exact account-specific bootstrap plan
 
-The policy templates and manual bootstrap inventory are prepared, but the account ID, final globally unique bucket name and current AWS resource inventory are not verified. The plan must be rendered against the authenticated account and checked for existing providers, buckets, roles, policies and boundaries before any create operation is proposed.
+The policy templates and manual bootstrap inventory are prepared. The target account ID `924422830139` was provided by the owner but must be confirmed against STS; the final globally unique bucket name and current AWS resource inventory are not verified. The local dev path uses the runbook's smaller bootstrap sequence and does not require OIDC roles or GitHub environments. The plan must be rendered against the authenticated account and checked for existing providers, buckets, roles, policies and boundaries before any create operation is proposed.
 
 ## Manual bootstrap inventory — proposal only
 
@@ -63,12 +63,12 @@ The policy templates and manual bootstrap inventory are prepared, but the accoun
 | IAM OIDC provider | 1 | `token.actions.githubusercontent.com`; reuse if present |
 | Runtime permissions boundaries | 2 | `attendance-dev-execution-boundary`, `attendance-prod-execution-boundary` |
 | GitHub plan/apply roles | 6 | dev-plan, dev-apply, prod-plan, prod-apply, billing-plan, billing-apply |
-| Managed policy templates | 26 | 22 dev/prod plan/apply policies + 4 billing policies |
+| Managed policy templates | 28 | 22 dev/prod plan/apply policies + 4 billing policies + 2 temporary CloudFront bootstrap policies |
 | GitHub environments | 6 | Exact names listed under T16 |
 
 The bucket must be in `us-east-1`, with all four S3 Block Public Access settings enabled, versioning, SSE-S3 default encryption, BucketOwnerEnforced ownership and a TLS-only deny policy. It must not have Object Lock or automatic state expiration.
 
-The role/policy inventory, exact trust documents, rendered policy JSON and bucket policy are documented in `docs/MANUAL-AWS-BOOTSTRAP-PLAN.md`, `docs/STATE-BUCKET-BOOTSTRAP.md` and `infra/policies/`. These remain templates until the account ID is verified and the owner approves the exact inventory.
+The pipeline inventory comprises 28 managed policy documents, 2 runtime boundaries, 6 OIDC trust documents and 1 generated TLS-only bucket policy (37 policy documents total). The role/policy inventory, exact trust documents, rendered policy JSON and bucket policy are documented in `docs/MANUAL-AWS-BOOTSTRAP-PLAN.md`, `docs/STATE-BUCKET-BOOTSTRAP.md` and `infra/policies/`. These remain templates until the account ID is verified and the owner approves the exact inventory.
 
 ## Read-only account verification before bootstrap
 
@@ -78,15 +78,16 @@ The repository contains no verified account ID or live AWS inventory yet. A repo
 
 ## Deployment sequence after gates are satisfied
 
+For the first dev deployment, follow `docs/DEPLOYMENT-RUNBOOK.md#1-solo-local-dev-bootstrap-owner-operated-path`; T16/OIDC setup is not required. For the later OIDC pipeline path only:
 1. Complete T16 GitHub environment and branch-protection configuration.
-2. Verify the AWS account ID and run the read-only inventory described above.
+2. Verify the AWS account ID against STS and run the read-only inventory described above.
 3. Choose the globally unique state bucket suffix and render the exact bootstrap resource/policy inventory.
 4. Present the full bootstrap plan to the owner and obtain explicit approval for the listed AWS mutations.
-5. Bootstrap only the approved state bucket/OIDC provider/permissions boundaries/roles/policies; reuse existing compatible resources rather than duplicating them.
+5. Bootstrap only the approved OIDC provider/roles/policies; reuse existing compatible resources rather than duplicating them.
 6. Verify every created/attached resource using read-only calls and record the exact ARNs.
 7. Initialize the dev backend and generate a dev plan only after separate approval. Review the complete plan, cost and resource actions with the owner; obtain explicit apply approval before applying that exact saved plan.
 8. Complete dev authentication, upload/recognition, attendance, reports, alarms, privacy, deletion, latency and browser acceptance.
-9. Production and billing operations require their own exact plan review and separate approval. Production remains blocked until dev acceptance and an independent production review.
+9. Production and billing operations require their own exact plan review and separate approval. Production remains blocked until dev acceptance and separate owner approval under the solo-owner model.
 
 ## Safety boundary
 

@@ -2,14 +2,22 @@
 
 ## Executive status
 
-## AWS deployment-readiness release candidate — PR #33
+## AWS readiness follow-up — PR #34
 
-**Status: IN_PROGRESS — not yet AWS-ready.** The isolated branch `release/aws-readiness-candidate` integrates the pending T16 helper fix, T38 access/KMS correction and T18 bootstrap renderer, and adds API route contract and Moto-backed employee integration tests. It also adds an OIDC post-assumption account/state-bucket check and replaces obsolete deployment documentation with current runbooks.
+**Status: IMPLEMENTATION COMPLETE; FINAL CI GATE IN PROGRESS; NOT YET MERGED INTO THE RELEASE CANDIDATE.**
 
-The first combined CI attempt (run 43685191974) failed Ruff on the new integration test; the unused import and unnecessary noqa were removed. The next attempt (run 43685265242) failed while collecting the new contract test because its initial regex was malformed; it was replaced with a line-based parser and its route-key extraction corrected. **A fresh successful CI run on the final candidate head is still required.** Earlier green PR runs do not prove the integrated candidate.
+- Release candidate PR #33 currently has base branch `solo/amit-monday` and head branch `release/aws-readiness-candidate` (baseline head `008d78c`). Follow-up PR #34 is isolated on `fix/aws-readiness-bootstrap`, based on that release branch and targeting it. No changes were made to `main`, `develop` or teammate PR #2.
+- The follow-up corrects the current Ruff failure, fixes the employee API integration-test stubs, and fixes a real DynamoDB double-serialization defect in employee CRUD, attendance overrides, settings, face deletion and scan transactions.
+- Dev/prod Terraform examples now use the correct callback path, complete required variables and the owner-provided dev account ID `924422830139`. CI checks the callback path, API ID shape, boundary ARN, dev account ID and frontend `config.json` exclusion.
+- Lambda reserved concurrency is configurable per environment, retaining the current defaults (19 reserved executions) while allowing individual values to be `null` when account quota is insufficient.
+- The runbook now contains a solo local dev bootstrap path with exact order, account/region, state-bucket controls, first/second apply, SNS/Cognito steps and troubleshooting. The OIDC/GitHub Actions pipeline (T16/T18) is optional for the first dev deployment.
+- GitHub environment and branch-protection helpers/docs now use the agreed solo-owner model: zero mandatory external approvals and owner self-review allowed. No live GitHub environment settings have been changed or verified.
 
-No changes have been merged to `solo/amit-monday`, `develop` or `main`. No AWS resources, remote backend initialization, Terraform plan or apply have been performed.
+**CI evidence:** exact-head workflow run [43689281495](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43689281495) passed both jobs on commit `4f433c85e2804571d40651a6825f2d5e2ef06924`. Python: **137 passed in 18.30s**, zero skipped; Ruff, region consistency, frontend/Terraform contract checks, JavaScript/CSP, syntax checks for every `scripts/*.sh`, workflow YAML, IAM/security policy validation, encrypted-plan and bootstrap-plan checks all passed. Terraform formatting passed, and backend-free init/validate passed for recognition, data, foundation, access, dev, prod and billing. This follow-up status-only commit will trigger another exact-head CI run; the new run is linked from PR #34.
 
+**AWS boundary:** no AWS resource creation, IAM mutation, remote backend initialization, Terraform plan or apply has been performed. The owner-provided account ID `924422830139` has not been verified against STS in this session. IAM policy effectiveness, live Cognito/Rekognition behavior and deployed browser/camera performance remain unverified.
+
+**Next action:** complete the exact-head CI run, then review and merge PR #34 into `release/aws-readiness-candidate`. Only after that candidate is green should the owner begin the separately approved local dev bootstrap in `docs/DEPLOYMENT-RUNBOOK.md`.
 ## Application correctness release gate — 15 November 2026
 
 **Baseline status: PASS at code, unit-regression, static-analysis and Terraform-validation level on `solo/amit-monday`; this is not an AWS deployment-readiness pass.** No teammate branch or PR was merged.
@@ -30,13 +38,13 @@ The application audit and fixes completed on this branch include:
 **Important boundary:** this is not a claim that live AWS authorization, real Rekognition behavior, or physical-browser performance has been measured. The browser application passed repository-level JavaScript syntax/CSP checks and its UI state fixes have regression review; the deployed Cognito/API/camera browser matrix plus the 20-scan p95 latency acceptance test require the approved dev stack and remain Part 2 acceptance checks. No AWS resources have been provisioned, no remote backend initialized, and no Terraform plan or apply run. AWS writes remain separately approval-gated.
 
 
-The solo application and the T01–T38 deployment-security and region-guard task chain have been consolidated into `solo/amit-monday`. The T01–T15, T17 and T31–T37 implementation tasks are complete at the code/documentation level with historical CI evidence recorded in their task PRs. T16 and T18 remain blocked on repository-administrator and owner-controlled AWS-account information/actions.
+The solo application and the T01–T38 deployment-security and region-guard task chain have been consolidated into `solo/amit-monday`. The T01–T15, T17 and T31–T37 implementation tasks are complete at the code/documentation level with historical CI evidence recorded in their task PRs. T16 and T18 are optional owner/admin gates for the later OIDC pipeline; they do not block the solo local first dev deployment.
 
 The canonical region guard is established on `solo/amit-monday`: `config/deployment.json` is the single region manifest, Terraform roots and wrappers use it, Lambda clients use the Lambda-reserved `AWS_REGION`, and CI rejects conflicting region literals/endpoints. A follow-up review then found that `infra/modules/access` still duplicated the region in Cognito, JWT, CSP and S3 URL settings, and that DynamoDB KMS actions were incorrectly placed in an S3 bucket policy. PR #31 corrects both and passed its own CI run 43680111003 (118 Python tests and both jobs); those corrections are integrated into PR #33 and await combined CI.
 
 **No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
 
-Target region: `us-east-1`, sourced from `config/deployment.json`. Target account: the owner's existing AWS account; the exact 12-digit account ID has not been verified in this session.
+Target region: `us-east-1`, sourced from `config/deployment.json`. Target account ID provided by the owner: `924422830139`; the authenticated STS identity has not been verified in this session.
 
 ## Source of truth and branch discipline
 
@@ -81,11 +89,11 @@ No system can guarantee that a future contributor never writes an incorrect regi
 
 **Status: BLOCKED — repository administrator action required.**
 
-The required environments are `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan` and `billing-apply`. Each must have the correct environment-scoped `AWS_ROLE_ARN`, account/bucket values, plan-only age recipient, apply-only private age identity secret, branch restriction and independent apply reviewer.
+The required environments are `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan` and `billing-apply`. Each must have the correct environment-scoped `AWS_ROLE_ARN`, account/bucket values, plan-only age recipient, apply-only private age identity secret and branch restriction. The solo-owner model has zero mandatory external approvals and allows owner self-review.
 
-The GitHub connector cannot inspect or configure Actions environment secrets/protection settings, and branch-protection reads returned 403. Their actual existence and values remain unverified. The guarded helpers `scripts/configure_github_environments.sh` and `scripts/configure_branch_protection.sh` default to dry-run and require an explicit `--apply`. PR #30 corrected the environment helper and added dry-run tests, including rejection of the authenticated owner as the sole independent reviewer; its CI run 43680845938 passed 119 Python tests and both jobs. Neither helper has been executed against the live repository settings. Environment AWS variables/secrets remain unset until approved bootstrap.
+The GitHub connector cannot inspect or configure Actions environment secrets/protection settings, and branch-protection reads returned 403. Their actual existence and values remain unverified. The guarded helpers `scripts/configure_github_environments.sh` and `scripts/configure_branch_protection.sh` default to dry-run and require an explicit `--apply`. PR #34 aligns the helper and docs with the solo-owner model: no independent reviewer is required and self-review is allowed. Dry-run regression tests cover the six environments and zero-approval branch protection. Neither helper has been executed against the live repository settings. Environment AWS variables/secrets remain unset until approved bootstrap.
 
-**Owner action:** provide the GitHub username of an independent reviewer, run both helpers' dry-runs, inspect the output, then run their `--apply` modes from an authenticated repository-admin GitHub CLI session. Populate AWS role/account/bucket variables and age keys only after approved bootstrap. Provide confirmation or an authorized read-only verification path.
+**Owner action for the optional pipeline:** run both helpers' dry-runs, inspect the exact branch restrictions and zero-approval solo-owner settings, then run their `--apply` modes from an authenticated repository-admin GitHub CLI session if/when the OIDC pipeline is enabled. Populate AWS role/account/bucket variables and age keys only after approved bootstrap. No reviewer username is required.
 
 ### T18 — exact manual AWS bootstrap plan
 
@@ -100,17 +108,17 @@ The plan enumerates:
 - Six matching GitHub environments and the required variables/secrets.
 - Read-only existence checks, bootstrap order, rollback and approval gates.
 
-No read-only STS inventory has been run against the owner's AWS account in this release-readiness pass. The exact 12-digit account ID, state bucket, OIDC provider, runtime boundaries and six deployment roles remain unverified. Do not treat repository CI or the renderer's unit tests as evidence of live AWS account state.
+No read-only STS inventory has been run against the owner's AWS account in this release-readiness pass. The owner-provided account ID is `924422830139`; STS identity, state bucket, OIDC provider, runtime boundaries and six deployment roles remain unverified. Do not treat repository CI or the renderer's unit tests as evidence of live AWS account state.
 
-A new renderer, `scripts/render_bootstrap_inventory.py`, now derives the account ID from the authenticated profile, checks a proposed state bucket name with read-only S3 HeadBucket, and writes the 6 OIDC trust policies, 2 runtime boundaries, 26 managed policies and TLS-only bucket policy to a local ignored directory. It fails closed on unresolved template variables, invalid JSON, managed-policy size overflow, unknown bucket availability and unexpected template counts. It performs no AWS writes, remote backend initialization or Terraform plan/apply. Its implementation and regression tests passed consolidated CI run [43680426827](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43680426827), commit `2188ac56088dfa40b3d4f52b095b23a7259780d0`: **125 Python tests** and both CI jobs, including Terraform formatting/init/validation.
+A new renderer, `scripts/render_bootstrap_inventory.py`, now derives the account ID from the authenticated profile, checks a proposed state bucket name with read-only S3 HeadBucket, and writes the 6 OIDC trust policies, 2 runtime boundaries, 28 managed policy documents and TLS-only bucket policy to a local ignored directory. It fails closed on unresolved template variables, invalid JSON, managed-policy size overflow, unknown bucket availability and unexpected template counts. It performs no AWS writes, remote backend initialization or Terraform plan/apply. Its implementation and regression tests passed consolidated CI run [43680426827](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43680426827), commit `2188ac56088dfa40b3d4f52b095b23a7259780d0`: **125 Python tests** and both CI jobs, including Terraform formatting/init/validation.
 
-**Owner action:** after the repository-side gate is ready and local checkout is intentionally connected, choose the globally unique bucket suffix, run `bash scripts/aws_preflight_readonly.sh` and the renderer using the approved profile, inspect the generated manifest and all 35 JSON policy documents, then review and explicitly approve the exact resource and policy inventory. A successful HeadBucket 404 is only a point-in-time observation, not a reservation. Approval for bootstrap writes and approval for Terraform plan/apply remain separate.
+**Owner action:** after the repository-side gate is ready and local checkout is intentionally connected, choose the globally unique bucket suffix, run `bash scripts/aws_preflight_readonly.sh` and the renderer using the approved profile, inspect the generated manifest and all 37 policy documents, then review and explicitly approve the exact resource and policy inventory. A successful HeadBucket 404 is only a point-in-time observation, not a reservation. Approval for bootstrap writes and approval for Terraform plan/apply remain separate.
 
 ## IAM design limitations requiring explicit review
 
 - API Gateway v2 child-resource paths remain scoped to the `/apis/*` resource family until the generated API ID can be pinned.
 - Some AWS create APIs require `Resource: "*"`; request-tag, function and service conditions are used where supported.
-- Billing's `aws-portal:ModifyBilling` is account-level and cannot be scoped to an individual budget ARN. It is isolated to the billing-apply role, main branch and independent reviewer gate; it must never be attached to dev/prod roles.
+- Billing's `aws-portal:ModifyBilling` is account-level and cannot be scoped to an individual budget ARN. It is isolated to the billing-apply role and main branch; explicit owner approval is required, with no mandatory independent reviewer in the solo-owner phase; it must never be attached to dev/prod roles.
 - Static template validation does not prove live AWS authorization. Rendered policies still require IAM Access Analyzer/review and a controlled dev deployment.
 
 ## Exact bootstrap inventory — not executed
@@ -121,20 +129,18 @@ A new renderer, `scripts/render_bootstrap_inventory.py`, now derives the account
 | IAM OIDC provider | 1 | `token.actions.githubusercontent.com` |
 | Runtime permissions boundaries | 2 | `attendance-dev-execution-boundary`, `attendance-prod-execution-boundary` |
 | GitHub plan/apply roles | 6 | dev-plan, dev-apply, prod-plan, prod-apply, billing-plan, billing-apply |
-| Managed policy templates | 26 | 22 dev/prod plan/apply + 4 billing plan/apply |
+| Managed policy templates | 28 | 22 dev/prod plan/apply + 4 billing plan/apply + 2 temporary CloudFront bootstrap policies |
 | GitHub environments | 6 | dev-plan, dev-apply, prod-plan, prod-apply, billing-plan, billing-apply |
 
 The exact role trust documents, managed policy JSON, account IDs and bucket name must be rendered and reviewed before creation. Existing resources must be inspected first; no duplicate provider, bucket, role or policy should be created.
 
 ## Next sequence
 
-1. Complete T16: configure and verify the six GitHub environments, their branch restrictions, environment variables/secrets and independent apply reviewers. The current GitHub connector cannot configure or verify these settings; repository-admin action is required.
-2. Complete T18 read-only verification: run `bash scripts/aws_preflight_readonly.sh` with an approved read-only AWS profile; verify the account ID, OIDC provider, state bucket, two boundaries, six roles and policy documents; choose a globally unique state bucket suffix.
-3. Render the exact account-specific bucket policy, OIDC trust policies, boundaries and all 26 managed policy documents. Perform static and AWS-side policy validation; present the exact resource/action inventory and obtain explicit approval before any AWS write.
-4. After separate bootstrap approval, create only the approved missing state bucket/OIDC provider/boundaries/roles/policies; verify all settings with read-only calls.
-5. Initialize the dev backend only after its separate approval, run the dev plan, present the complete plan and obtain explicit apply approval. Apply only the reviewed saved plan.
-6. Complete dev integration/privacy/performance/browser acceptance before a separately approved production plan/apply.
-7. Promote the approved solo release to `develop` only through a reviewed PR. Keep teammate PR #2 separate throughout.
+1. For the first dev deployment, follow the solo local path in `docs/DEPLOYMENT-RUNBOOK.md`: verify STS identity, create the API/boundary/state bucket only after separate approval, write the ignored backend file, check Lambda quota, then review and approve the first plan/apply.
+2. Add the CloudFront origin to `allowed_origins`, `callback_urls` and `logout_urls`, review and approve the required second apply, then confirm SNS and create Cognito admin/kiosk users.
+3. Run the consent-gated E2E smoke test and complete dev integration/privacy/performance/browser acceptance.
+4. For the optional OIDC pipeline only, complete T16/T18: configure the six GitHub environments and exact branch restrictions (zero required external approvals; owner self-review allowed), verify STS identity and live inventory, render all 37 policy documents and obtain separate owner approval for each AWS mutation.
+5. Add pipeline roles/environments after local dev acceptance; promote to `develop` only through a reviewed PR. Keep teammate PR #2 separate throughout.
 
 ## Phase C operational readiness
 
@@ -148,7 +154,7 @@ The exact role trust documents, managed policy JSON, account IDs and bucket name
 - T29 remains in progress until local reproduction and a full cross-document consistency review are evidenced.
 - T30 remains TODO until all release gates are reviewed.
 
-T19–T24 and the live portions of T25–T30 remain release, deployment and operational acceptance work. Phase B is not fully closed until repository-admin and owner-controlled blockers are resolved.
+T19–T24 and the live portions of T25–T30 remain release, deployment and operational acceptance work. The first local dev deployment is no longer blocked on OIDC/GitHub environment setup, but it still requires owner-approved AWS bootstrap writes, reviewed Terraform plans and live acceptance.
 
 ## Safety boundary
 

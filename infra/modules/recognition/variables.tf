@@ -63,3 +63,21 @@ variable "execution_role_boundary_arn" {
   description = "Mandatory customer-managed permissions boundary attached to all application roles."
   type        = string
 }
+
+
+variable "reserved_concurrency" {
+  description = "Reserved concurrency for selected recognition Lambdas. Set an entry to null to use the account's unreserved pool."
+  type = object({
+    recognize = number
+    enroll    = number
+    failure   = number
+  })
+
+  validation {
+    condition = alltrue([
+      for value in values(var.reserved_concurrency) :
+      value == null ? true : (value >= 1 && floor(value) == value)
+    ])
+    error_message = "Reserved concurrency values must be null or positive whole numbers."
+  }
+}

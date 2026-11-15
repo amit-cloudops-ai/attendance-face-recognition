@@ -11,7 +11,6 @@ import boto3
 from attendance_common.auth import get_username, require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist, to_iso
-from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
@@ -59,11 +58,6 @@ def _timestamp(value, label: str, business_date: str) -> str | None:
     if normalized.date().isoformat() != business_date:
         raise ValueError(f"{label} must fall on the attendance date in Asia/Kolkata")
     return normalized.isoformat(timespec="seconds")
-
-
-def _ddb_item(item: dict) -> dict:
-    serializer = TypeSerializer()
-    return {key: serializer.serialize(value) for key, value in item.items()}
 
 
 def lambda_handler(event, context):
@@ -143,13 +137,13 @@ def lambda_handler(event, context):
             condition_values = None
         elif "version" in old:
             condition = "attribute_exists(employee_id) AND #version=:old_version"
-            condition_values = {":old_version": _ddb_item({"v": int(old["version"])})["v"]}
+            condition_values = {":old_version": int(old["version"])}
         elif "updated_at" in old:
             condition = (
                 "attribute_exists(employee_id) AND attribute_not_exists(#version) "
                 "AND updated_at=:old_updated"
             )
-            condition_values = {":old_updated": _ddb_item({"v": old["updated_at"]})["v"]}
+            condition_values = {":old_updated": old["updated_at"]}
         else:
             condition = (
                 "attribute_exists(employee_id) AND attribute_not_exists(#version) "
@@ -158,7 +152,7 @@ def lambda_handler(event, context):
             condition_values = None
         put = {
             "TableName": attendance.name,
-            "Item": _ddb_item(item),
+            "Item": item,
             "ConditionExpression": condition,
         }
         if condition_values:
@@ -168,7 +162,7 @@ def lambda_handler(event, context):
         try:
             attendance.meta.client.transact_write_items(TransactItems=[
                 {"Put": put},
-                {"Put": {"TableName": audit.name, "Item": _ddb_item(audit_item)}},
+                {"Put": {"TableName": audit.name, "Item": audit_item}},
             ])
         except ClientError as exc:
             if (

@@ -9,7 +9,6 @@ import boto3
 from attendance_common.auth import get_username, require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist, parse_hhmm, to_iso
-from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
@@ -52,11 +51,6 @@ def _public_employee(item: dict) -> dict:
     # Expose cleanup state without returning biometric identifiers.
     public["has_face_templates"] = bool(item.get("face_ids")) or bool(item.get("photo_count", 0))
     return public
-
-
-def _ddb_item(item: dict) -> dict:
-    serializer = TypeSerializer()
-    return {key: serializer.serialize(value) for key, value in item.items()}
 
 
 def _audit_item(event, action, employee_id, old, new, reason, at):
@@ -146,12 +140,12 @@ def lambda_handler(event, context):
                 employees.meta.client.transact_write_items(TransactItems=[
                     {"Put": {
                         "TableName": employees.name,
-                        "Item": _ddb_item(item),
+                        "Item": item,
                         "ConditionExpression": "attribute_not_exists(employee_id)",
                     }},
                     {"Put": {
                         "TableName": audit.name,
-                        "Item": _ddb_item(audit_item),
+                        "Item": audit_item,
                     }},
                 ])
             except ClientError as exc:
@@ -186,23 +180,22 @@ def lambda_handler(event, context):
                     {"active": True}, {"active": False},
                     "Employee deactivated by administrator.", now,
                 )
-                serializer = TypeSerializer()
                 try:
                     employees.meta.client.transact_write_items(TransactItems=[
                         {"Update": {
                             "TableName": employees.name,
-                            "Key": _ddb_item({"employee_id": employee_id}),
+                            "Key": {"employee_id": employee_id},
                             "UpdateExpression": "SET active=:inactive, updated_at=:now",
                             "ConditionExpression": "active=:active",
                             "ExpressionAttributeValues": {
-                                ":inactive": serializer.serialize(False),
-                                ":active": serializer.serialize(True),
-                                ":now": serializer.serialize(now),
+                                ":inactive": False,
+                                ":active": True,
+                                ":now": now,
                             },
                         }},
                         {"Put": {
                             "TableName": audit.name,
-                            "Item": _ddb_item(audit_item),
+                            "Item": audit_item,
                         }},
                     ])
                 except ClientError as exc:

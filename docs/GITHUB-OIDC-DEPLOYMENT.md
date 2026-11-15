@@ -37,20 +37,20 @@ The apply path requires a numeric plan run ID, confirms the plan run is successf
 
 ## GitHub environment protection rules
 
-Configure the following branch restrictions and reviewers before enabling deployments:
+Configure the following branch restrictions and solo-owner review policy before enabling deployments:
 
 | Environment | Allowed deployment branch | Required reviewers |
 |---|---|---|
-| dev-plan | develop only | None required |
-| dev-apply | develop only | At least one independent reviewer; prevent self-review |
-| prod-plan | main only | At least one independent reviewer; prevent self-review |
-| prod-apply | main only | At least one independent reviewer; prevent self-review |
-| billing-plan | main only | At least one independent reviewer; prevent self-review |
-| billing-apply | main only | At least one independent reviewer; prevent self-review |
+| dev-plan | develop only | None |
+| dev-apply | develop only | None; owner self-review allowed |
+| prod-plan | main only | None |
+| prod-apply | main only | None; owner self-review allowed |
+| billing-plan | main only | None |
+| billing-apply | main only | None; owner self-review allowed |
 
-Protect main and develop with pull-request review requirements. Require CODEOWNERS review for .github/workflows/**, infra/policies/** and infra/** so changes to deployment logic, role policies and Terraform are reviewed before reaching the release branches. Restrict environment administration to repository maintainers.
+Protect main and develop with required pull requests and CI checks. During the solo-owner phase, require zero external approvals and allow owner self-review. Add CODEOWNERS review for .github/workflows/**, infra/policies/** and infra/** when a second trusted maintainer is available. Restrict environment administration to repository maintainers.
 
-The AWS trust policy only distinguishes repository and environment. GitHub environment branch restrictions and reviewer rules are therefore part of the security boundary, not optional housekeeping. The workflow's branch if-condition is an additional guard, not a replacement for GitHub environment deployment branch restrictions.
+The AWS trust policy only distinguishes repository and environment. Exact GitHub environment branch restrictions, the workflow's branch if-condition, required CI checks, saved-plan provenance and manual workflow dispatch form the deployment boundary. This repository currently uses a solo-owner model: independent environment reviewers are not required and owner self-review is allowed. Add independent reviewers if the project later gains another trusted operator.
 
 ## Required environment variables
 
@@ -76,7 +76,7 @@ The production callback/logout URLs and allowed origins must be the final HTTPS 
 
 ## Approval boundary
 
-The six trust policies are templates only. OIDC provider creation, role creation, role permission attachments, GitHub environment creation/configuration, reviewer selection and branch protection changes remain manual, explicit approval gates. No AWS or GitHub environment configuration was changed by this task.
+The six trust policies are templates only. OIDC provider creation, role creation, role permission attachments, GitHub environment creation/configuration, branch protection changes remain manual, explicit owner-controlled configuration steps. The solo owner may self-review; no independent reviewer is required. No AWS or GitHub environment configuration was changed by this task.
 
 
-See `docs/GITHUB-ENVIRONMENT-SETUP.md` for the exact six environment names, variables, secrets, deployment branch restrictions, reviewer requirements and the verification limitation for repository settings.
+See `docs/GITHUB-ENVIRONMENT-SETUP.md` for the exact six environment names, variables, secrets, deployment branch restrictions, the solo-owner review model and the verification limitation for repository settings.

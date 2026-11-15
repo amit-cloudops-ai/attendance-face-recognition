@@ -1,4 +1,4 @@
-"""Small atomic transaction adapter for Moto's unsupported low-level AV decoding."""
+"""Atomic transaction adapter for Moto, accepting resource-native and AV values."""
 from boto3.dynamodb.types import TypeDeserializer
 from botocore.exceptions import ClientError
 
@@ -6,16 +6,28 @@ from botocore.exceptions import ClientError
 def install_transaction_emulator(monkeypatch, db):
     """Emulate TransactWriteItems atomically using Moto's supported item APIs.
 
-    Moto's low-level transaction backend passes AttributeValue dictionaries into
-    its key lookup path (unhashable dict error). This adapter keeps application
-    requests in the real low-level AWS shape, decodes them, preflights conditions,
-    and rolls back all touched tables if any action fails.
+    The real boto3 DynamoDB resource client transforms native values into
+    AttributeValue structures before sending the request. This test adapter
+    intercepts the client method before those event handlers run, so it accepts
+    native values and legacy AttributeValue maps, preflights conditions, and
+    rolls back all touched tables if any action fails.
     """
     client = db.meta.client
     deserializer = TypeDeserializer()
 
+    attribute_value_types = {"S", "N", "B", "BOOL", "NULL", "M", "L", "SS", "NS", "BS"}
+
+    def decode_value(value):
+        if (
+            isinstance(value, dict)
+            and len(value) == 1
+            and next(iter(value)) in attribute_value_types
+        ):
+            return deserializer.deserialize(value)
+        return value
+
     def decode(item):
-        return {key: deserializer.deserialize(value) for key, value in item.items()}
+        return {key: decode_value(value) for key, value in item.items()}
 
     def snapshot(table):
         items = []

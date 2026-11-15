@@ -9,7 +9,6 @@ from attendance_common.auth import get_username, require_group
 from attendance_common.config import DEFAULT_SETTINGS, _reset_cache, get_settings
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist, to_iso
-from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
@@ -67,11 +66,6 @@ def _validate_updates(body: dict) -> dict:
     return validated
 
 
-def _ddb_item(item: dict) -> dict:
-    serializer = TypeSerializer()
-    return {key: serializer.serialize(value) for key, value in item.items()}
-
-
 def lambda_handler(event, context):
     event = event or {}
     denied = require_group(event, "admin")
@@ -117,13 +111,13 @@ def lambda_handler(event, context):
         }
         if stored and "version" in stored:
             condition = "attribute_exists(pk) AND #version=:old_version"
-            condition_values = {":old_version": _ddb_item({"v": int(stored["version"])})["v"]}
+            condition_values = {":old_version": int(stored["version"])}
         elif stored and "updated_at" in stored:
             condition = (
                 "attribute_exists(pk) AND attribute_not_exists(#version) "
                 "AND updated_at=:old_updated"
             )
-            condition_values = {":old_updated": _ddb_item({"v": stored["updated_at"]})["v"]}
+            condition_values = {":old_updated": stored["updated_at"]}
         elif stored:
             condition = (
                 "attribute_exists(pk) AND attribute_not_exists(#version) "
@@ -135,7 +129,7 @@ def lambda_handler(event, context):
             condition_values = None
         put_config = {
             "TableName": config.name,
-            "Item": _ddb_item(config_item),
+            "Item": config_item,
             "ConditionExpression": condition,
         }
         if condition_values:
@@ -145,7 +139,7 @@ def lambda_handler(event, context):
         try:
             config.meta.client.transact_write_items(TransactItems=[
                 {"Put": put_config},
-                {"Put": {"TableName": audit.name, "Item": _ddb_item(audit_item)}},
+                {"Put": {"TableName": audit.name, "Item": audit_item}},
             ])
         except ClientError as exc:
             if (

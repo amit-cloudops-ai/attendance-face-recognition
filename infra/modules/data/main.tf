@@ -59,12 +59,12 @@ locals {
     daily_job = {
       memory_size                    = 512
       timeout                        = 60
-      reserved_concurrent_executions = 1
+      reserved_concurrent_executions = var.reserved_concurrency.daily
     }
     weekly_job = {
       memory_size                    = 512
       timeout                        = 120
-      reserved_concurrent_executions = 1
+      reserved_concurrent_executions = var.reserved_concurrency.weekly
     }
     reports = {
       memory_size                    = 256

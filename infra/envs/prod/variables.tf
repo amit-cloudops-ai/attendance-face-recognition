@@ -73,3 +73,29 @@ variable "execution_role_boundary_arn" {
     error_message = "execution_role_boundary_arn must be the pre-created attendance-prod-execution-boundary policy in this AWS account."
   }
 }
+
+variable "lambda_reserved_concurrency" {
+  description = "Per-environment Lambda reserved concurrency. Set individual functions to null when the account quota cannot support reservations."
+  type = object({
+    recognize = number
+    enroll    = number
+    failure   = number
+    daily     = number
+    weekly    = number
+  })
+  default = {
+    recognize = 10
+    enroll    = 5
+    failure   = 2
+    daily     = 1
+    weekly    = 1
+  }
+
+  validation {
+    condition = alltrue([
+      for value in values(var.lambda_reserved_concurrency) :
+      value == null ? true : (value >= 1 && floor(value) == value)
+    ])
+    error_message = "Lambda reserved concurrency values must be null or positive whole numbers."
+  }
+}

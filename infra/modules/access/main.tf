@@ -610,7 +610,7 @@ locals {
   }
   frontend_files = {
     for path in fileset(local.frontend_root, "**") : path => path
-    if !endswith(path, ".gitkeep")
+    if !endswith(path, ".gitkeep") && path != "config.json"
   }
 }
 
