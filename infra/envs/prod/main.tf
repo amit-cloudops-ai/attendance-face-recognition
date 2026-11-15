@@ -1,3 +1,8 @@
+import {
+  to = module.access.aws_apigatewayv2_api.http
+  id = var.api_id
+}
+
 module "foundation" {
   source = "../../modules/foundation"
 
