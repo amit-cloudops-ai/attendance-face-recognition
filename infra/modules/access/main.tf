@@ -10,7 +10,7 @@ locals {
     sourceIp       = "$context.identity.sourceIp"
     userAgent      = "$context.identity.userAgent"
   })
-  web_content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://cognito-idp.${var.region}.amazonaws.com https://${local.cognito_base_url} https://s3.${var.region}.amazonaws.com https://*.s3.${var.region}.amazonaws.com; form-action 'self' https://${local.cognito_base_url}; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+  web_content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://cognito-idp.${var.region}.amazonaws.com https://${local.cognito_base_url} https://s3.${var.region}.amazonaws.com https://*.s3.${var.region}.amazonaws.com https://${var.raw_bucket_name}.s3.amazonaws.com; form-action 'self' https://${local.cognito_base_url}; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 }
 
 resource "aws_cognito_user_pool" "main" {
