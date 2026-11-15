@@ -88,11 +88,29 @@ def _scan_outcome(attendance, request_id: str, captured_at: str) -> tuple[str, d
                 return item["employee_id"], outcome
         last_key = response.get("LastEvaluatedKey")
         if not last_key:
-            return None
+            break
         response = attendance.query(
             IndexName="date-index",
             KeyConditionExpression=Key("date").eq(business_date),
             ExclusiveStartKey=last_key,
+        )
+
+    # GSI reads are eventually consistent. The failure destination must not
+    # turn a committed scan into an error merely because the index lags.
+    # This expensive strong read is restricted to the rare exhausted-retry path.
+    response = attendance.scan(ConsistentRead=True)
+    while True:
+        for item in response.get("Items", []):
+            if item.get("date") != business_date:
+                continue
+            outcome = (item.get("scan_events") or {}).get(request_id)
+            if outcome:
+                return item["employee_id"], outcome
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            return None
+        response = attendance.scan(
+            ConsistentRead=True, ExclusiveStartKey=last_key
         )
 
 
