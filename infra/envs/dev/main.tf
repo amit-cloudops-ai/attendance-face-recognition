@@ -41,6 +41,7 @@ module "recognition" {
 module "access" {
   source = "../../modules/access"
 
+  region                          = local.deployment_region
   env                             = var.env
   account_id                      = var.account_id
   kms_key_id                      = module.foundation.kms_key_id
