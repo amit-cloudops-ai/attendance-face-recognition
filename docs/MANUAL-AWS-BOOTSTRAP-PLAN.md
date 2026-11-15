@@ -16,6 +16,7 @@ Do not assume an account ID, bucket suffix, existing OIDC provider state, or res
 
 | Resource | Proposed name | Purpose | Initial state |
 |---|---|---|---|
+| API Gateway HTTP API | attendance-dev-http-api / attendance-prod-http-api | One tagged API per environment; imported into Terraform state | Owner-approved pre-bootstrap create |
 | S3 state bucket | attendance-tf-state-<account-id>-<approved-suffix> | Remote state, versioned and SSE-S3 | Manual bootstrap |
 | IAM OIDC provider | token.actions.githubusercontent.com | GitHub Actions federation | Create only if absent |
 | IAM boundary | attendance-dev-execution-boundary | Restrict dev Lambda/Scheduler runtime roles | Attach to runtime roles |
@@ -35,9 +36,10 @@ The policy set counts are:
 - Prod plan: core, edge, state (3 managed policies).
 - Prod apply: core, data, Lambda, IAM, foundation, access, state, DynamoDB KMS (8 managed policies).
 - Billing plan/apply: one budget policy and one state policy each (4 managed policies total).
+- Temporary CloudFront bootstrap: one create-only policy for dev and one for prod (2 temporary managed policies; attach only for the first approved deployment and detach immediately after creation).
 - Runtime boundaries: one dev and one prod managed policy.
 
-Total: 26 managed policies across dev, prod and billing, plus the two runtime permissions-boundary policies.
+Total: 28 managed policy documents (26 permanent plus 2 temporary create-only CloudFront bootstrap policies), plus the two runtime permissions-boundary policies.
 
 Each policy template has CI checks for JSON validity, 6,144-character size, environment isolation and the service-specific constraints documented in infra/policies/README.md.
 
@@ -51,7 +53,7 @@ Billing has dedicated plan/apply policy templates and OIDC trust templates in T3
 
 ### 1. Read-only identity and existence checks
 
-Before any write operation, use an authenticated read-only AWS session to verify the active STS identity and region. Inspect whether the OIDC provider, state bucket, boundary policies, deployment roles and policy names already exist. Record exact ARNs and current trust/permission documents. No writes in this step. Use `bash scripts/aws_preflight_readonly.sh` with the approved `default` profile. The script discovers a unique existing bucket matching `attendance-tf-state-<account-id>-*`; if none or multiple are found, set `TF_STATE_BUCKET` explicitly to inspect a known candidate. A prior read-only inventory found no matching account-prefixed state bucket and did not confirm the OIDC provider, runtime boundaries or six deployment roles; rerun it immediately before bootstrap to refresh the evidence. After choosing an owner-approved suffix, run `python scripts/render_bootstrap_inventory.py --suffix <suffix> --profile default --output-dir .local/bootstrap-rendered-<suffix>`. This renderer calls only STS GetCallerIdentity and S3 HeadBucket, derives the account ID from the authenticated session, rejects ambiguous bucket availability, and writes the 6 OIDC trust policies, 2 runtime boundaries, 26 managed policies and TLS-only state-bucket policy locally. It does not create resources, initialize Terraform state or run a plan/apply. Keep the generated `.local` output out of Git and review the account, bucket name, all JSON policies and counts before approval.
+Before any write operation, use an authenticated read-only AWS session to verify the active STS identity and region. Inspect whether the OIDC provider, state bucket, boundary policies, deployment roles and policy names already exist. Record exact ARNs and current trust/permission documents. No writes in this step. Use `bash scripts/aws_preflight_readonly.sh` with the approved `default` profile. The script discovers a unique existing bucket matching `attendance-tf-state-<account-id>-*`; if none or multiple are found, set `TF_STATE_BUCKET` explicitly to inspect a known candidate. No read-only inventory has been run against the owner's AWS account in this readiness pass. The exact account ID, matching state bucket, OIDC provider, runtime boundaries and six deployment roles remain unverified. After the owner separately approves creation of the tagged environment API, run `bash scripts/bootstrap_api_gateway.sh --env dev|prod --account-id <verified-account-id> --profile <approved-profile>` first without `--apply` to inspect the dry-run. Only after approving that exact API creation, rerun with `--apply` and record the returned API ID. Then run `python scripts/render_bootstrap_inventory.py --suffix <suffix> --api-id <api-id> --profile <approved-profile> --output-dir .local/bootstrap-rendered-<suffix>`. This renderer calls only STS GetCallerIdentity and S3 HeadBucket, derives the account ID from the authenticated session, rejects ambiguous bucket availability, and writes the 6 OIDC trust policies, 2 runtime boundaries, 28 managed policies and TLS-only state-bucket policy locally. It does not create resources, initialize Terraform state or run a plan/apply. Keep the generated `.local` output out of Git and review the account, bucket name, all JSON policies and counts before approval.
 
 ### 2. State bucket
 
@@ -75,7 +77,7 @@ Create the six roles with trust policies:
 - attendance-github-billing-plan trusts only ...:environment:billing-plan.
 - attendance-github-billing-apply trusts only ...:environment:billing-apply.
 
-Every trust policy requires aud=sts.amazonaws.com and exact sub equality. Attach only the matching plan/apply managed policies. Do not allow these deployment roles to manage themselves, the OIDC provider, their own trust policies or the deployment policy attachments.
+Every trust policy requires aud=sts.amazonaws.com and exact sub equality. Attach only the matching plan/apply managed policies. The two CloudFront bootstrap policies are temporary: attach to the matching apply role only for its first approved deployment, then detach them immediately. Do not allow these deployment roles to manage themselves, the OIDC provider, their own trust policies or the deployment policy attachments.
 
 ### 6. GitHub environment configuration
 
@@ -117,7 +119,7 @@ Before performing any bootstrap write, present to the owner:
 1. Verified 12-digit account ID and region confirmation against `config/deployment.json` and the authenticated STS identity.
 2. Final state bucket name and exact bucket configuration/policy.
 3. Whether the OIDC provider already exists.
-4. Exact IAM resource inventory (one OIDC provider if absent, two boundaries, six roles and 26 managed policy attachments/templates).
+4. Exact IAM resource inventory (one OIDC provider if absent, two boundaries, six roles, 26 permanent managed policies and two temporary create-only CloudFront bootstrap policies).
 5. Fully rendered trust policies, boundaries and all role policy documents.
 6. Exact GitHub environment names, variables, secrets and branch/reviewer controls.
 7. Planned first Terraform backend init and dev plan scope.
