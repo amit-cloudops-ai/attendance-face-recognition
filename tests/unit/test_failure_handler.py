@@ -234,3 +234,31 @@ def test_malformed_failure_message_is_returned_for_sqs_retry(aws_env):
         "Records": [{"messageId": "bad-message", "body": "{not-json"}]
     }, None)
     assert result == {"batchItemFailures": [{"itemIdentifier": "bad-message"}]}
+
+
+
+def test_failure_scan_uses_strong_base_table_fallback_when_gsi_lags(aws_env, monkeypatch):
+    scans, attendance, employees, s3, _ = aws_env
+    request_id = str(uuid.uuid4())
+    object_key = f"captures/{request_id}.jpg"
+    outcome = {
+        "action": "clock_in", "status": "present", "date": "2026-11-14",
+        "clock_in": "2026-11-14T09:00:00+05:30", "clock_out": None,
+    }
+    scans.put_item(Item={
+        "request_id": request_id, "kind": "scan", "code": "pending",
+        "message": "Processing", "created_at": "2026-11-14T09:00:00+05:30",
+        "ttl": 9999999999,
+    })
+    employees.put_item(Item={"employee_id": "EMP001", "name": "Priya", "active": True})
+    attendance.put_item(Item={
+        "employee_id": "EMP001", "date": "2026-11-14", "clock_in": outcome["clock_in"],
+        "status": "present", "scan_events": {request_id: outcome},
+    })
+    s3.put_object(Bucket="attendance-raw", Key=object_key, Body=b"image")
+    monkeypatch.setattr(attendance, "query", lambda **kwargs: {"Items": []})
+
+    failure.lambda_handler(destination_event(request_id, object_key), None)
+    item = scans.get_item(Key={"request_id": request_id})["Item"]
+    assert item["code"] == "matched"
+    assert item["employee_id"] == "EMP001"
