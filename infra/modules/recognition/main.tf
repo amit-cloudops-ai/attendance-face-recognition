@@ -129,13 +129,14 @@ locals {
         Action = [
           "dynamodb:GetItem",
           "dynamodb:PutItem",
-          "dynamodb:UpdateItem"
+          "dynamodb:UpdateItem",
+          "dynamodb:TransactWriteItems"
         ]
         Resource = [var.tables.attendance.arn]
       },
       {
         Effect = "Allow"
-        Action = ["dynamodb:GetItem"]
+        Action = ["dynamodb:GetItem", "dynamodb:TransactWriteItems"]
         Resource = [
           var.tables.employees.arn,
           var.tables.config.arn,
