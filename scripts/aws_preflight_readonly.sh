@@ -6,8 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 command -v aws >/dev/null || { echo "AWS CLI v2 is required." >&2; exit 2; }
-python scripts/check_region_consistency.py
-REGION="$(python scripts/check_region_consistency.py --print-region)"
+python3 scripts/check_region_consistency.py
+REGION="$(python3 scripts/check_region_consistency.py --print-region)"
 
 for variable in AWS_REGION AWS_DEFAULT_REGION; do
   current="${!variable:-}"
@@ -22,11 +22,10 @@ export AWS_DEFAULT_REGION="$REGION"
 echo "=== Canonical deployment region ==="
 echo "$REGION"
 
-echo
 echo "=== Authenticated AWS identity (read-only STS) ==="
 IDENTITY="$(aws sts get-caller-identity --output json)"
 printf '%s\n' "$IDENTITY"
-ACCOUNT_ID="$(python -c 'import json,sys; print(json.load(sys.stdin)["Account"])' <<<"$IDENTITY")"
+ACCOUNT_ID="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["Account"])' <<<"$IDENTITY")"
 if [[ ! "$ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
   echo "STS did not return a 12-digit AWS account ID." >&2
   exit 2
@@ -43,6 +42,15 @@ report() {
     echo "NOT CONFIRMED: resource may be absent or caller may lack read permission."
   fi
 }
+
+echo
+echo
+echo "=== Account and service quota preflight (read-only) ==="
+report "Lambda concurrency limits and current usage" aws lambda get-account-settings --region "$REGION" \
+  --query "{ConcurrentExecutions:AccountLimit.ConcurrentExecutions,UnreservedConcurrentExecutions:AccountLimit.UnreservedConcurrentExecutions,FunctionCount:AccountUsage.FunctionCount}" --output json
+report "Amazon Rekognition service quotas" aws service-quotas list-service-quotas --service-code rekognition --region "$REGION" \
+  --query "Quotas[].{Name:QuotaName,Value:Value,Adjustable:Adjustable}" --output json
+
 
 OIDC_ARN="arn:aws:iam::$ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
 report "GitHub OIDC provider" aws iam get-open-id-connect-provider \
@@ -104,6 +112,65 @@ for role in \
   else
     echo "NOT CONFIRMED: role may be absent or caller may lack read permission."
   fi
+done
+
+echo
+echo "=== Existing application resources (read-only, project prefixes only) ==="
+report "Project DynamoDB tables" aws dynamodb list-tables --region "$REGION" \
+  --query "TableNames[?starts_with(@, 'attendance-dev-') || starts_with(@, 'attendance-prod-')]" --output json
+report "Project KMS aliases" aws kms list-aliases --region "$REGION" \
+  --query "Aliases[?AliasName=='alias/attendance-dev' || AliasName=='alias/attendance-prod']" --output json
+report "Project Rekognition collections" aws rekognition list-collections --region "$REGION" \
+  --query "CollectionIds[?starts_with(@, 'attendance-dev-') || starts_with(@, 'attendance-prod-')]" --output json
+report "Project Cognito user pools" aws cognito-idp list-user-pools --max-results 60 --region "$REGION" \
+  --query "UserPools[?starts_with(Name, 'attendance-dev-') || starts_with(Name, 'attendance-prod-')]" --output json
+report "Project API Gateway v2 APIs" aws apigatewayv2 get-apis --region "$REGION" \
+  --query "Items[?starts_with(Name, 'attendance-dev-') || starts_with(Name, 'attendance-prod-')]" --output json
+report "Project Lambda functions" aws lambda list-functions --region "$REGION" \
+  --query "Functions[?starts_with(FunctionName, 'attendance-dev-') || starts_with(FunctionName, 'attendance-prod-')]" --output json
+report "Project SQS queues" aws sqs list-queues --queue-name-prefix attendance- --region "$REGION" --output json
+report "Project SNS topics" aws sns list-topics --region "$REGION" \
+  --query "Topics[?contains(TopicArn, ':attendance-dev-alerts') || contains(TopicArn, ':attendance-prod-alerts')]" --output json
+report "Project EventBridge Scheduler groups" aws scheduler list-schedule-groups --region "$REGION" \
+  --query "ScheduleGroups[?starts_with(Name, 'attendance-')]" --output json
+for group in attendance-dev attendance-prod; do
+  report "Schedules in group $group" aws scheduler list-schedules --group-name "$group" --region "$REGION" --output json
+done
+report "Project Lambda log groups" aws logs describe-log-groups --log-group-name-prefix /aws/lambda/attendance- --region "$REGION" \
+  --query "logGroups[].logGroupName" --output json
+report "Project CloudWatch alarms" aws cloudwatch describe-alarms --region "$REGION" \
+  --query "MetricAlarms[?starts_with(AlarmName, 'attendance-')]" --output json
+report "Project IAM runtime roles" aws iam list-roles \
+  --query "Roles[?starts_with(RoleName, 'attendance-')]" --output json
+report "Project IAM managed policies" aws iam list-policies --scope Local \
+  --query "Policies[?contains(PolicyName, 'attendance')]" --output json
+report "Project AWS Budgets" aws budgets describe-budgets --account-id "$ACCOUNT_ID" \
+  --query "Budgets[?starts_with(BudgetName, 'attendance-')]" --output json
+report "Project CloudFront distributions" aws cloudfront list-distributions \
+  --query "DistributionList.Items[?contains(Origins.Items[].DomainName, 'attendance-dev-$ACCOUNT_ID-web') || contains(Origins.Items[].DomainName, 'attendance-prod-$ACCOUNT_ID-web')].{Id:Id,Comment:Comment,DomainName:DomainName,Enabled:Enabled}" --output json
+
+echo
+echo "=== Check globally unique application bucket names (read-only) ==="
+for env in dev prod; do
+  for kind in raw reports web; do
+    candidate="attendance-$env-$ACCOUNT_ID-$kind"
+    error_file="$(mktemp)"
+    if aws s3api head-bucket --bucket "$candidate" 2>"$error_file"; then
+      echo "EXISTS in this account: $candidate"
+      report "Bucket location: $candidate" aws s3api get-bucket-location --bucket "$candidate" --output json
+      report "Bucket public access block: $candidate" aws s3api get-public-access-block --bucket "$candidate" --output json
+      report "Bucket ownership controls: $candidate" aws s3api get-bucket-ownership-controls --bucket "$candidate" --output json
+      report "Bucket versioning: $candidate" aws s3api get-bucket-versioning --bucket "$candidate" --output json
+      report "Bucket encryption: $candidate" aws s3api get-bucket-encryption --bucket "$candidate" --output json
+      report "Bucket policy: $candidate" aws s3api get-bucket-policy --bucket "$candidate" --output json
+    elif grep -Eq '\(404\)|Not Found|NoSuchBucket' "$error_file"; then
+      echo "NOT FOUND (candidate appears available): $candidate"
+    else
+      echo "NOT CONFIRMED (possible name collision or missing permission): $candidate"
+      cat "$error_file" >&2
+    fi
+    rm -f "$error_file"
+  done
 done
 
 BUCKET="${TF_STATE_BUCKET:-}"

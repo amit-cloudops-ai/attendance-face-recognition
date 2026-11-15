@@ -46,10 +46,12 @@ Latency budget (target p95 under 3 s): client resize + upload about 0.5 s, S3 ev
 | Platform | KMS, buckets, layer, SNS, alarms, budgets, CI/CD, bootstrap | Lead |
 
 ## 5. Data model
-Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee over a date range (PK query), by date for all employees (GSI `date-index`), employee list (about 100 items; Scan is acceptable and cached in the admin Lambda), result polling by `request_id` (TTL 1 day).
+Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee over a date range (PK query), by date for all employees (GSI `date-index`), employee list (about 100 items; Scan is acceptable at this scale), result polling by `request_id` (TTL 1 day).
 
 ## 6. Security
-### 6.1 IAM matrix (one role per Lambda; all also get CloudWatch Logs on their own log group and `kms:Decrypt`/`kms:GenerateDataKey` on the attendance KMS key)
+The encrypted alerts topic is protected by an explicit SNS topic policy that preserves account-owner management and allows only CloudWatch alarms in the same account with the `attendance-${var.env}-*` alarm-name prefix to publish. The customer-managed KMS key policy separately permits the CloudWatch service principal to encrypt alarm notifications. Daily/weekly Lambda publisher roles have `kms:Decrypt` and `kms:GenerateDataKey*` through the regional SNS service, bounded by the environment runtime permissions boundary. The dev/prod runtime modules wait for foundation resources so the topic policy exists before alarms are created.
+
+### 6.1 IAM matrix (one role per Lambda; all get CloudWatch Logs on their own log group; KMS permissions are granted only to handlers that need encrypted S3/SQS/SNS operations)
 | Lambda | Allowed actions and resources |
 |---|---|
 | presign | `s3:PutObject` on raw `captures/*`; `dynamodb:PutItem` on scan-results |
@@ -69,7 +71,7 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 `rekognition:DetectFaces` does not support resource-level permissions, so `*` is acceptable only for that one action. `daily-job` needs `dynamodb:UpdateItem` on attendance to add the `missing_clock_out` flag after checking a clock-in without a clock-out. `enroll` needs `rekognition:DeleteFaces` on the collection to roll back a face index if the conditional employee update fails.
 
 ### 6.2 Controls
-- Encryption at rest: DynamoDB (KMS), S3 (SSE-KMS with bucket key), CloudWatch logs unencrypted of PII by design (no PII logged). TLS enforced by bucket policies (`aws:SecureTransport`) and CloudFront (redirect to HTTPS, TLS 1.2+).
+- Encryption at rest: DynamoDB (KMS), S3 (SSE-KMS with bucket key), CloudWatch logs contain no biometric images, tokens or full face data; Lambda logs use JSON format with 30-day retention. TLS enforced by bucket policies (`aws:SecureTransport`) and CloudFront (redirect to HTTPS, TLS 1.2+).
 - Raw bucket: Block Public Access, no versioning. Workers delete images after a durable terminal result; retryable failures retain images while Lambda retries. The failure consumer reconciles already-committed attendance/enrollment writes, removes an uncommitted request-scoped face template, finalizes exhausted requests and deletes the image. Lifecycle expires `captures/` and `enroll/` after 1 day (S3 minimum granularity) as a backstop, plus incomplete multipart uploads. Reports bucket: versioning on (audit trail). Web bucket: private, CloudFront OAC only.
 - Pre-signed POST: 60 s expiry, JPEG only, 1 KB to 1 MB, key fixed by server.
 - API: Cognito JWT authorizer on every route + group check in the Lambda; API Gateway throttling (10 req/s, burst 20 per stage); Lambda reserved concurrency caps on `recognize` and `enroll` to bound Rekognition spend.
@@ -81,7 +83,7 @@ Defined in [contracts.md](contracts.md) section 3. Access patterns: by employee 
 |---|---|---|
 | Photo/video of an employee shown to the camera | Strict threshold, supervised kiosk, audit trail | Real in v1; fix is Face Liveness (LATER) |
 | Someone abuses upload endpoint | Auth required, pre-signed POST limits, throttling, concurrency cap, budget alarm | Low |
-| Stolen kiosk token | Dedicated `kiosk` user with kiosk-only routes, 60 min access tokens, disable the user to revoke | Medium (device theft) |
+| Stolen kiosk token | Dedicated `kiosk` user with kiosk-only routes and 60 min access tokens; disabling blocks new auth/refresh but already-issued JWTs remain valid until expiry (up to 60 min) | Medium (device theft) |
 | Biometric data leak | Raw images are retained only for the bounded retry/recovery window, then deleted; only Rekognition feature vectors remain for enrolled employees; KMS, least privilege and offboarding deletion | Low |
 | Admin misuse | Cognito admin group, override requires reason and is audited | Low |
 | Cost attack | Throttling, reserved concurrency, AWS Budget alarm | Low |
@@ -103,7 +105,7 @@ Biometric data is personal data (India DPDP Act 2023 applies). Controls: explici
 | Bad deploy | `git revert` on `main`, pipeline redeploys; DynamoDB PITR for data mistakes |
 
 ## 8. Observability
-Structured JSON logs (30-day retention); alarms to SNS `attendance-{env}-alerts` (email lead): Lambda `Errors` > 0 on any function, `Throttles` > 0, DLQ `ApproximateNumberOfMessagesVisible` > 0, `recognize` p95 `Duration` > 2500 ms, job failures; AWS Budget 15 USD (80% and 100%). CloudWatch dashboard: scans per hour, p95 latency, error counts, Rekognition calls.
+Structured JSON logs (30-day retention); alarms to SNS `attendance-{env}-alerts` (email lead): Lambda `Errors` > 0 on any function, `Throttles` > 0, DLQ `ApproximateNumberOfMessagesVisible` > 0, `recognize` p95 `Duration` > 2500 ms, job failures; AWS Budget 15 USD (80% and 100%). CloudWatch metrics and alarms are provisioned; a custom dashboard (scans per hour, p95 latency, error counts, Rekognition calls) is deferred and is not part of the current Terraform build.
 
 ## 9. Cost
 See [COST.md](COST.md). About 10 to 14 USD per month at 100 employees x 2 scans/day.
@@ -125,11 +127,19 @@ See [COST.md](COST.md). About 10 to 14 USD per month at 100 employees x 2 scans/
 | D12 | Liveness deferred | Time; risk documented, mitigations listed |
 
 ## 11. Deployment
-1. **Bootstrap (once, Lead, Console):** create S3 bucket `attendance-tfstate-<account_id>` (versioning on, encryption on, TLS-only); create the IAM OIDC provider `token.actions.githubusercontent.com`; create scoped roles `attendance-github-deploy-dev` and `attendance-github-deploy-prod` with trust subjects for the GitHub `dev` and `prod` environments. See `infra/bootstrap/README.md`.
-2. Create GitHub environments `dev` (deployment branch `develop`) and `prod` (deployment branch `main`, required reviewer). Configure repository/environment variables: `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `TF_STATE_BUCKET`, `AWS_ACCOUNT_ID`, `ALERT_EMAIL`, `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS`, and `ALLOWED_ORIGINS`. The three URL/origin variables are non-empty JSON arrays of strings.
-3. Merge reviewed changes to `develop` or `main`. Deployment is **manual only**: trigger `.github/workflows/deploy.yml` from the matching branch, choose `plan`, review the one-day plan artifact, then trigger `apply` and provide that plan run ID. Apply downloads the exact saved plan and verifies it was created by a successful plan run on the same branch and exact commit SHA; Terraform rejects it if the state has changed. Production apply is gated by the `prod` environment reviewer. CI push events never apply Terraform.
-4. On first apply, localhost is used for Cognito callback/logout and raw-bucket CORS to avoid a module dependency cycle. After CloudFront is created, update `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS` and `ALLOWED_ORIGINS` to include the exact HTTPS site origin, then plan and apply the reviewed update.
-5. Post-deploy: create Cognito users (`kiosk-01`, admins), confirm SNS email subscription, and run the e2e smoke script. No deployment has been executed from this branch; no AWS resources have been provisioned.
+
+The deployment is approval-gated and is not yet executed. The target is AWS account `924422830139`, region `us-east-1`. The solo release is maintained on `solo/amit-monday`; only after the readiness gates pass should it be promoted by PR to `develop` for dev and later `main` for production.
+
+1. **Read-only inventory:** confirm STS identity and inspect the existing OIDC provider, state bucket, runtime boundaries, six deployment roles and policy attachments. On 14 November 2026, STS verified account `924422830139`; the read-only preflight found no matching state bucket and returned `NoSuchEntity` for the expected OIDC provider and roles. Any result affected by missing read permissions remains unconfirmed.
+2. **Bootstrap plan:** choose a globally unique `attendance-tf-state-924422830139-<approved-suffix>` bucket name. Render the exact bucket configuration/policy, OIDC trust documents, two runtime boundaries, six plan/apply roles and 26 managed policy templates. Present all changes and permissions to the owner. No AWS write is allowed before explicit approval.
+3. **GitHub governance:** configure six exact environments: `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan`, `billing-apply`. Restrict dev to `develop`; prod and billing to `main`. The repository owner is the sole apply reviewer and self-review is allowed. This is a manual owner checkpoint, not independent approval. Use `scripts/configure_github_environments.sh` and `scripts/configure_branch_protection.sh` in dry-run mode first.
+4. **AWS bootstrap:** after a separate explicit approval, create only approved missing resources. Verify all resource ARNs, trust relationships, policies and bucket controls using read-only calls.
+5. **Dev plan and apply:** approve remote backend initialization separately. Run the dev plan from `develop`, inspect the complete saved plan and cost, then obtain separate explicit approval before applying that exact encrypted plan artifact.
+6. **First deployment URL/CORS update:** the first apply uses localhost callback/logout URLs and raw-bucket allowed origins to avoid a Terraform dependency cycle. After CloudFront is created, add the exact HTTPS site origin to `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS` and `ALLOWED_ORIGINS` in the dev apply environment variables. Repeat with the production CloudFront origin only during the separately approved production release. Run a second reviewed plan and separately approved apply.
+7. **Cognito user bootstrap:** Terraform creates the user pool and the `admin` and `kiosk` groups, but it does not create users. Create the first administrator in the Cognito console and add the account to the `admin` group. Create a dedicated kiosk account and add it to `kiosk`. Public self-registration is disabled.
+8. **Alerts:** confirm the SNS email subscription and any AWS Budget notification email from the inbox. An unconfirmed SNS subscription will not deliver alarms.
+9. **Dev acceptance:** run consent-based enrollment and scan tests, validate clock-in/clock-out/debounce, daily/weekly jobs, reports, offboarding, raw-image deletion, alarms, cost, browser camera behaviour and p95 capture-to-result timing. The existing API smoke test does not replace browser/device testing.
+10. **Production:** only after dev acceptance, promote the approved release to `main`, run a separate production plan, review it, and obtain a separate explicit apply approval. Billing remains on its isolated root and role pair.
 
 ## 12. Operations runbook
 | Task | How |
@@ -138,7 +148,7 @@ See [COST.md](COST.md). About 10 to 14 USD per month at 100 employees x 2 scans/
 | Offboard | Admin app, Deactivate (sets inactive and deletes faces) |
 | Tune accuracy | Admin app Settings (or config table item `SETTINGS`): `face_match_threshold` |
 | Re-run daily/weekly job | Console, Lambda, Test with `{"date": "YYYY-MM-DD"}` / `{"week": "YYYY-Www"}` |
-| Revoke a kiosk | Cognito, disable user `kiosk-01` |
+| Disable a kiosk | Cognito, disable user `kiosk-01`; already-issued access JWTs may remain valid for up to 60 minutes |
 | Roll back | Revert commit on `main`, run a new manual plan, review it, then apply through the protected `prod` environment |
 | Restore data | DynamoDB point-in-time restore to a new table, then swap |
 

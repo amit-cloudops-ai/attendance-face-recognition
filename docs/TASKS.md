@@ -28,7 +28,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T13 | Review Terraform state bucket bootstrap specification | DONE | Versioning, public access block, SSE-S3, ownership controls, TLS-only policy and state/lock object scope documented |
 | T14 | Audit GitHub OIDC trust and deployment workflow permissions | DONE | Exact audience/subjects, operation-specific environments, branch gates, token permissions and no static credentials |
 | T15 | Audit encrypted Terraform plan artifact lifecycle | DONE | Exact workflow/run/attempt/commit binding, encryption, one-day retention, artifact access and identity cleanup |
-| T16 | Reconcile GitHub environment variables, secrets and protection rules | BLOCKED | Exact names/scopes documented; actual environment secrets, reviewers and branch restrictions must be configured and verified by repository admin |
+| T16 | Reconcile GitHub environment variables, secrets and protection rules | BLOCKED | Solo-owner model documented; owner-only apply checkpoints with self-review allowed; actual environment settings/secrets and branch restrictions still require configuration and verification |
 | T17 | Add or verify infrastructure template linting in CI | DONE | No CloudFormation/SAM source exists; Terraform and JSON policy templates are validated; CI fails if unlinted CloudFormation/SAM is introduced |
 | T18 | Produce exact manual bootstrap change plan | BLOCKED | Bootstrap plan documented; exact AWS account ID, globally unique state bucket suffix and owner approval are required before finalizing mutation inventory |
 | T19 | Open solo-only deployment-readiness PR to develop | TODO | T16/T18 and required security/CI gates resolved; PR contains only approved solo implementation; teammate PRs remain separate |
@@ -51,13 +51,21 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T37 | Build dedicated billing plan/apply policies and OIDC roles | DONE | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
 
 | T38 | Establish canonical AWS region manifest and CI drift prevention | DONE | Terraform providers, backend initialization, Lambda SDKs, contracts, frontend config, IAM regional ARNs and documentation resolve to config/deployment.json; CI fails on any conflicting region or legacy region reference |
+| T39 | Complete full solo pre-deployment audit and close static blockers | IN_PROGRESS | Phased findings in docs/PREDEPLOYMENT-AUDIT.md; Part 1 application corrections and Part 2 static fixes are in PR #29; CI run 43630911862 passed on code/script commit; live SNS/KMS delivery and expanded AWS inventory remain open |
+| T40 | Correct encrypted SNS/KMS permissions and verify alert delivery | BLOCKED | Static KMS key policy, SNS topic policy, daily/weekly publisher permissions and runtime boundary checks are now in PR #29; latest CI and live dev notification/email confirmation remain required |
+| T41 | Make local Terraform deployment inputs and packaging safe | IN_PROGRESS | Callback/boundary examples, account-bound ARN validation, provider allowed-account restrictions, STS wrapper guard and config.json exclusion are in PR #29; local WSL verification remains |
+| T42 | Complete runtime failure monitoring and raw-image retention guarantee | TODO | Add Scheduler target-error monitoring, durable scheduled-job failure handling, and test/implement cleanup for raw objects after failure-processor exhaustion |
+| T43 | Complete browser and deployed integration acceptance | TODO | Cognito/PKCE, camera, CORS, enrollment/offboarding, reports, schedule jobs, real capture-to-screen p95, and browser/device matrix verified in dev |
+| T44 | Make business updates and audit events atomic | TODO | Employee create/deactivate, settings updates and attendance overrides must commit with their audit event atomically or use a durable outbox; add failure-injection tests |
+| T45 | Complete biometric consent, privacy and token-revocation controls | BLOCKED | Owner/privacy approval for notice version, purpose, retention, deletion/withdrawal and us-east-1 processing; decide response to 60-minute JWT revocation delay |
+| T46 | Define attendance report data retention | TODO | Set reports bucket lifecycle and noncurrent-version expiry consistent with the approved retention schedule |
 
 ## Phase C — release and operations
 
 | ID | Task | Status | Acceptance criteria |
 |---|---|---|---|
 | T25 | Establish operational runbooks and incident response | TODO | Alert ownership, severity, triage, recovery, escalation and rollback documented |
-| T26 | Verify budget alarms and cost guardrails | TODO | Budgets, thresholds, notification paths and expected monthly cost documented and tested |
+| T26 | Verify budget alarms and cost guardrails | BLOCKED | Owner must choose one account-wide budget or separate Environment-tag-filtered dev/prod budgets; current two budgets both track total account spend |
 | T27 | Verify backup, restore and disaster recovery procedures | TODO | Recovery objectives, backup configuration and restore test evidence recorded |
 | T28 | Add dependency and container/code supply-chain checks | TODO | Dependency scanning and pinned/reviewed CI actions with actionable failure policy |
 | T29 | Complete end-to-end release documentation | TODO | Architecture, deployment, configuration, operator and user documentation agree with implementation |
@@ -72,10 +80,16 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T13 state bucket bootstrap specification: PR #21; CI run 43618372200 passed.
 - T14 GitHub OIDC hardening: PR #22; CI run 43618685801 passed.
 - T15 encrypted plan artifact lifecycle: PR #23; CI run 43618692691 passed.
-- T16 GitHub environment setup: PR #24; documentation is ready, but actual GitHub environment settings cannot be inspected or configured by the current connector. Repository-admin action is required.
+- T16 GitHub environment setup: PR #24; solo-owner governance documented; actual GitHub environment settings cannot be inspected or configured by the current connector. Repository-admin action is required.
 - T17 template linting: PR #25; CI run 43619026006 passed. No CloudFormation/SAM templates exist; Terraform and JSON policy templates are validated in CI.
-- T18 manual bootstrap plan: PR #26; plan is documented and CI run 43619095037 passed. Exact account ID, globally unique bucket suffix and owner approval remain required.
+- T18 manual bootstrap plan: PR #26; plan is documented and CI run 43619095037 passed. Account 924422830139 verified by read-only STS; globally unique bucket suffix and explicit owner approval remain required.
 - T37 implementation is complete: billing plan/apply policy and OIDC trust templates, isolated billing workflow path and six-environment documentation are validated by CI run 43620012088. PR #27.
 - T38 is complete and merged into `solo/amit-monday`: canonical region manifest, Terraform provider loading, backend wrapper/workflow export, contract/example updates, Moto fixture alignment and repository-wide region drift guard. Consolidated CI run 43622637663 passed all 27 Python/security steps and all 21 Terraform formatting/validation steps on head commit `8bae76d788074e9c0d47d886fe355fddbcff709f`.
 - Consolidation PR #28 was merged into `solo/amit-monday` at merge commit `a43adea001009004597e19e1c04c14079205865a`. It contains the T01–T38 security and region-guard work. The individual task PRs remain historical and may remain open; do not merge teammate PRs or promote to `main`/`develop` without the required T16/T18 gates and owner direction.
 - No AWS resources, OIDC provider, IAM roles, boundaries, state bucket or KMS keys have been created. No remote backend init, Terraform plan or apply has been run. PR #28 merge did not provision AWS resources.
+
+- T39 pre-deployment audit is in progress on PR #29. It corrects the DynamoDB KMS key-policy attachment, Python 3 command usage, deploy-time STS account assertion, Lambda JSON logging, solo-owner governance, route-contract coverage and dev raw-image cleanup verification. The expanded read-only AWS inventory has not yet been run. Do not treat T39 as DONE until CI passes and the owner has completed the required local checks.
+
+- T40–T43 are newly identified by the full pre-deployment audit. Do not mark them complete based on static Terraform validation alone; T40 requires a live dev notification test, and T43 requires a deployed dev environment.
+
+- T44–T46 were added by the full pre-deployment audit. T45 requires a product/privacy decision; do not treat a boolean consent flag as a complete governance process.

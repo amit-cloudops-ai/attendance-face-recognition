@@ -1,6 +1,6 @@
 # SPEC: Scope and Finish Line
 
-**Version 1.1, FROZEN on 14 Nov 2026.** This amendment changes only the deployment region to `us-east-1`; functional scope and acceptance criteria are unchanged. Any further change needs lead approval and an update to this file in the same PR.
+**Version 1.2, FROZEN on 14 Nov 2026.** Version 1.1 established `us-east-1` as the deployment region. Version 1.2 clarifies the solo-owner release governance; functional scope and acceptance criteria are unchanged. Any further change needs owner approval and an update to this file in the same PR.
 **Target:** production-ready and live by **15 Nov 2026**. Submission 16 Nov (buffer day).
 
 ## 1. Purpose
@@ -33,13 +33,13 @@ Contactless attendance for ~100 employees: face capture in browser, recognition 
 ## 4. Non-functional acceptance criteria
 | ID | Criterion | How we prove it |
 |---|---|---|
-| N01 | p95 capture-click to result-on-screen is 3 s or less over 20 consecutive scans (warm) | `scripts/e2e_smoke` timing output pasted in STATUS |
-| N02 | No raw image remains in the raw bucket 10 minutes after any test | List `captures/` and `enroll/` after test: empty |
+| N01 | p95 capture-click to result-on-screen is 3 s or less over 20 consecutive scans (warm) | Browser/device stopwatch or automated browser timing evidence; API smoke p95 is supplemental only |
+| N02 | No raw image remains in the raw bucket 10 minutes after any test | `scripts/e2e_smoke.sh` checks each uploaded key and confirms `captures/` and `enroll/` are empty |
 | N03 | Encryption at rest on DynamoDB and S3 (KMS); TLS-only bucket policies | Screenshots + Terraform |
 | N04 | One IAM role per Lambda; no `*` resources except where AWS requires it (logs) | IAM matrix in ARCHITECTURE section 6 matches Terraform |
 | N05 | No public bucket; only CloudFront reads the web bucket | Block Public Access screenshot |
 | N06 | `terraform apply` from a clean checkout builds a working environment | Rebuild dev from scratch once before freeze |
-| N07 | CI green on `main`; no direct pushes; at least 1 review on every PR | Branch protection screenshot |
+| N07 | CI green on `main`; no direct pushes; every change goes through a PR whose diff and CI are inspected by the repository owner before merge (solo-owner model; no independent reviewer) | Branch protection screenshot and owner PR checklist |
 | N08 | Alarms email the lead: any Lambda errors, DLQ depth above 0, daily/weekly job failure, monthly budget over 15 USD | Trigger one alarm deliberately |
 | N09 | Monthly cost at 100 employees x 2 scans/day is 15 USD or less | docs/COST.md |
 | N10 | Logs retained 30 days, JSON structured, never contain images, tokens or full face data | Code review + sample log |
@@ -57,8 +57,8 @@ Contactless attendance for ~100 employees: face capture in browser, recognition 
 1. **Unit tests** (each Part, `pytest`, moto for S3/DynamoDB, mocks for Rekognition).
 2. **Contract tests** (`tests/contract`): assert every Lambda reads and writes exactly the shapes in contracts.md.
 3. **Integration on dev**: API calls against the deployed dev stack.
-4. **E2E smoke** (`scripts/e2e_smoke`): enroll, scan, scan again, query, run daily job, fetch report.
-5. **Pilot**: the whole team uses the prod kiosk for real for at least 1 working day before submission.
+4. **E2E smoke** (`scripts/e2e_smoke.sh`): verify AWS account, enroll, run at least 20 scans, verify duplicate debounce, verify raw-image deletion, and query attendance. **Scheduled-job acceptance** is a separate dev-only check: invoke daily/weekly jobs with controlled test periods and verify JSON/CSV reports and absence calculations.
+5. **Pilot**: a consenting cohort of intended employees uses the dev kiosk under supervision for at least 1 working day; record false matches, missed matches, usability issues and latency before production approval.
 
 ## 7. Project Definition of Done (release gate, 15 Nov)
 - [ ] All MUST criteria pass (F01-F10, F12, N01-N11); evidence linked in STATUS
@@ -69,5 +69,6 @@ Contactless attendance for ~100 employees: face capture in browser, recognition 
 
 ## 8. Known limitations (declared up front)
 - **Still-photo spoofing:** v1 uses still images; a printed or on-screen photo of an enrolled employee could match. Mitigations in v1: strict threshold (default 95, tunable), kiosk supervised by reception, audit trail. Planned fix (LATER): Rekognition Face Liveness.
+- **JWT revocation delay:** API Gateway validates JWTs statelessly. Disabling a Cognito kiosk/admin user prevents future authentication/refresh but does not immediately invalidate an already-issued access token; it can remain usable until its 60-minute expiry. A server-side denylist or shorter-token/refresh design is deferred.
 - Lighting and camera quality affect accuracy; enrollment with 3-5 varied photos is mandatory.
 - Single region (us-east-1), no multi-region failover. The canonical region is `config/deployment.json`.

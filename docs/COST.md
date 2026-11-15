@@ -17,6 +17,11 @@
 | EventBridge Scheduler, SNS | tiny | 0 USD |
 | **Total (worst case)** | | **about 12 to 14 USD / month** |
 
+**Budget and cost-control caveats**
+- The estimate is for one active environment at the stated workload. Running dev and prod simultaneously at similar volume can approach twice the application-service cost.
+- The current two $15 budget resources have no environment cost filters; both track total account spend and duplicate account-wide alerts. Resolve the budget scope before applying the billing root.
+- AWS Budgets notifications are not a hard spending cap. AWS reports that budget data is refreshed periodically and notifications can arrive after charges have accrued; see [AWS Budgets best practices](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-best-practices.html).
+
 **Sensitivities**
 - 30-day month instead of 22 working days: Rekognition about 12 USD.
 - Skip separate DetectFaces (rely on SearchFacesByImage only): halves Rekognition cost, loses the multiple-faces and quality checks. We keep both for correctness.

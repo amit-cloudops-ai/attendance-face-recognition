@@ -83,11 +83,11 @@
       "Resource": "arn:aws:s3:::attendance-prod-${account_id}-reports/reports/*"
     },
     {
-      "Sid": "KmsRuntimeAccessViaS3AndSqs",
+      "Sid": "KmsRuntimeAccessViaS3SqsAndSns",
       "Effect": "Allow",
       "Action": [
         "kms:Decrypt",
-        "kms:GenerateDataKey"
+        "kms:GenerateDataKey*"
       ],
       "Resource": "arn:aws:kms:us-east-1:${account_id}:key/*",
       "Condition": {
@@ -97,7 +97,8 @@
         "StringEquals": {
           "kms:ViaService": [
             "s3.us-east-1.amazonaws.com",
-            "sqs.us-east-1.amazonaws.com"
+            "sqs.us-east-1.amazonaws.com",
+            "sns.us-east-1.amazonaws.com"
           ]
         }
       }

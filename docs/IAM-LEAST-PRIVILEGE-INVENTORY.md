@@ -1,6 +1,6 @@
 # IAM least-privilege inventory — deployment and runtime roles
 
-**Application baseline:** `solo/amit-monday`; security tasks T01–T37 are consolidated on `release/phase-b-region-guard`.
+**Application baseline:** `solo/amit-monday`; security tasks T01–T38 are consolidated on `solo/amit-monday`.
 **Target region:** `us-east-1`  
 **Status:** candidate inventory only. This document is not an attachable policy and does not authorize AWS changes.
 
@@ -21,7 +21,7 @@ OIDC requirements:
 - Dev subjects: `...:environment:dev-plan` and `...:environment:dev-apply`; both restricted to `develop`.
 - Prod subjects: `...:environment:prod-plan` and `...:environment:prod-apply`; both restricted to `main`.
 - Billing subjects: `...:environment:billing-plan` and `...:environment:billing-apply`; both restricted to `main`.
-- Apply environments require an independent reviewer and self-review prevention. See `docs/GITHUB-ENVIRONMENT-SETUP.md`.
+- Apply environments require the repository owner's manual approval checkpoint, with self-review allowed. This is not independent separation of duties. See `docs/GITHUB-ENVIRONMENT-SETUP.md`.
 
 Plan roles must not have infrastructure mutation permissions. Prod plan/apply permissions must be separate from dev. Do not use static AWS credentials or wildcard OIDC subjects.
 
@@ -77,7 +77,7 @@ The data handler review confirms these concrete SDK operations in the solo imple
 | override | GetItem employee/attendance; PutItem attendance/audit | Existing policy covers the observed calls |
 | settings | PutItem config/audit | Existing policy covers the observed calls |
 
-Data-role KMS correction: DynamoDB encryption is service-managed. Only daily_job/weekly_job report writers and the reports reader receive direct KMS actions. Recognition raw-image and encrypted-SQS KMS actions are separately documented in section 3B. The foundation key's SNS and CloudFront service statements still require provider/resource-scope review in the foundation-module task.
+Data-role KMS correction: DynamoDB encryption is service-managed. Only daily_job/weekly_job report writers and the reports reader receive direct KMS actions. Recognition raw-image and encrypted-SQS KMS actions are separately documented in section 3B. The foundation key's SNS, CloudWatch alarm and CloudFront service statements require exact source-ARN review and live notification testing in dev.
 
 The runtime policy code has now been changed to remove the blanket KMS grant from every Lambda role and instead add per-handler KMS statements:
 
@@ -98,6 +98,7 @@ The foundation KMS key policy includes a Lambda service-principal statement for 
 AWS authorization references reviewed:
 - S3 SSE-KMS requires `kms:GenerateDataKey` for PutObject and `kms:Decrypt` for GetObject: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html
 - SQS SSE-KMS producers require `kms:GenerateDataKey` and `kms:Decrypt`; consumers require `kms:Decrypt`: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-key-management.html
+- Encrypted SNS publishers require `kms:GenerateDataKey*` and `kms:Decrypt`; CloudWatch alarms need a customer-managed key policy statement for `cloudwatch.amazonaws.com` when publishing to an encrypted topic.
 
 This is a static code/policy review, not live AWS authorization proof. T02–T08 and T31–T36 record the completed policy/provider/region hardening. The remaining validation is IAM Access Analyzer plus approved dev deployment evidence; do not treat static CI as a substitute for live authorization.
 
@@ -118,7 +119,7 @@ Two environment-specific boundary policy templates have been drafted:
 - `infra/policies/execution-role-boundary-dev.json.tftpl` — rendered policy name: `attendance-dev-execution-boundary`.
 - `infra/policies/execution-role-boundary-prod.json.tftpl` — rendered policy name: `attendance-prod-execution-boundary`.
 
-The templates cap the union of runtime permissions identified by the data and recognition call-site audits. They use exact environment resource ARNs and an account-ID template variable. KMS use is limited to the environment key alias via `kms:ResourceAliases` and to S3/SQS forward access sessions via `kms:ViaService`. The templates are allow-list boundaries: they contain no IAM management, STS, provisioning, `iam:PassRole`, or boundary self-management actions. `rekognition:DetectFaces` is the only runtime action with `Resource: "*"`, because AWS does not support resource-level authorization for that action.
+The templates cap the union of runtime permissions identified by the data and recognition call-site audits. They use exact environment resource ARNs and an account-ID template variable. KMS use is limited to the environment key alias via `kms:ResourceAliases` and to S3/SQS/SNS forward access sessions via `kms:ViaService`. Daily/weekly job roles require `kms:Decrypt` and `kms:GenerateDataKey*` to publish to the encrypted alerts topic. The templates are allow-list boundaries: they contain no IAM management, STS, provisioning, `iam:PassRole`, or boundary self-management actions. `rekognition:DetectFaces` is the only runtime action with `Resource: "*"`, because AWS does not support resource-level authorization for that action.
 
 A permissions boundary does not grant permissions; each role still needs its own least-privilege inline policy. The templates are not yet attachable because the verified 12-digit account ID must be supplied at render time. Rendered JSON and ARNs must be validated before bootstrap.
 
@@ -192,7 +193,7 @@ The seven data handlers were reviewed against their actual boto3 call sites and 
 | settings | Config GetItem via get_settings; PutItem config; PutItem audit | Exact config and audit table ARNs | Exact actions/resources present; no UpdateItem required |
 
 KMS review:
-- daily_job and weekly_job each write report JSON and CSV objects through single-part `PutObject`; the role's `kms:GenerateDataKey` grant is scoped to the project CMK.
+- daily_job and weekly_job each write report JSON and CSV objects through single-part `PutObject`; the role's `kms:Decrypt` and `kms:GenerateDataKey*` grants are scoped to the project CMK and SNS/S3 forward access sessions.
 - reports reads the generated report JSON using `GetObject`; its `kms:Decrypt` grant is scoped to the same CMK.
 - No data handler requires direct KMS access for DynamoDB table encryption; DynamoDB performs encryption/decryption on behalf of the caller.
 - The report bucket policy and CMK resource policy still need validation in the foundation policy task. This static call-site audit does not prove live authorization.

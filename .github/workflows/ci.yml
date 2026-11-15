@@ -35,6 +35,7 @@ jobs:
           bash -n scripts/aws_preflight_readonly.sh
           bash -n scripts/configure_github_environments.sh
           bash -n scripts/configure_branch_protection.sh
+          bash -n scripts/local_predeploy_check.sh
       - name: Validate GitHub Actions workflow YAML
         run: |
           python - <<'PY'
@@ -68,11 +69,12 @@ jobs:
                       raise SystemExit(f"Boundary must not manage IAM/STS: {path}")
                   if statement.get("Resource") == "*" and actions != ["rekognition:DetectFaces"]:
                       raise SystemExit(f"Unexpected unscoped resource in {path}: {actions}")
-              kms = next(s for s in statements if s["Sid"] == "KmsRuntimeAccessViaS3AndSqs")
+              kms = next(s for s in statements if s["Sid"] == "KmsRuntimeAccessViaS3SqsAndSns")
               if kms["Condition"]["ForAnyValue:StringEquals"]["kms:ResourceAliases"] != expected_alias:
                   raise SystemExit(f"Wrong KMS alias scope in {path}")
               if set(kms["Condition"]["StringEquals"]["kms:ViaService"]) != {
-                  "s3.us-east-1.amazonaws.com", "sqs.us-east-1.amazonaws.com"
+                  "s3.us-east-1.amazonaws.com", "sqs.us-east-1.amazonaws.com",
+                  "sns.us-east-1.amazonaws.com"
               }:
                   raise SystemExit(f"Wrong KMS ViaService scope in {path}")
               compact = json.dumps(policy, separators=(",", ":"))
@@ -266,8 +268,142 @@ jobs:
               if "kms_key_id" not in root[start:end]:
                   raise SystemExit(f"{env} access module must receive foundation KMS key ID")
           access_outputs = Path("infra/modules/access/outputs.tf").read_text(encoding="utf-8")
-          if "cognito-idp.us-east-1.amazonaws.com" not in access_outputs:
-              raise SystemExit("Cognito issuer output must match us-east-1")
+          if 'data "aws_region" "current"' not in access or "data.aws_region.current.name" not in access:
+              raise SystemExit("Access module must derive regional endpoints from the configured provider region")
+          if "us-east-1" in access:
+              raise SystemExit("Access module must not hardcode the deployment region; use the provider region data source")
+          if "cognito-idp.${local.region}.amazonaws.com" not in access_outputs:
+              raise SystemExit("Cognito issuer output must match the provider region")
+          PY
+
+      - name: Validate Lambda JSON logging and retention
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          for module in ("data", "recognition"):
+              source = Path(f"infra/modules/{module}/main.tf").read_text(encoding="utf-8")
+              required = (
+                  'logging_config {',
+                  'log_format            = "JSON"',
+                  'application_log_level = "INFO"',
+                  'system_log_level      = "WARN"',
+                  'log_group             = aws_cloudwatch_log_group.lambda[each.key].name',
+                  'retention_in_days = 30',
+              )
+              for item in required:
+                  if item not in source:
+                      raise SystemExit(f"{module} Lambda logging configuration missing: {item}")
+          PY
+
+      - name: Validate local Terraform account and frontend config guards
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          wrapper = Path("scripts/terraform.sh").read_text(encoding="utf-8")
+          for path in ("infra/envs/dev/versions.tf", "infra/envs/prod/versions.tf", "infra/billing/versions.tf"):
+              source = Path(path).read_text(encoding="utf-8")
+              if "allowed_account_ids = [var.account_id]" not in source:
+                  raise SystemExit(f"{path} does not restrict provider account identity")
+          if 'path != "config.json"' not in access:
+              raise SystemExit("Generated web/config.json is not excluded from the generic frontend fileset")
+          if "aws sts get-caller-identity" not in wrapper or "EXPECTED_AWS_ACCOUNT_ID" not in wrapper:
+              raise SystemExit("Local Terraform wrapper is missing its STS account guard")
+          dev_vars = Path("infra/envs/dev/terraform.tfvars.example").read_text(encoding="utf-8")
+          prod_vars = Path("infra/envs/prod/terraform.tfvars.example").read_text(encoding="utf-8")
+          if "http://localhost:8000/callback.html" not in dev_vars:
+              raise SystemExit("Dev callback example does not match web/callback.html")
+          if "attendance-dev-execution-boundary" not in dev_vars:
+              raise SystemExit("Dev tfvars example is missing the required execution boundary ARN")
+          if "attendance-prod-execution-boundary" not in prod_vars:
+              raise SystemExit("Prod tfvars example is missing the required execution boundary ARN")
+          billing_vars = Path("infra/billing/terraform.tfvars.example").read_text(encoding="utf-8")
+          if 'account_id  = "123456789012"' not in billing_vars:
+              raise SystemExit("Billing tfvars example is missing the expected account ID")
+          PY
+
+      - name: Validate tagged Rekognition collection creation
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("infra/modules/recognition/main.tf").read_text(encoding="utf-8")
+          if 'tags = {' not in source[source.index('resource "aws_rekognition_collection" "faces"'):]:
+              raise SystemExit("Rekognition collection must be tagged at creation")
+          for env in ("dev", "prod"):
+              path = Path(f"infra/policies/github-apply-{env}-core.json.tftpl")
+              policy = json.loads(path.read_text(encoding="utf-8").replace("${account_id}", "123456789012"))
+              statement = next(s for s in policy["Statement"] if s["Sid"] == "RekognitionCollectionCreate")
+              conditions = statement.get("Condition", {}).get("StringEquals", {})
+              if conditions.get("aws:RequestTag/Project") != "attendance":
+                  raise SystemExit(f"{env} Rekognition collection create is missing the Project tag guard")
+              if conditions.get("aws:RequestTag/Environment") != env:
+                  raise SystemExit(f"{env} Rekognition collection create is missing the Environment tag guard")
+          PY
+
+      - name: Validate foundation dependency ordering
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          for env in ("dev", "prod"):
+              root = Path(f"infra/envs/{env}/main.tf").read_text(encoding="utf-8")
+              for module in ("data", "recognition"):
+                  start = root.index(f'module "{module}"')
+                  end = root.find("\n}", start)
+                  if not re.search(r"depends_on\s*=\s*\[module\.foundation\]", root[start:end]):
+                      raise SystemExit(f"{env} {module} module must wait for foundation resources and SNS topic policy")
+          PY
+
+      - name: Validate encrypted SNS notification KMS permissions
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          access = Path("infra/modules/access/main.tf").read_text(encoding="utf-8")
+          data = Path("infra/modules/data/main.tf").read_text(encoding="utf-8")
+          foundation = Path("infra/modules/foundation/main.tf").read_text(encoding="utf-8")
+          key_policy = access.split('data "aws_iam_policy_document" "attendance_kms_key"', 1)[1].split(
+              'resource "aws_kms_key_policy"', 1
+          )[0]
+          sns = key_policy.split('sid    = "AllowEncryptedAlertsTopic"', 1)[1].split("  statement {", 1)[0]
+          cloudwatch = key_policy.split(
+              'sid    = "AllowCloudWatchAlarmsToPublishToEncryptedAlertsTopic"', 1
+          )[1].split("  statement {", 1)[0]
+          if "sns.amazonaws.com" not in sns or "kms:Decrypt" not in sns or "kms:GenerateDataKey*" not in sns:
+              raise SystemExit("Encrypted SNS topic must permit SNS to use the customer-managed key")
+          if "cloudwatch.amazonaws.com" not in cloudwatch:
+              raise SystemExit("CloudWatch alarm service principal is missing from the alerts KMS key policy")
+          topic_policy = foundation.split('data "aws_iam_policy_document" "alerts_topic"', 1)[1].split(
+              'resource "aws_sns_topic_policy" "alerts"', 1
+          )[0]
+          if "cloudwatch.amazonaws.com" not in topic_policy or 'actions   = ["sns:Publish"]' not in topic_policy:
+              raise SystemExit("SNS topic policy does not allow CloudWatch alarms to publish")
+          for required in ("aws:SourceAccount", "aws:SourceArn", "ArnLike"):
+              if required not in topic_policy:
+                  raise SystemExit(f"SNS topic CloudWatch policy missing {required}")
+          for required in ("kms:Decrypt", "kms:GenerateDataKey*", "aws:SourceAccount", "aws:SourceArn", "ArnLike"):
+              if required not in cloudwatch:
+                  raise SystemExit(f"CloudWatch encrypted SNS KMS statement missing {required}")
+          for job in ("daily_job", "weekly_job"):
+              section = data.split(f"{job} = [{{", 1)[1].split("}]", 1)[0]
+              if "kms:Decrypt" not in section or "kms:GenerateDataKey*" not in section:
+                  raise SystemExit(f"{job} role lacks KMS permissions required for encrypted SNS publishing")
+          for env in ("dev", "prod"):
+              path = Path(f"infra/policies/execution-role-boundary-{env}.json.tftpl")
+              policy = json.loads(path.read_text(encoding="utf-8").replace("${account_id}", "123456789012"))
+              kms = next(s for s in policy["Statement"] if s["Sid"] == "KmsRuntimeAccessViaS3SqsAndSns")
+              via = set(kms["Condition"]["StringEquals"]["kms:ViaService"])
+              if "sns.us-east-1.amazonaws.com" not in via:
+                  raise SystemExit(f"{env} runtime boundary blocks KMS use through SNS")
+              publish = next(s for s in policy["Statement"] if s["Sid"] == "AlertsTopicPublish")
+              if "sns:Publish" not in publish["Action"] or f"attendance-{env}-alerts" not in publish["Resource"]:
+                  raise SystemExit(f"{env} runtime boundary does not scope SNS publish to its alerts topic")
           PY
 
       - name: Validate DynamoDB customer-managed KMS policies
@@ -282,10 +418,22 @@ jobs:
               "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext", "kms:CreateGrant",
               "kms:DescribeKey",
           }
-          if "AllowDynamoDBUseOfKeyThroughService" not in access:
-              raise SystemExit("Missing DynamoDB KMS ViaService statement")
-          if "dynamodb.us-east-1.amazonaws.com" not in access or "kms:CallerAccount" not in access:
-              raise SystemExit("DynamoDB KMS service statement must be account and region constrained")
+          web_policy = access.split('data "aws_iam_policy_document" "web_bucket"', 1)[1].split(
+              'data "aws_iam_policy_document" "attendance_kms_key"', 1
+          )[0]
+          key_policy = access.split('data "aws_iam_policy_document" "attendance_kms_key"', 1)[1].split(
+              'resource "aws_kms_key_policy"', 1
+          )[0]
+          if "AllowDynamoDBUseOfKeyThroughService" in web_policy or "kms:ViaService" in web_policy:
+              raise SystemExit("DynamoDB KMS permissions must not be placed in the S3 bucket policy")
+          if "AllowDynamoDBUseOfKeyThroughService" not in key_policy:
+              raise SystemExit("Missing DynamoDB KMS ViaService statement in the actual KMS key policy")
+          if "AllowDynamoDBCreateGrantThroughService" not in key_policy:
+              raise SystemExit("Missing AWS-resource-constrained DynamoDB CreateGrant statement in KMS key policy")
+          if "dynamodb.${local.region}.amazonaws.com" not in key_policy or "kms:CallerAccount" not in key_policy:
+              raise SystemExit("DynamoDB KMS key-policy statement must be account and region constrained")
+          if "kms:GrantIsForAWSResource" not in key_policy:
+              raise SystemExit("DynamoDB CreateGrant must be limited to AWS resources")
 
           for env in ("dev", "prod"):
               path = Path(f"infra/policies/github-apply-{env}-dynamodb-kms.json.tftpl")
@@ -501,9 +649,11 @@ jobs:
               source = path.read_text(encoding="utf-8")
               for required in ('backend "s3"', f'key          = "{key}"',
                                "encrypt      = true", "use_lockfile = true",
-                               manifest_path, "region = local.deployment_region"):
+                               manifest_path):
                   if required not in source:
                       raise SystemExit(f"{path} missing backend/provider requirement: {required}")
+              if not re.search(r"^\s*region\s*=\s*local\.deployment_region\s*$", source, re.MULTILINE):
+                  raise SystemExit(f"{path} provider region must load from the canonical manifest")
               backend = source.split('backend "s3" {', 1)[1].split("}", 1)[0]
               if re.search(r"^\s*region\s*=", backend, re.MULTILINE):
                   raise SystemExit(f"{path} duplicates backend region outside canonical manifest")
@@ -568,8 +718,8 @@ jobs:
 
           docs = Path("docs/GITHUB-OIDC-DEPLOYMENT.md").read_text(encoding="utf-8")
           for required in ("dev-plan", "dev-apply", "prod-plan", "prod-apply", "billing-plan", "billing-apply",
-                           "prevent self-review", "TF_PLAN_AGE_RECIPIENT",
-                           "TF_PLAN_AGE_IDENTITY", "CODEOWNERS"):
+                           "solo-owner", "self-review is allowed", "TF_PLAN_AGE_RECIPIENT",
+                           "TF_PLAN_AGE_IDENTITY"):
               if required not in docs:
                   raise SystemExit(f"OIDC deployment guide missing: {required}")
           PY
@@ -627,8 +777,8 @@ jobs:
               "EXECUTION_ROLE_BOUNDARY_ARN", "TF_STATE_BUCKET",
               "COGNITO_CALLBACK_URLS", "COGNITO_LOGOUT_URLS", "ALLOWED_ORIGINS",
               "TF_PLAN_AGE_RECIPIENT", "TF_PLAN_AGE_IDENTITY",
-              "prevent self-review", "Require pull requests", "Python",
-              "terraform-fmt", "cannot be verified from this session",
+              "solo-owner", "self-review allowed", "Require pull requests", "Python",
+              "terraform-fmt", "remain unverified",
           ):
               if required not in docs:
                   raise SystemExit(f"GitHub environment setup guide missing: {required}")
@@ -784,6 +934,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
       - uses: actions/checkout@v4
       - run: terraform fmt -check -diff -recursive infra
       - name: Verify committed environment and billing provider lockfiles

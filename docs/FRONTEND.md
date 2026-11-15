@@ -29,13 +29,25 @@ The access module uploads every file under `web/` to the private web bucket and 
 
 3. Ensure the dev Cognito app client callback and logout URLs include `http://localhost:8000/callback.html` and `http://localhost:8000/`.
 4. Ensure the dev raw-bucket CORS allowed origins include `http://localhost:8000`.
-5. Run `python -m http.server 8000 --directory web` and open `http://localhost:8000`. Camera access is permitted on localhost.
+5. Run `python3 -m http.server 8000 --directory web` and open `http://localhost:8000`. Camera access is permitted on localhost.
 
 For the deployed site, the generated config uses the same-origin API base `/api`. Do not point production users at a direct API Gateway URL.
 
 ## First deployment CORS step
 
 The raw bucket is created by the foundation module, while the CloudFront distribution is created by the access module. To avoid a Terraform dependency cycle, the first deployment uses the configured `allowed_origins` list (default: localhost). After the first approved deployment, add the exact CloudFront site origin from the Terraform output to `allowed_origins`, `callback_urls` and `logout_urls`, then run a reviewed second plan/apply. This is required for browser-to-S3 presigned POST uploads and Cognito Hosted UI redirects to work on the deployed domain.
+
+## First Cognito users after the first successful deployment
+
+Terraform creates the Cognito user pool and the `admin` and `kiosk` groups, but deliberately does not create user accounts. Public self-registration is disabled.
+
+1. In the AWS Cognito console, open the deployed environment's user pool.
+2. Create the first administrator account using an approved work email. Complete the temporary-password setup and verify the email.
+3. Add that user to the `admin` group.
+4. Create a separate reception/kiosk account and add it to the `kiosk` group. The admin group is also allowed to use kiosk endpoints for supervised testing.
+5. Store credentials in the approved password manager; never commit them or paste them into logs.
+
+After the first apply, confirm the SNS email subscription from the AWS confirmation email. Repeat for any budget notification subscription. Until confirmed, email alarms may not be delivered.
 
 ## Browser verification matrix
 

@@ -1,6 +1,6 @@
-# Contracts (FROZEN v1.1)
+# Contracts (FROZEN v1.2)
 
-**Region amendment (14 Nov 2026):** The deployment region is `us-east-1`. `config/deployment.json` is the repository's canonical region manifest. Terraform providers read it directly; deployment/local Terraform wrappers export the same value for the S3 backend. Lambda SDK clients use the Lambda-reserved `AWS_REGION`. Do not add independent region literals.
+**Version 1.2 clarification (14 Nov 2026):** The deployment region is `us-east-1`; `config/deployment.json` is the canonical region manifest. Version 1.2 also documents the optional `request_id` argument used for exactly-once scan transitions and the deterministic offboarding audit key. No external HTTP request/response shape or result-code vocabulary changes.
 
 Every name, schema, endpoint and code in this file is a promise between Parts. **Do not rename or reshape anything here.** If you think something must change, tell the lead; the lead changes it here first, then everyone updates. AIs and humans: copy names exactly.
 
@@ -49,7 +49,7 @@ GSI **`date-index`**: PK `date`, SK `employee_id`, projection ALL.
 `face_match_threshold` N default 95, `min_brightness` N default 40, `min_sharpness` N default 40, `grace_minutes` N default 15, `debounce_minutes` N default 10, `weekend_days` L of N ISO weekdays (Mon=1..Sun=7) default [6,7], `max_photos_per_employee` N default 5.
 Holiday items: `pk = "HOLIDAY#YYYY-MM-DD"`, `name` S.
 
-**audit**: PK `audit_id` (S, UUID)
+**audit**: PK `audit_id` (S; UUID for ordinary actions, deterministic `faces-delete#employee_id#fingerprint` key for idempotent `faces_delete`)
 `actor` S (Cognito username), `action` S (`override` | `employee_create` | `employee_deactivate` | `faces_delete` | `settings_update`), `employee_id` S (optional), `date` S (optional), `old` M, `new` M, `reason` S, `at` S (ISO).
 
 ## 4. S3 keys
@@ -68,9 +68,9 @@ Only the recognition module defines `aws_s3_bucket_notification` for the raw buc
 | `config.py` | Lead | `get_settings()` returns dict with defaults filled in (60 s in-memory cache) |
 | `responses.py` | Lead | `ok(body, status=200)`, `error(status, code, message)` for API proxy format |
 | `auth.py` | Part C | `require_group(event, "admin" or "kiosk")`; `get_username(event)`. NOTE: HTTP API gives `cognito:groups` as a stringified list like `"[admin]"`, so match with a word-boundary check, never JSON-parse |
-| `record_scan.py` | Part B | `record_scan(employee_id: str, scanned_at: datetime, confidence: float) -> dict` |
+| `record_scan.py` | Shared attendance library | `record_scan(employee_id: str, scanned_at: datetime, confidence: float, request_id: str | None = None) -> dict` |
 
-`record_scan` returns `{"action": "clock_in"|"clock_out"|"duplicate_ignored", "status": "present"|"late", "date": "YYYY-MM-DD", "clock_in": ISO, "clock_out": ISO|None}` and implements F03/F04: first scan of the IST date = clock_in (`late` if time > shift_start + grace_minutes, else `present`); later scan at least `debounce_minutes` after clock_in = update clock_out (last scan wins); otherwise `duplicate_ignored`. Writes use conditional expressions. Part A calls it from the `recognize` Lambda (library call, not a Lambda invoke, for latency).
+`record_scan` returns `{"action": "clock_in"|"clock_out"|"duplicate_ignored", "status": "present"|"late", "date": "YYYY-MM-DD", "clock_in": ISO, "clock_out": ISO|None}`. Production recognition calls must supply the UUID v4 `request_id`; omitting it is retained only for legacy/unit compatibility. The function implements F03/F04: first scan of the IST date = clock_in (`late` if time > shift_start + grace_minutes, else `present`); later scan at least `debounce_minutes` after clock_in = update clock_out (last scan wins); otherwise `duplicate_ignored`. Writes use conditional expressions. Part A calls it from the `recognize` Lambda (library call, not a Lambda invoke, for latency).
 
 ## 6. Result codes
 **Scan** (`kind=scan`): `pending`, `matched` (with `action`), `no_match`, `no_face`, `multiple_faces`, `low_quality`, `inactive`, `error`.

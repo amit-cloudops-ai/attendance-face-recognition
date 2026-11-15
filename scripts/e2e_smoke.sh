@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-required=(API_BASE ADMIN_TOKEN KIOSK_TOKEN EMPLOYEE_ID EMPLOYEE_NAME EMPLOYEE_EMAIL ENROLL_PHOTO_1 ENROLL_PHOTO_2 ENROLL_PHOTO_3 SCAN_PHOTO)
+required=(API_BASE ADMIN_TOKEN KIOSK_TOKEN AWS_ACCOUNT_ID RAW_BUCKET EMPLOYEE_ID EMPLOYEE_NAME EMPLOYEE_EMAIL ENROLL_PHOTO_1 ENROLL_PHOTO_2 ENROLL_PHOTO_3 SCAN_PHOTO)
 for name in "${required[@]}"; do
   if [[ -z "${!name:-}" ]]; then
     echo "Missing required environment variable: $name" >&2
@@ -14,7 +14,7 @@ if [[ "${CONSENT_CONFIRMED:-}" != "YES" ]]; then
   exit 2
 fi
 
-for command in curl jq python3 file; do
+for command in curl jq python3 file aws; do
   command -v "$command" >/dev/null || { echo "Required command not found: $command" >&2; exit 2; }
 done
 
@@ -24,6 +24,20 @@ if [[ ! "$EMPLOYEE_ID" =~ ^[A-Z0-9_-]{3,20}$ ]]; then
 fi
 
 API_BASE="${API_BASE%/}"
+DEPLOY_REGION="${AWS_REGION:-us-east-1}"
+if [[ "$DEPLOY_REGION" != "us-east-1" ]]; then
+  echo "Refusing smoke test outside canonical region us-east-1 (got $DEPLOY_REGION)." >&2
+  exit 2
+fi
+if [[ ! "$AWS_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
+  echo "AWS_ACCOUNT_ID must be the verified 12-digit dev account ID." >&2
+  exit 2
+fi
+actual_account="$(aws sts get-caller-identity --query Account --output text --region "$DEPLOY_REGION")"
+if [[ "$actual_account" != "$AWS_ACCOUNT_ID" ]]; then
+  echo "Refusing smoke test: AWS CLI identity $actual_account does not match AWS_ACCOUNT_ID $AWS_ACCOUNT_ID." >&2
+  exit 2
+fi
 RUNS="${RUNS:-20}"
 if [[ ! "$RUNS" =~ ^[0-9]+$ ]] || (( RUNS < 20 )); then
   echo "RUNS must be an integer of at least 20." >&2
@@ -34,19 +48,39 @@ SHIFT_END="${SHIFT_END:-18:00}"
 DEPARTMENT="${DEPARTMENT:-SmokeTest}"
 TMP_DIR="$(mktemp -d)"
 CREATED=0
+RAW_KEYS=()
 LATENCIES=()
 
 cleanup() {
+  local original_status=$?
+  local final_status="$original_status"
+  local cleanup_failed=0
   if [[ "$CREATED" == "1" ]]; then
     echo "Cleaning up test employee $EMPLOYEE_ID (attendance history is retained)…"
-    curl -sS --max-time 20 -o /dev/null -X DELETE \
+    employee_cleanup_status="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' -X DELETE \
       -H "Authorization: Bearer $ADMIN_TOKEN" \
-      "$API_BASE/admin/employees/$EMPLOYEE_ID" || true
-    curl -sS --max-time 20 -o /dev/null -X DELETE \
+      "$API_BASE/admin/employees/$EMPLOYEE_ID")" || cleanup_failed=1
+    faces_cleanup_status="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' -X DELETE \
       -H "Authorization: Bearer $ADMIN_TOKEN" \
-      "$API_BASE/admin/employees/$EMPLOYEE_ID/faces" || true
+      "$API_BASE/admin/employees/$EMPLOYEE_ID/faces")" || cleanup_failed=1
+    [[ "$employee_cleanup_status" =~ ^(200|204|404)$ ]] || cleanup_failed=1
+    [[ "$faces_cleanup_status" =~ ^(200|204|404)$ ]] || cleanup_failed=1
+  fi
+  # Remove only raw objects uploaded by this smoke test if application cleanup failed.
+  if [[ -n "${RAW_KEYS[*]-}" ]]; then
+    for key in "${RAW_KEYS[@]}"; do
+      aws s3api delete-object --bucket "$RAW_BUCKET" --key "$key" \
+        --region "$DEPLOY_REGION" >/dev/null || cleanup_failed=1
+    done
   fi
   rm -rf "$TMP_DIR"
+  if (( cleanup_failed )); then
+    echo "WARNING: E2E cleanup was incomplete; inspect employee $EMPLOYEE_ID and tracked raw keys." >&2
+    if (( final_status == 0 )); then
+      final_status=1
+    fi
+  fi
+  exit "$final_status"
 }
 trap cleanup EXIT
 
@@ -82,10 +116,14 @@ api_post() {
 
 upload_presigned() {
   local token="$1" request_path="$2" photo="$3"
-  local request upload_url request_id fields_file
+  local request upload_url request_id fields_file raw_key
   request="$(api_post "$token" "$request_path" '{}')"
   upload_url="$(jq -er '.upload.url' <<<"$request")"
   request_id="$(jq -er '.request_id' <<<"$request")"
+  raw_key="$(jq -er '.upload.fields.key' <<<"$request")"
+  RAW_KEYS+=("$raw_key")
+  UPLOAD_REQUEST_ID="$request_id"
+  UPLOAD_RAW_KEY="$raw_key"
   fields_file="$TMP_DIR/fields-$request_id.tsv"
   jq -r '.upload.fields | to_entries[] | [.key, .value] | @tsv' <<<"$request" > "$fields_file"
 
@@ -96,13 +134,44 @@ upload_presigned() {
   # The file part is intentionally last, as required by S3 presigned POST.
   form_args+=(--form "file=@$photo;type=image/jpeg")
   curl -fsS --max-time 30 -o /dev/null -X POST "$upload_url" "${form_args[@]}"
-  printf '%s\n' "$request_id"
+}
+
+verify_raw_deleted() {
+  local key="$1" attempt
+  for attempt in $(seq 1 60); do
+    if aws s3api head-object --bucket "$RAW_BUCKET" --key "$key" --region "$DEPLOY_REGION" \
+      >/dev/null 2>"$TMP_DIR/head-object.err"; then
+      sleep 10
+      continue
+    fi
+    if grep -Eq '\((404|NoSuchKey)\)|Not Found' "$TMP_DIR/head-object.err"; then
+      return 0
+    fi
+    echo "Could not verify raw-image deletion for s3://$RAW_BUCKET/$key; AWS returned an unconfirmed error:" >&2
+    cat "$TMP_DIR/head-object.err" >&2
+    return 1
+  done
+  echo "Raw image still exists after 10 minutes: s3://$RAW_BUCKET/$key" >&2
+  return 1
+}
+
+verify_raw_prefixes_empty() {
+  local prefix keys
+  for prefix in captures/ enroll/; do
+    keys="$(aws s3api list-objects-v2 --bucket "$RAW_BUCKET" --prefix "$prefix" \
+      --query 'Contents[].Key' --output json --region "$DEPLOY_REGION")"
+    if ! jq -e 'length == 0' >/dev/null <<<"$keys"; then
+      echo "Raw bucket prefix $prefix is not empty after the smoke test:" >&2
+      jq . <<<"$keys" >&2
+      return 1
+    fi
+  done
 }
 
 poll_result() {
   local token="$1" request_id="$2"
   local response code
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 240); do
     response="$(api_get "$token" "/kiosk/result/$request_id")"
     code="$(jq -r '.code // empty' <<<"$response")"
     if [[ -n "$code" && "$code" != "pending" ]]; then
@@ -111,7 +180,7 @@ poll_result() {
     fi
     sleep 0.25
   done
-  echo "Timed out waiting for result $request_id." >&2
+  echo "Timed out waiting for result $request_id after 60 seconds." >&2
   return 1
 }
 
@@ -124,13 +193,33 @@ employee_body="$(jq -n \
   --arg start "$SHIFT_START" \
   --arg end "$SHIFT_END" \
   '{employee_id:$id,name:$name,email:$email,department:$department,shift_start:$start,shift_end:$end,consent:true}')"
-api_post "$ADMIN_TOKEN" "/admin/employees" "$employee_body" > "$TMP_DIR/employee.json"
+existing_status="$(curl -sS -o "$TMP_DIR/existing-employee.json" -w '%{http_code}' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" "$API_BASE/admin/employees/$EMPLOYEE_ID")"
+case "$existing_status" in
+  404) ;;
+  200)
+    echo "Refusing to reuse existing employee ID $EMPLOYEE_ID; choose a unique test ID." >&2
+    exit 2
+    ;;
+  *)
+    echo "Could not safely verify that employee ID $EMPLOYEE_ID is unused (HTTP $existing_status)." >&2
+    cat "$TMP_DIR/existing-employee.json" >&2
+    exit 2
+    ;;
+esac
+
+# Set cleanup before the create request so a lost HTTP response cannot leave
+# a successfully-created test employee behind.
 CREATED=1
+api_post "$ADMIN_TOKEN" "/admin/employees" "$employee_body" > "$TMP_DIR/employee.json"
 
 for photo in "$ENROLL_PHOTO_1" "$ENROLL_PHOTO_2" "$ENROLL_PHOTO_3"; do
-  request_id="$(upload_presigned "$ADMIN_TOKEN" "/admin/employees/$EMPLOYEE_ID/enroll-url" "$photo")"
+  upload_presigned "$ADMIN_TOKEN" "/admin/employees/$EMPLOYEE_ID/enroll-url" "$photo"
+  request_id="$UPLOAD_REQUEST_ID"
+  raw_key="$UPLOAD_RAW_KEY"
   outcome="$(poll_result "$ADMIN_TOKEN" "$request_id")"
   code="$(jq -r '.code' <<<"$outcome")"
+  verify_raw_deleted "$raw_key"
   if [[ "$code" != "enrolled" ]]; then
     echo "Enrollment failed for request $request_id: $(jq -r '.message' <<<"$outcome")" >&2
     exit 1
@@ -155,9 +244,12 @@ echo "Running $RUNS kiosk scan cycles for $EMPLOYEE_ID on $TODAY_IST…"
 
 for ((index = 1; index <= RUNS; index += 1)); do
   start_ns="$(python3 -c 'import time; print(time.monotonic_ns())')"
-  request_id="$(upload_presigned "$KIOSK_TOKEN" "/kiosk/upload-url" "$SCAN_PHOTO")"
+  upload_presigned "$KIOSK_TOKEN" "/kiosk/upload-url" "$SCAN_PHOTO"
+  request_id="$UPLOAD_REQUEST_ID"
+  raw_key="$UPLOAD_RAW_KEY"
   outcome="$(poll_result "$KIOSK_TOKEN" "$request_id")"
   end_ns="$(python3 -c 'import time; print(time.monotonic_ns())')"
+  verify_raw_deleted "$raw_key"
   elapsed_ms="$(( (end_ns - start_ns) / 1000000 ))"
   LATENCIES+=("$elapsed_ms")
 
@@ -185,6 +277,8 @@ if (( count < 1 )); then
   exit 1
 fi
 
+verify_raw_prefixes_empty
+
 p95="$(printf '%s\n' "${LATENCIES[@]}" | sort -n | python3 -c 'import math,sys; values=[int(line) for line in sys.stdin if line.strip()]; print(sorted(values)[math.ceil(.95*len(values))-1])')"
 printf '\nAPI-path latency p95: %s ms across %s scans\n' "$p95" "$RUNS"
 if (( p95 > 3000 )); then
@@ -192,5 +286,6 @@ if (( p95 > 3000 )); then
   exit 1
 fi
 echo "Attendance query returned the test employee's record."
+echo "All test capture and enrollment objects were verified deleted; captures/ and enroll/ are empty."
 echo "Smoke flow passed. The cleanup trap will deactivate the test employee and remove indexed face templates."
 echo "Note: this script measures API/upload/recognition round-trip, not browser camera capture or result rendering; it is not standalone evidence for SPEC N01."

@@ -1,4 +1,6 @@
-# Team Brief: Serverless Face-Recognition Attendance System
+# Historical Team Brief — Serverless Face-Recognition Attendance System
+
+> **Not the active workflow for the solo release.** This document records the original Part A/B/C team plan. Current work follows `solo/amit-monday`; do not use the old teammate assignments, branch names or approval requirements. See `docs/AI_CONTEXT.md` and `docs/CHATGPT_PROJECT_INSTRUCTIONS.md`.
 
 Read this whole page (15 min), then your Part guide in `docs/parts/`. Questions go to the lead.
 

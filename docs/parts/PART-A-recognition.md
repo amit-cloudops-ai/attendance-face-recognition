@@ -1,5 +1,7 @@
 # Part A: Recognition Engine
 
+> **Historical contributor guide:** this Part A/B/C assignment is retained for technical context only. The active release is owned and integrated on `solo/amit-monday`; do not follow old contributor ownership, teammate or branch instructions for current work.
+
 **Owner:** ______  **Folders you own:** `services/recognition/*`, `infra/modules/recognition/`
 **Read first:** SPEC (F01 F03 F05 F06 F12, N01 N02 N10), contracts sections 1, 3, 4, 6, 7, 9, 10.
 

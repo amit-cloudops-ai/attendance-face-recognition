@@ -1,21 +1,35 @@
 # GitHub environment and deployment variable setup
 
-**Status:** configuration checklist. The repository connector can update code and workflows but cannot read or configure GitHub Actions environment protection rules or branch protection settings. These settings have not been verified or changed.
+**Status:** solo-owner configuration checklist. The repository connector cannot read or configure GitHub Actions environment protection rules or branch protection settings. These settings have not been verified or changed.
 
-## Create six environments
+## Six deployment environments
 
 Create these exact repository environments:
 
-| Environment | Allowed branch | Review requirement |
+| Environment | Allowed branch | Owner approval checkpoint |
 |---|---|---|
-| dev-plan | develop only | No required reviewer |
-| dev-apply | develop only | At least one independent reviewer; prevent self-review |
-| prod-plan | main only | At least one reviewer recommended |
-| prod-apply | main only | At least one independent reviewer; prevent self-review |
-| billing-plan | main only | At least one reviewer recommended |
-| billing-apply | main only | At least one independent reviewer; prevent self-review |
+| dev-plan | develop only | No |
+| dev-apply | develop only | Yes — repository owner |
+| prod-plan | main only | No |
+| prod-apply | main only | Yes — repository owner |
+| billing-plan | main only | No |
+| billing-apply | main only | Yes — repository owner |
+
+This is a **solo-owner workflow**. The repository owner is the sole reviewer on apply environments and self-review is allowed. This provides a deliberate manual deployment checkpoint, not independent approval or separation of duties. Do not request or configure a teammate as a reviewer. If independent separation of duties becomes a requirement later, the governance model must be deliberately changed.
 
 Use deployment branch restrictions, not only the workflow's if-condition. The workflow's OIDC subject is bound to the exact environment name, so the environment names must match exactly. Do not create generic dev/prod environments for this workflow.
+
+Run the helper in dry-run mode first:
+
+```bash
+bash scripts/configure_github_environments.sh
+```
+
+Only after inspecting the output and deciding to change GitHub settings, run:
+
+```bash
+bash scripts/configure_github_environments.sh --apply
+```
 
 ## Variables to define in each environment
 
@@ -39,28 +53,39 @@ The role ARNs are non-secret configuration values. The account ID, bucket name a
 
 - dev-apply: TF_PLAN_AGE_IDENTITY containing only the dev private age identity.
 - prod-apply: TF_PLAN_AGE_IDENTITY containing only the prod private age identity.
+- billing-apply: TF_PLAN_AGE_IDENTITY containing only the billing private age identity, if required by the billing workflow.
 - Do not set TF_PLAN_AGE_IDENTITY in plan environments.
-- Do not reuse the same private identity between dev and prod.
+- Do not reuse the same private identity between dev, prod and billing.
 - Never store the private identity in repository variables, source control, artifacts or logs.
 
 ## Branch protection
 
 For `main`, `develop` and `solo/amit-monday`, configure:
+
 - Require pull requests before merging.
-- Require at least one approving review from someone other than the PR author.
-- Dismiss stale approvals after new commits.
 - Require the Python and terraform-fmt status checks.
 - Require conversation resolution.
 - Block force pushes and branch deletion.
-- Require CODEOWNERS review if a suitable CODEOWNERS file and independent code owner are configured.
+- Enforce the rules for administrators.
+- Do not require independent approving reviews or latest-push approval; those settings are incompatible with the agreed solo-owner model.
 
-Require reviews for changes to .github/workflows/**, infra/**, infra/policies/** and docs/security/**. The person who authors a deployment workflow or policy change must not be the only reviewer of that change.
+The owner must personally inspect every PR diff, verify CI and security evidence, and consciously merge. This is an owner-controlled review checkpoint, not an independent review. The branch-protection helper defaults to dry-run:
+
+```bash
+bash scripts/configure_branch_protection.sh
+```
+
+Apply only after reviewing its output:
+
+```bash
+bash scripts/configure_branch_protection.sh --apply
+```
 
 ## Preflight checklist before any AWS bootstrap
 
 - All six environments exist with exact names.
 - Allowed deployment branches match the table above.
-- Apply environments have independent reviewers and prevent self-review.
+- Apply environments require the repository owner's manual approval, with self-review allowed.
 - AWS_ROLE_ARN points to the matching role only.
 - Account ID, state bucket and boundary ARN match the approved AWS account/environment.
 - Age recipients and private identities are different per environment and the private identities exist only as apply-environment secrets.
@@ -70,4 +95,4 @@ Require reviews for changes to .github/workflows/**, infra/**, infra/policies/**
 
 ## Verification limitation
 
-GitHub branch protection API reads returned 403 Resource not accessible by integration, and the repository connector does not expose GitHub Actions environment settings. Therefore the environment list, variable values, secret presence, reviewer configuration and branch restrictions cannot be verified from this session. This task remains blocked until a repository administrator configures the six environments and provides confirmation or an authorized read-only verification path.
+The GitHub connector cannot inspect or configure Actions environment settings, and branch-protection reads returned 403 Resource not accessible by integration. Therefore the environment list, variable values, secret presence, owner-review configuration and branch restrictions remain unverified until checked through an authorized GitHub CLI session or GitHub UI.

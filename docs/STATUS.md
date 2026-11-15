@@ -6,9 +6,9 @@ The solo application and the T01–T38 deployment-security and region-guard task
 
 The region-consistency implementation is complete on this branch: `config/deployment.json` is the canonical AWS region manifest; Terraform provider roots read it; the deployment workflow and local Terraform wrapper export it for the S3 backend; Lambda clients use the Lambda-reserved `AWS_REGION`; contracts and examples are aligned; CI rejects any noncanonical AWS region literal, regional ARN or regional endpoint. The full consolidated CI run 43622495235 passed on commit `65f82c6597bd9705c334b5cb2f6b3bfc528c946d` (27 Python/security steps and 21 Terraform formatting/validation steps).
 
-**No AWS resources have been provisioned.** No OIDC provider, IAM roles, execution boundaries, state bucket, KMS key or budget resources have been created. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
+**No attendance-project AWS resources have been provisioned by this deployment work.** The read-only preflight did not find the expected GitHub OIDC provider, deployment roles, runtime boundaries or project state bucket. Unrelated resources in the existing account have not yet been fully inventoried. No remote Terraform backend initialization, Terraform plan or apply has been run. Every AWS mutation remains approval-gated.
 
-Target region: `us-east-1`, sourced from `config/deployment.json`. Target account: the owner's existing AWS account; the exact 12-digit account ID has not been verified in this session.
+Target region: `us-east-1`, sourced from `config/deployment.json`. Read-only STS verification on 14 November 2026 confirmed AWS account `924422830139`, IAM user `Amit-admin`, through the `default` profile. This is the verified target account for the next planning step; no AWS mutation was performed.
 
 ## Source of truth and branch discipline
 
@@ -31,15 +31,82 @@ Target region: `us-east-1`, sourced from `config/deployment.json`. Target accoun
 | T32–T36 | Scheduler trust isolation, provider lockfiles, billing isolation, CloudFront KMS scope and DynamoDB KMS authorization | PRs #13–#17; CI runs 43616332197, 43616787686, 43617044959, 43617191177 |
 | T37 | Dedicated billing plan/apply policy and OIDC roles, isolated billing state root | PR #27; CI run 43620012088 |
 
-The task PR CI runs are historical evidence for their respective commits. The final consolidated CI passed on head `8bae76d`: Python/security 27/27 and Terraform 21/21. The merge into `solo/amit-monday` has also triggered a fresh post-merge CI run; its final result is being checked. IAM templates have not been attached to AWS roles. IAM Access Analyzer and live AWS authorization tests have not been performed.
+The task PR CI runs are historical evidence for their respective commits. The consolidated solo baseline CI passed on head `8bae76d`: Python/security 27/27 and Terraform 21/21. The solo baseline's later CI run 43623141820 also passed. PR #29 contains additional audit fixes and its latest CI result must be checked before merge. IAM templates have not been attached to AWS roles. IAM Access Analyzer and live AWS authorization tests have not been performed.
+
+## Full pre-deployment audit — PR #29
+
+**Audit status: IN PROGRESS.** The full phased findings are recorded in [`docs/PREDEPLOYMENT-AUDIT.md`](PREDEPLOYMENT-AUDIT.md). The current audit fixes remain in PR #29 and are not yet merged into `solo/amit-monday`.
+
+### Static issues found and corrections prepared
+
+| Finding | Correction in PR #29 | Verification still required |
+|---|---|---|
+| DynamoDB `kms:ViaService` statement was placed in the S3 web-bucket policy, not the KMS key policy | Moved the DynamoDB use statement into the actual KMS key policy; separated `CreateGrant` and constrained it with `kms:GrantIsForAWSResource=true`; added CI structural checks | Terraform validate and IAM Access Analyzer/live authorization in dev |
+| Access module duplicated `us-east-1` literals | Uses `data.aws_region.current.name` from the configured provider | Terraform validate and region guard |
+| Local wrappers and deployment workflow used `python` | Switched to `python3` | Local Ubuntu execution and GitHub CI |
+| Deployment workflow did not assert the assumed AWS account | Added read-only STS check against `TF_VAR_account_id` before backend initialization | GitHub workflow plan run after approved bootstrap |
+| Lambda application logs were not explicitly configured as JSON | Added JSON logging configuration and explicit 30-day log group references | Terraform validate and sample CloudWatch log inspection |
+| Contract tests did not verify Terraform API route parity | Added static contract tests for route map/document parity, handler existence and JWT route authorization; clarified the `record_scan(request_id)` contract | Latest pytest run; expand payload-shape contract coverage |
+| E2E smoke did not verify raw-image deletion or AWS account identity | Added STS account guard, per-object deletion checks and empty raw-prefix checks | Run only against dev after deployment, with a consenting participant |
+| Solo-owner instructions conflicted with old reviewer/Part A/B/C instructions | Updated governance helpers, CODEOWNERS, AI instructions and deployment docs | GitHub settings dry-run and owner verification |
+| Preflight checked bootstrap resources but not application resource-name collisions | Expanded read-only inventory to inspect project-prefixed S3, IAM, Lambda, DynamoDB, KMS, Rekognition, Cognito, API Gateway, SQS, SNS, Scheduler, CloudWatch, Budgets and CloudFront resources | Run expanded script; current AWS inventory output is still incomplete |
+
+### Acceptance evidence status
+
+| Requirement | Current status |
+|---|---|
+| N01 — browser capture-to-result p95 | NOT VERIFIED; API-path smoke timing is supplemental and excludes camera/rendering |
+| N02 — raw image deletion within 10 minutes | Test strengthened; NOT RUN against dev |
+| N03 — KMS encryption and TLS-only policies | Static Terraform/policy review only; no live resource verification |
+| N04 — least-privilege runtime IAM | Static call-site review only; no IAM Access Analyzer/live authorization test |
+| N05 — no public buckets / CloudFront-only web access | Static configuration only; no deployed bucket policy verification |
+| N06 — clean checkout Terraform deployment | NOT RUN; no remote backend init, plan or apply |
+| N07 — PR governance and branch protection | Helper scripts revised; GitHub environment/branch settings NOT APPLIED or verified |
+| N08 — alarms and notifications | Terraform definitions exist; no alarm trigger test; SNS subscription confirmation pending |
+| N09 — cost | Estimate only; saved Pricing Calculator estimate absent; budget scope is blocked (see T26) |
+| N10 — JSON logs and 30-day retention | JSON logging configuration added in PR #29; no sample CloudWatch logs observed |
+| N11 — Chrome/Android/Safari/iOS matrix | NOT RUN; browser matrix remains blank |
+
+### Remaining limitations
+
+- `tests/contract` now has static API route contract checks, but it does not yet assert every Lambda's full request/response and DynamoDB/S3 side-effect shapes. `tests/integration` remains empty.
+- The expanded AWS inventory has not been executed. The earlier read-only run verified STS account `924422830139` and inspected bootstrap resources only; it did not check all application resource-name collisions.
+- The local Ubuntu checkout cannot be inspected from GitHub. The owner must pull the audited branch and run the prescribed local checks.
+- No AWS write, remote backend initialization, Terraform plan or apply has been performed.
+
+### Latest application audit corrections
+
+The audited code commit `31bb951c9c6dcffe3ddd95e9aa9b2d9df4808d75` passed CI run [43628880020](https://github.com/amit-cloudops-ai/attendance-face-recognition/actions/runs/43628880020): 95 tests passed, Ruff clean, JS/shell/CSP checks passed, and Terraform fmt/validate passed for all modules and roots.
+
+PR #29 now also:
+- Filters weekend/holiday attendance out of weekly working-day percentages and adds regression data.
+- Extends kiosk/enrollment polling windows to 30 seconds.
+- Adds a retry action for face-template deletion on inactive employees.
+- Makes enrollment photo selection respect configured maximum/remaining slots.
+- Tracks exact E2E raw-image keys and attempts test-only cleanup if application cleanup fails.
+
+This is CI evidence for the code commit, not local WSL evidence or a live AWS test. The latest audit-document updates are documentation-only and have their own CI run in progress. The SNS/KMS static policy correction, local Terraform account/input guards, config.json exclusion and quota checks are now in PR #29; latest CI and local WSL checks remain pending. Live encrypted SNS delivery and the expanded AWS inventory remain unverified.
+
+### Part 2 — Terraform/IAM static corrections
+
+The current PR #29 branch now includes:
+- CloudWatch alarm access to the encrypted SNS topic in both the KMS key policy and SNS topic policy, scoped by account and project alarm ARN.
+- Daily/weekly publisher KMS permissions and SNS in the runtime boundary ViaService allowlist.
+- Dev/prod callback and boundary ARN example corrections, account-bound boundary validation, and provider allowed-account restrictions for dev/prod/billing.
+- STS account guard for local Terraform remote init/plan/apply/state-changing operations.
+- Exclusion of generated `web/config.json` from the generic S3 frontend fileset.
+- Terraform CI pinned to 1.10.5, matching deployment.
+- Expanded read-only preflight for Lambda concurrency and Rekognition quotas, plus billing backend/tfvars examples.
+
+These are source/CI corrections only. No live IAM policy, SNS topic policy, GitHub setting or AWS resource has been applied. Latest CI on the current head must pass, and local WSL checks remain outstanding.
 
 ## Region-consistency implementation
 
 - Canonical value: `config/deployment.json` → `aws_region: us-east-1`.
-- Dev, prod and billing Terraform providers load the canonical manifest rather than carrying separate provider-region literals.
+- Dev, prod and billing Terraform provider roots load the canonical manifest; the access module now derives regional endpoints from the configured provider region rather than hardcoding a second region literal.
 - S3 backend region is supplied from the same manifest through `scripts/terraform.sh` locally and the deployment workflow in GitHub Actions.
 - Lambda SDK clients use the Lambda-reserved `AWS_REGION`; the local/test fallback remains `us-east-1`.
-- Contracts are amended to v1.1 for the region-only change. SPEC is amended to v1.1; functional scope and acceptance criteria are unchanged.
+- Contracts are amended to v1.2: canonical region alignment plus explicit optional `request_id` argument for exactly-once scan processing and deterministic offboarding audit IDs. SPEC is v1.2; external HTTP request/response shapes remain unchanged.
 - Frontend runtime examples, Cognito domain examples, raw-bucket endpoints, architecture decision log and cost assumptions are aligned.
 - Moto test fixtures are aligned to the target region.
 - CI runs `scripts/check_region_consistency.py`, which checks the manifest, Terraform roots, backend configuration, all repository text for noncanonical region tokens, regional ARNs/endpoints and Lambda region selection. The local Terraform wrapper and GitHub deployment workflow also run the full gate before proceeding.
@@ -53,11 +120,13 @@ No system can guarantee that a future contributor never writes an incorrect regi
 
 **Status: BLOCKED — repository administrator action required.**
 
-The required environments are `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan` and `billing-apply`. Each must have the correct environment-scoped `AWS_ROLE_ARN`, account/bucket values, plan-only age recipient, apply-only private age identity secret, branch restriction and independent apply reviewer.
+The required environments are `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan` and `billing-apply`. Each must have the correct environment-scoped `AWS_ROLE_ARN`, account/bucket values, plan-only age recipient, apply-only private age identity secret and exact deployment-branch restriction.
 
-The GitHub connector cannot inspect or configure Actions environment secrets/protection settings, and branch-protection reads returned 403. Their actual existence and values remain unverified. I added two guarded GitHub CLI helpers: `scripts/configure_github_environments.sh` (six exact environments, allowed branches and independent reviewers) and `scripts/configure_branch_protection.sh` (PR reviews, CI checks and protected branches). Both default to dry-run and require an explicit `--apply`; neither has been executed. Environment AWS variables/secrets remain intentionally unset until the AWS account inventory and bootstrap create the roles, bucket and boundaries.
+The agreed governance model is **solo-owner**: the repository owner is the sole manual reviewer on apply environments, with self-review allowed. This is an owner checkpoint, not independent separation of duties. No teammate or second GitHub username is required. Branch protection requires PRs, CI checks, conversation resolution and protection against force-push/deletion, but does not require an independent approval or latest-push approval.
 
-**Owner action:** provide the GitHub username of an independent reviewer, run both helpers' dry-runs, inspect the output, then run their `--apply` modes from an authenticated repository-admin GitHub CLI session. Populate AWS role/account/bucket variables and age keys only after approved bootstrap. Provide confirmation or an authorized read-only verification path.
+The GitHub connector cannot inspect or configure Actions environment secrets/protection settings, and branch-protection reads returned 403. Their actual existence and values remain unverified. The guarded helpers `scripts/configure_github_environments.sh` and `scripts/configure_branch_protection.sh` have been revised for this model. Both default to dry-run and require an explicit `--apply`; neither has been executed. Environment AWS variables/secrets remain intentionally unset until the AWS bootstrap is approved and creates the roles, bucket and boundaries.
+
+**Owner action:** run both helpers' dry-runs, inspect the output, then decide whether to run their `--apply` modes from an authenticated repository-admin GitHub CLI session. Populate AWS role/account/bucket variables and age keys only after approved bootstrap. Provide confirmation or an authorized read-only verification path.
 
 ### T18 — exact manual AWS bootstrap plan
 
@@ -72,15 +141,15 @@ The plan enumerates:
 - Six matching GitHub environments and the required variables/secrets.
 - Read-only existence checks, bootstrap order, rollback and approval gates.
 
-The exact 12-digit AWS account ID, final bucket suffix and current resource inventory are not known. A read-only inventory script now exists at `scripts/aws_preflight_readonly.sh`, but it has not been run against the owner's account. The bootstrap plan must be rendered with verified account values and presented to the owner before any write operation.
+The exact account ID is now verified as `924422830139` through read-only STS in `us-east-1`. The read-only inventory completed on 14 November 2026 using profile `default`: GitHub OIDC `GetOpenIDConnectProvider` returned `NoSuchEntity`; the six expected GitHub roles returned `NoSuchEntity`; neither runtime boundary policy was returned; and no bucket matching `attendance-tf-state-924422830139-*` was found. The script labels these findings as unconfirmed where permissions could affect visibility. No matching project state bucket candidate was identified, and no AWS resource or policy was changed. The inventory output is recorded in the current conversation; the account-specific plan must use the verified account ID and clearly distinguish confirmed absence from unconfirmed visibility.
 
-**Owner action:** provide/confirm the account ID and final bucket suffix, run or authorize read-only inventory, then review and explicitly approve the exact resource and policy inventory. Approval for bootstrap writes and approval for Terraform plan/apply remain separate.
+**Owner action:** choose/approve a globally unique state bucket suffix, review the exact resource and policy inventory rendered for account `924422830139`, and explicitly approve any bootstrap writes. Approval for bootstrap writes, Terraform backend initialization and Terraform plan/apply remain separate gates.
 
 ## IAM design limitations requiring explicit review
 
 - API Gateway v2 child-resource paths remain scoped to the `/apis/*` resource family until the generated API ID can be pinned.
 - Some AWS create APIs require `Resource: "*"`; request-tag, function and service conditions are used where supported.
-- Billing's `aws-portal:ModifyBilling` is account-level and cannot be scoped to an individual budget ARN. It is isolated to the billing-apply role, main branch and independent reviewer gate; it must never be attached to dev/prod roles.
+- Billing's `aws-portal:ModifyBilling` is account-level and cannot be scoped to an individual budget ARN. It is isolated to the billing-apply role, main branch and owner approval checkpoint; it must never be attached to dev/prod roles.
 - Static template validation does not prove live AWS authorization. Rendered policies still require IAM Access Analyzer/review and a controlled dev deployment.
 
 ## Exact bootstrap inventory — not executed
@@ -98,7 +167,7 @@ The exact role trust documents, managed policy JSON, account IDs and bucket name
 
 ## Next sequence
 
-1. Complete T16: configure and verify the six GitHub environments, their branch restrictions, environment variables/secrets and independent apply reviewers. The current GitHub connector cannot configure or verify these settings; repository-admin action is required.
+1. Complete T16: configure and verify the six GitHub environments, their branch restrictions, environment variables/secrets and owner approval checkpoints. The current GitHub connector cannot configure or verify these settings; repository-admin action is required.
 2. Complete T18 read-only verification: run `bash scripts/aws_preflight_readonly.sh` with an approved read-only AWS profile; verify the account ID, OIDC provider, state bucket, two boundaries, six roles and policy documents; choose a globally unique state bucket suffix.
 3. Render the exact account-specific bucket policy, OIDC trust policies, boundaries and all 26 managed policy documents. Perform static and AWS-side policy validation; present the exact resource/action inventory and obtain explicit approval before any AWS write.
 4. After separate bootstrap approval, create only the approved missing state bucket/OIDC provider/boundaries/roles/policies; verify all settings with read-only calls.

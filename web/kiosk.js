@@ -61,13 +61,13 @@ async function jpegFile() {
 }
 
 async function poll(requestId) {
-  const deadline = Date.now() + 8000;
+  const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
     const data = await api(`/kiosk/result/${encodeURIComponent(requestId)}`);
     if (data.code !== "pending") return data;
     await new Promise(resolve => setTimeout(resolve, 350));
   }
-  throw new Error("Recognition is taking longer than expected. Please try again or ask reception for help.");
+  throw new Error("Recognition is still processing. Wait before taking another image; ask reception to check the request if it remains pending.");
 }
 
 async function capture() {
@@ -91,11 +91,16 @@ async function capture() {
 signIn.addEventListener("click", () => accessToken() ? logout() : login());
 button.addEventListener("click", async () => {
   if (!accessToken()) return login();
-  if (!cameraReady) {
-    try { await startCamera(); } catch (error) { status(error.message || "Camera unavailable.", "error"); }
-    return;
+  try {
+    if (!requireGroup("kiosk")) return;
+    if (!cameraReady) {
+      await startCamera();
+      return;
+    }
+    await capture();
+  } catch (error) {
+    status(error.message || "Camera unavailable.", "error");
   }
-  await capture();
 });
 
 try {

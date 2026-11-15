@@ -1,12 +1,12 @@
 # Phase B — Deployment readiness and AWS access design
 
-**Consolidation branch:** `release/phase-b-region-guard`  
+**Solo application branch:** `solo/amit-monday`  
 **Application baseline:** `solo/amit-monday`  
 **Scope:** Complete the deployment-security implementation and prepare an approval-gated development deployment. This document does not authorize AWS resource creation, IAM policy attachment, remote backend initialization, Terraform plan or Terraform apply.
 
 ## Verified deployment baseline
 
-- Target AWS account: the owner's existing account; exact 12-digit account ID remains unverified.
+- Target AWS account: `924422830139`, verified by read-only STS using profile `default` on 14 November 2026.
 - Canonical deployment region: `us-east-1`, declared only in `config/deployment.json`.
 - Dev, prod and billing state keys are isolated: `attendance/dev/terraform.tfstate`, `attendance/prod/terraform.tfstate`, `attendance/billing/terraform.tfstate`.
 - Terraform S3 native lock files are enabled (`use_lockfile = true`); Terraform is pinned to 1.10.5 in CI.
@@ -29,7 +29,7 @@ The task chain T01–T15, T17 and T31–T37 has implementation/documentation and
 - Terraform policy-template validation and provider lockfiles.
 - Scheduler trust hardening, CloudFront KMS scope, DynamoDB KMS ViaService access and isolated billing roles.
 
-T16 and T18 remain blocked on actions that cannot be completed by repository code changes alone. T38 (canonical region manifest and drift-prevention gate) is in progress until this branch's CI validates it.
+T16 and T18 remain blocked on repository-admin and owner approval gates. T38 (canonical region manifest and drift-prevention gate) is implemented; the latest solo-owner governance and audit-fix PR CI must pass before this branch is treated as release-ready.
 
 ## Security design requirements
 
@@ -39,7 +39,7 @@ T16 and T18 remain blocked on actions that cannot be completed by repository cod
 4. `iam:PassRole` must be limited to exact application execution-role ARNs and the correct service principal.
 5. Every Terraform-created Lambda and Scheduler role must receive the exact pre-created environment permissions boundary. Apply roles may attach the boundary but must not edit/delete its policy or create an unbounded role.
 6. The public repository must not upload cleartext Terraform plans. Plans are encrypted with environment-specific age recipients; private identities exist only as matching apply-environment secrets.
-7. GitHub environments must enforce exact branch restrictions and independent reviewer approval for apply operations.
+7. GitHub environments must enforce exact branch restrictions and the repository owner's manual approval checkpoint for apply operations. Self-review is allowed in the solo-owner model; this is not independent separation of duties.
 8. Billing actions remain isolated to the billing role pair. In particular, account-level `aws-portal:ModifyBilling` must never be attached to dev/prod roles.
 9. No AWS write, role assumption, backend initialization, plan or apply may occur before the corresponding owner approval.
 
@@ -47,13 +47,13 @@ T16 and T18 remain blocked on actions that cannot be completed by repository cod
 
 ### T16 — GitHub environment configuration
 
-Create and verify six exact environments: `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan`, `billing-apply`. Configure environment-scoped `AWS_ROLE_ARN`, account/state bucket values, separate age recipients and apply-only private age identity secrets. Restrict dev environments to `develop`; restrict prod and billing to `main`. Apply environments require an independent reviewer and self-review prevention.
+Create and verify six exact environments: `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan`, `billing-apply`. Configure environment-scoped `AWS_ROLE_ARN`, account/state bucket values, separate age recipients and apply-only private age identity secrets. Restrict dev environments to `develop`; restrict prod and billing to `main`. Apply environments require the repository owner's manual approval checkpoint, with self-review allowed. No teammate reviewer is required.
 
-The current GitHub connection cannot inspect or configure environment settings/secrets or branch protection. This remains an explicit repository-admin task.
+The current GitHub connection cannot inspect or configure environment settings/secrets or branch protection. This remains an explicit repository-admin task. The agreed solo-owner model uses owner-only apply checkpoints and no independent review.
 
 ### T18 — exact account-specific bootstrap plan
 
-The policy templates and manual bootstrap inventory are prepared, but the account ID, final globally unique bucket name and current AWS resource inventory are not verified. The plan must be rendered against the authenticated account and checked for existing providers, buckets, roles, policies and boundaries before any create operation is proposed.
+The account ID is verified as `924422830139`. The read-only preflight in `us-east-1` returned `NoSuchEntity` for the expected GitHub OIDC provider and six expected roles, no matching runtime boundary policies, and no bucket matching `attendance-tf-state-924422830139-*`. Treat boundary/policy visibility as unconfirmed where IAM read permissions may affect results. No AWS resources or policies were changed. The final state bucket suffix and exact rendered bootstrap inventory still require owner review.
 
 ## Manual bootstrap inventory — proposal only
 
@@ -74,7 +74,7 @@ The role/policy inventory, exact trust documents, rendered policy JSON and bucke
 
 After the owner supplies or authorizes an authenticated AWS CLI session, run `bash scripts/aws_preflight_readonly.sh` with read-only permissions. It verifies STS identity/region, inspects the OIDC provider, two boundary policies, six role trust policies/attachments and, when `TF_STATE_BUCKET` is supplied, bucket location/ownership/public-access/versioning/encryption/policy. Record exact ARNs and distinguish "not found" from "access denied". Do not create missing resources during this pass.
 
-The repository contains no verified account ID or live AWS inventory yet. A repository connection is not proof of AWS account access.
+The live read-only AWS inventory has now been run against account `924422830139`. No writes were performed. A repository connection alone is not proof of AWS account access; the STS result is the verified identity evidence.
 
 ## Deployment sequence after gates are satisfied
 
@@ -86,7 +86,7 @@ The repository contains no verified account ID or live AWS inventory yet. A repo
 6. Verify every created/attached resource using read-only calls and record the exact ARNs.
 7. Initialize the dev backend and generate a dev plan only after separate approval. Review the complete plan, cost and resource actions with the owner; obtain explicit apply approval before applying that exact saved plan.
 8. Complete dev authentication, upload/recognition, attendance, reports, alarms, privacy, deletion, latency and browser acceptance.
-9. Production and billing operations require their own exact plan review and separate approval. Production remains blocked until dev acceptance and an independent production review.
+9. Production and billing operations require their own exact plan review and separate approval. Production remains blocked until dev acceptance and a separately approved production plan/apply by the owner.
 
 ## Safety boundary
 

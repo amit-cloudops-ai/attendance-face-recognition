@@ -98,7 +98,13 @@
       "Action": [
         "rekognition:CreateCollection"
       ],
-      "Resource": "*"
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "attendance",
+          "aws:RequestTag/Environment": "dev"
+        }
+      }
     },
     {
       "Sid": "RekognitionCollectionManage",

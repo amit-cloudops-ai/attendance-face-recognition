@@ -99,12 +99,12 @@ locals {
   lambda_kms_permissions = {
     daily_job = [{
       Effect   = "Allow"
-      Action   = ["kms:GenerateDataKey"]
+      Action   = ["kms:Decrypt", "kms:GenerateDataKey*"]
       Resource = [var.kms_key_arn]
     }]
     weekly_job = [{
       Effect   = "Allow"
-      Action   = ["kms:GenerateDataKey"]
+      Action   = ["kms:Decrypt", "kms:GenerateDataKey*"]
       Resource = [var.kms_key_arn]
     }]
     reports = [{
@@ -474,6 +474,13 @@ resource "aws_lambda_function" "lambda" {
 
   environment {
     variables = local.lambda_environment
+  }
+
+  logging_config {
+    log_format            = "JSON"
+    application_log_level = "INFO"
+    system_log_level      = "WARN"
+    log_group             = aws_cloudwatch_log_group.lambda[each.key].name
   }
 
   depends_on = [aws_iam_role_policy.lambda]
