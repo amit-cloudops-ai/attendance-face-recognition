@@ -1,5 +1,18 @@
 # Face-Recognition Attendance System
 
+<p align="center">
+  <strong>AWS serverless attendance platform with face recognition, employee administration and workforce reporting.</strong>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/Attendance%20Face%20Recognition%20AWS%20Architecture.png" alt="AWS architecture diagram for the Face-Recognition Attendance System" width="100%">
+</p>
+
+<p align="center">
+  <em>System architecture · AWS us-east-1 · Employee kiosk · Admin workspace · Reporting pipeline</em>
+</p>
+
+
 A serverless employee-attendance platform built on AWS. Employees use a browser-based kiosk to record attendance through face recognition; authorised administrators manage employee records, review attendance, configure recognition policy and generate daily and weekly reports.
 
 The repository contains the application, infrastructure-as-code, automated tests, operational runbooks and release evidence. It is designed around a static-first browser frontend and event-driven AWS services.
