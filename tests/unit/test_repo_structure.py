@@ -31,5 +31,5 @@ def test_access_module_uses_manifest_region_and_service_correct_kms_policy():
 def test_environment_roots_pass_manifest_region_to_access_module():
     for environment in ("dev", "prod"):
         source = (ROOT / f"infra/envs/{environment}/main.tf").read_text(encoding="utf-8")
-        access_call = source.split('module "access" {', 1)[1].split("\\n}", 1)[0]
+        access_call = source.split('module "access" {', 1)[1].split("\n}", 1)[0]
         assert "region                          = local.deployment_region" in access_call
