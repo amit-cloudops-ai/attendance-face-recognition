@@ -63,26 +63,12 @@
       }
     },
     {
-      "Sid": "ApiGatewayCreateApi",
-      "Effect": "Allow",
-      "Action": [
-        "apigateway:POST"
-      ],
-      "Resource": "arn:aws:apigateway:us-east-1::/apis",
-      "Condition": {
-        "StringEquals": {
-          "aws:RequestTag/Project": "attendance",
-          "aws:RequestTag/Environment": "dev"
-        }
-      }
-    },
-    {
       "Sid": "ApiGatewayCreateChildResources",
       "Effect": "Allow",
       "Action": [
         "apigateway:POST"
       ],
-      "Resource": "arn:aws:apigateway:us-east-1::/apis/*/*"
+      "Resource": "arn:aws:apigateway:us-east-1::/apis/${api_id}/*"
     },
     {
       "Sid": "ApiGatewayManageApi",
@@ -93,7 +79,7 @@
         "apigateway:PUT",
         "apigateway:DELETE"
       ],
-      "Resource": "arn:aws:apigateway:us-east-1::/apis/*",
+      "Resource": "arn:aws:apigateway:us-east-1::/apis/${api_id}",
       "Condition": {
         "StringEquals": {
           "aws:ResourceTag/Project": "attendance",
@@ -252,6 +238,17 @@
       "Effect": "Allow",
       "Action": "cloudfront:CreateResponseHeadersPolicy",
       "Resource": "*"
+    },
+    {
+      "Sid": "ApiGatewayManageChildResources",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET",
+        "apigateway:PATCH",
+        "apigateway:PUT",
+        "apigateway:DELETE"
+      ],
+      "Resource": "arn:aws:apigateway:us-east-1::/apis/${api_id}/*"
     }
   ]
 }
