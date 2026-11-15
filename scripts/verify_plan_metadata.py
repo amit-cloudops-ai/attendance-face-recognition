@@ -28,7 +28,7 @@ def verify_metadata(metadata_path: Path, expected: dict[str, str]) -> dict[str, 
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Cannot read plan metadata: {exc}") from exc
     if not isinstance(metadata, dict):
-        raise ValueError("Plan metadata must be a JSON object")
+        raise TypeError("Plan metadata must be a JSON object")
 
     missing = [field for field in EXPECTED_FIELDS if field not in metadata]
     if missing:
