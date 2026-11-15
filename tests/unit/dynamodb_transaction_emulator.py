@@ -36,12 +36,10 @@ def install_transaction_emulator(monkeypatch, db):
             table.put_item(Item=item)
 
     def transact_write_items(TransactItems, **kwargs):
-        names = set()
         tables = {}
         for entry in TransactItems:
             operation = next(iter(entry.values()))
             table_name = operation["TableName"]
-            names.add(table_name)
             tables[table_name] = db.Table(table_name)
         before = {name: snapshot(table) for name, table in tables.items()}
         try:
