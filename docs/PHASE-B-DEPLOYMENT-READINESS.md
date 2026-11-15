@@ -29,7 +29,7 @@ The task chain T01–T15, T17 and T31–T38 has implementation/documentation and
 - Terraform policy-template validation and provider lockfiles.
 - Scheduler trust hardening, CloudFront KMS scope, DynamoDB KMS ViaService access and isolated billing roles.
 
-T16 and T18 remain owner/admin tasks for the optional OIDC/GitHub Actions pipeline. The first dev deployment can use the solo local bootstrap in `docs/DEPLOYMENT-RUNBOOK.md`; it does not require the OIDC provider, six deployment roles, six GitHub environments or promotion to `develop`. The access-module/KMS follow-up and readiness fixes are isolated in PR #34 targeting `release/aws-readiness-candidate`.
+T16 and T18 remain owner/admin tasks for the optional OIDC/GitHub Actions pipeline. The first dev deployment can use the solo local bootstrap in `docs/DEPLOYMENT-RUNBOOK.md`; it does not require the OIDC provider, six deployment roles, six GitHub environments or promotion to `develop`. The access-module/KMS follow-up and readiness fixes were integrated into `release/aws-readiness-candidate` by PR #34 (squash commit `ba31ad365a75f9539ef07282bce22992899b1b97`).
 
 ## Security design requirements
 
