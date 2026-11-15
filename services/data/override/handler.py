@@ -13,8 +13,6 @@ from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist, to_iso
 from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
-from boto3.dynamodb.types import TypeSerializer
-from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
@@ -140,7 +138,7 @@ def lambda_handler(event, context):
             condition_values = None
         elif "updated_at" in old:
             condition = "attribute_exists(employee_id) AND updated_at=:old_updated"
-            condition_values = {":old_updated": serializer.serialize(old["updated_at"])}
+            condition_values = {":old_updated": _ddb_item({"v": old["updated_at"]})["v"]}
         else:
             condition = "attribute_exists(employee_id) AND attribute_not_exists(updated_at)"
             condition_values = None
