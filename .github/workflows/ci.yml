@@ -266,8 +266,8 @@ jobs:
               if "kms_key_id" not in root[start:end]:
                   raise SystemExit(f"{env} access module must receive foundation KMS key ID")
           access_outputs = Path("infra/modules/access/outputs.tf").read_text(encoding="utf-8")
-          if "cognito-idp.us-east-1.amazonaws.com" not in access_outputs:
-              raise SystemExit("Cognito issuer output must match us-east-1")
+          if "cognito-idp.${var.region}.amazonaws.com" not in access_outputs:
+              raise SystemExit("Cognito issuer output must use the canonical region input")
           PY
 
       - name: Validate DynamoDB customer-managed KMS policies
@@ -284,8 +284,18 @@ jobs:
           }
           if "AllowDynamoDBUseOfKeyThroughService" not in access:
               raise SystemExit("Missing DynamoDB KMS ViaService statement")
-          if "dynamodb.us-east-1.amazonaws.com" not in access or "kms:CallerAccount" not in access:
-              raise SystemExit("DynamoDB KMS service statement must be account and region constrained")
+          web_start = access.index('data "aws_iam_policy_document" "web_bucket"')
+          key_start = access.index('data "aws_iam_policy_document" "attendance_kms_key"')
+          key_end = access.index('resource "aws_kms_key_policy" "attendance"')
+          web_policy = access[web_start:key_start]
+          key_policy = access[key_start:key_end]
+          if "kms:" in web_policy:
+              raise SystemExit("KMS actions must not be placed in an S3 bucket policy")
+          if (
+              "dynamodb.${var.region}.amazonaws.com" not in key_policy
+              or "kms:CallerAccount" not in key_policy
+          ):
+              raise SystemExit("DynamoDB KMS service statement must be in the key policy and region/account constrained")
 
           for env in ("dev", "prod"):
               path = Path(f"infra/policies/github-apply-{env}-dynamodb-kms.json.tftpl")
