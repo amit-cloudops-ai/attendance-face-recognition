@@ -1,6 +1,6 @@
 # Serverless Face-Recognition Attendance System
 
-Contactless, real-time employee clock-in / clock-out using face recognition on AWS. A kiosk browser captures a still image, uploads it straight to S3, and a Lambda matches the face against an Amazon Rekognition collection, writes a timestamped attendance record to DynamoDB, and shows the result in under 3 seconds. Scheduled jobs mark absences and publish daily and weekly summaries. An admin web app lets HR filter and export attendance.
+Contactless, real-time employee clock-in / clock-out using face recognition on AWS. A kiosk browser captures a still image, uploads it straight to S3, and a Lambda matches the face against an Amazon Rekognition collection, writes a timestamped attendance record to DynamoDB, and targets a p95 capture-click-to-result time of 3 seconds or less. This is a deployment acceptance target, not a measured claim; it requires the 20-scan browser/device test in `docs/SPEC.md`. Scheduled jobs mark absences and publish daily and weekly summaries. An admin web app lets HR filter and export attendance.
 
 **Status:** [docs/STATUS.md](docs/STATUS.md) | **Finish line:** [docs/SPEC.md](docs/SPEC.md) | **New to the team?** Start with [docs/TEAM_BRIEF.md](docs/TEAM_BRIEF.md)
 
