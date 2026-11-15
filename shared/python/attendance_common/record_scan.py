@@ -6,7 +6,6 @@ from typing import Any
 from uuid import UUID
 
 import boto3
-from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 from .config import get_settings
@@ -26,15 +25,10 @@ def _conditional_failure(exc: ClientError) -> bool:
     return exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException"
 
 
-def _marshal(item: dict) -> dict:
-    serializer = TypeSerializer()
-    return {key: serializer.serialize(value) for key, value in item.items()}
-
-
 def _guarded_transaction(employees, attendance, employee_id: str, action: dict) -> bool:
     check = {"ConditionCheck": {
         "TableName": employees.name,
-        "Key": _marshal({"employee_id": employee_id}),
+        "Key": {"employee_id": employee_id},
         "ConditionExpression": "active = :active",
         "ExpressionAttributeValues": {":active": {"BOOL": True}},
     }}
@@ -62,7 +56,7 @@ def _guarded_transaction(employees, attendance, employee_id: str, action: dict) 
 def _guarded_put(employees, attendance, employee_id: str, item: dict) -> bool:
     item = {**item, "version": int(item.get("version", 0)) or 1}
     return _guarded_transaction(employees, attendance, employee_id, {"Put": {
-        "TableName": attendance.name, "Item": _marshal(item),
+        "TableName": attendance.name, "Item": item,
         "ConditionExpression": "attribute_not_exists(employee_id)",
     }})
 
@@ -83,10 +77,10 @@ def _guarded_update(employees, attendance, employee_id: str, kwargs: dict) -> bo
     names = {**(kwargs.get("ExpressionAttributeNames") or {}), "#version": "version"}
     update = {
         "TableName": attendance.name,
-        "Key": _marshal(kwargs["Key"]),
+        "Key": kwargs["Key"],
         "UpdateExpression": expression,
         "ConditionExpression": kwargs["ConditionExpression"],
-        "ExpressionAttributeValues": _marshal(values),
+        "ExpressionAttributeValues": values,
         "ExpressionAttributeNames": names,
     }
     return _guarded_transaction(employees, attendance, employee_id, {"Update": update})
