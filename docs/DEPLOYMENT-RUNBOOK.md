@@ -15,14 +15,15 @@ This snapshot records verified state from the owner's WSL session. It supersedes
 | Dev API Gateway | Existing `attendance-dev-http-api`, ID `7nii6lm2z2`; tags match; no stages/routes/integrations |
 | GitHub OIDC provider | `NoSuchEntity`; optional for local first dev deployment |
 | GitHub deployment roles | Six expected roles returned `NoSuchEntity`; optional for local first dev deployment |
-| Dev execution boundary | No matching local managed policy returned by `iam list-policies --scope Local` |
+| Dev execution boundary | Created; ARN `arn:aws:iam::924422830139:policy/attendance-dev-execution-boundary`; ID `ANPA5OO7E7A5XXNJSF5ZB`; default version `v1` |
+| Dev execution boundary document | Source JSON passed Access Analyzer with zero findings; complete live-vs-rendered comparison still pending because pasted version output was truncated |
 | Dev boundary validation | IAM Access Analyzer `validate-policy` returned `findings: []` for rendered JSON |
 | Release candidate CI | Run `43693544631` passed on exact head `d810e4618a4a6567a12b2ff25f9a13d8677d925c` (workflow #1231) |
-| State bucket candidate | `attendance-tf-state-924422830139-amit-2026-1115`; initial `HeadBucket` returned 404; recheck before create |
+| Terraform state bucket | Created: `attendance-tf-state-924422830139-amit-2026-1115`; location, ownership, public-access block, versioning, encryption and TLS-only policy verified read-only |
 | Local rendered inventory | `.local/bootstrap-rendered/`; 37 JSON documents; ignored local output, do not commit |
 | Preflight compatibility | Repository preflight now uses `python3` |
 
-No IAM policy or S3 bucket has been created by this bootstrap sequence. No remote backend initialization, Terraform plan or apply has been run. The existing API was discovered and verified; this sequence did not create it. The first dev deployment uses the local AWS CLI path; OIDC roles/environments and the 37-document CI/CD IAM inventory are optional later work.
+The owner created the approved dev IAM boundary and Terraform state bucket on 15 November 2026; all bucket controls listed above were verified read-only. No remote backend initialization, Terraform plan or apply has been run. The existing API was discovered and verified; this sequence did not create it. The first dev deployment uses the local AWS CLI path; OIDC roles/environments and the 37-document CI/CD IAM inventory are optional later work. The Terraform wrapper uses `python3` for WSL compatibility.
 
 
 ## 1. Solo local dev bootstrap (owner-operated path)
@@ -78,16 +79,22 @@ All steps below are instructions for the repository owner. They are not executed
    aws accessanalyzer validate-policy --policy-document file:///tmp/attendance-dev-execution-boundary.json --policy-type IDENTITY_POLICY --region us-east-1 --output json
    ```
 
-   The owner has approved creation of this exact policy. First check whether it already exists; if it does, stop and inspect its default version and policy document rather than attempting a duplicate. If absent, create it from the already-rendered and Access Analyzer-validated inventory document:
+   The owner created this exact policy on 15 November 2026. Its ARN, policy ID and default version were verified with `get-policy`. The rendered source passed IAM Access Analyzer with zero findings. Before backend initialization, compare the complete live default-version document against `.local/bootstrap-rendered/execution-role-boundary-dev.json` using the read-only commands below:
 
    ```bash
-   aws iam list-policies --scope Local --query "Policies[?PolicyName=='attendance-dev-execution-boundary'].{Name:PolicyName,Arn:Arn,Id:PolicyId}" --output table
-   aws iam create-policy --policy-name attendance-dev-execution-boundary --policy-document file://.local/bootstrap-rendered/execution-role-boundary-dev.json --description "Dev Lambda execution-role permissions boundary for attendance system"
-   aws iam get-policy --policy-arn arn:aws:iam::924422830139:policy/attendance-dev-execution-boundary
-   aws iam get-policy-version --policy-arn arn:aws:iam::924422830139:policy/attendance-dev-execution-boundary --version-id <DefaultVersionId-from-get-policy>
+   aws iam get-policy-version --policy-arn arn:aws:iam::924422830139:policy/attendance-dev-execution-boundary --version-id v1 --query 'PolicyVersion.Document' --output json > /tmp/attendance-dev-boundary-live.json
+   python3 - <<'PY'
+   import json
+   from pathlib import Path
+   live = json.loads(Path('/tmp/attendance-dev-boundary-live.json').read_text())
+   source = json.loads(Path('.local/bootstrap-rendered/execution-role-boundary-dev.json').read_text())
+   if live != source:
+       raise SystemExit('MISMATCH: live IAM policy differs from rendered source')
+   print('MATCH: live IAM policy equals rendered source')
+   PY
    ```
 
-   Do not attach this boundary to the deployment user; Terraform attaches it to the application execution roles. If the policy already exists, do not overwrite it; compare its document to the rendered source and report any difference before proceeding.
+   Do not attach this boundary to the deployment user; Terraform attaches it to the application execution roles.
 
 4. **Create the Terraform state bucket.** The selected candidate is `attendance-tf-state-924422830139-amit-2026-1115`. The renderer's initial read-only `HeadBucket` check returned 404 on 15 November 2026; this is only a point-in-time absence signal, not a reservation. Recheck immediately before creation. A successful HEAD means stop and inspect; 403, 301, timeout or any response other than a clear 404 means availability is unknown and must stop. Create this exact bucket in `us-east-1` only after reviewing and approving the bootstrap operation. For `us-east-1`, omit `--create-bucket-configuration` from `create-bucket`. Follow every control in [STATE-BUCKET-BOOTSTRAP.md](STATE-BUCKET-BOOTSTRAP.md): BucketOwnerEnforced object ownership, all four S3 Block Public Access settings, versioning enabled, default SSE-S3 encryption, and a bucket policy denying all non-TLS requests. Do not enable Object Lock or automatic state-version expiration. The exact owner-operated AWS CLI sequence is:
 
