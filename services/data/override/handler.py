@@ -115,6 +115,7 @@ def lambda_handler(event, context):
             "source": "admin",
             "updated_at": now,
             "updated_by": username,
+            "version": int(old.get("version", 0)) + 1,
         }
         if clock_in:
             item["clock_in"] = clock_in
@@ -140,11 +141,20 @@ def lambda_handler(event, context):
         if not old:
             condition = "attribute_not_exists(employee_id)"
             condition_values = None
+        elif "version" in old:
+            condition = "attribute_exists(employee_id) AND #version=:old_version"
+            condition_values = _ddb_item({"v": int(old["version"])})
         elif "updated_at" in old:
-            condition = "attribute_exists(employee_id) AND updated_at=:old_updated"
-            condition_values = {":old_updated": _ddb_item({"v": old["updated_at"]})["v"]}
+            condition = (
+                "attribute_exists(employee_id) AND attribute_not_exists(#version) "
+                "AND updated_at=:old_updated"
+            )
+            condition_values = _ddb_item({"v": old["updated_at"]})
         else:
-            condition = "attribute_exists(employee_id) AND attribute_not_exists(updated_at)"
+            condition = (
+                "attribute_exists(employee_id) AND attribute_not_exists(#version) "
+                "AND attribute_not_exists(updated_at)"
+            )
             condition_values = None
         put = {
             "TableName": attendance.name,
@@ -153,6 +163,8 @@ def lambda_handler(event, context):
         }
         if condition_values:
             put["ExpressionAttributeValues"] = condition_values
+        if old:
+            put["ExpressionAttributeNames"] = {"#version": "version"}
         try:
             attendance.meta.client.transact_write_items(TransactItems=[
                 {"Put": put},
