@@ -45,6 +45,8 @@ for environment in ("dev", "prod"):
     callback_url = callback_line.split('["', 1)[1].split('"]', 1)[0]
     if not re.fullmatch(r"\d{12}", account_id):
         fail(f"{environment} account_id must be a 12-digit account ID")
+    if environment == "dev" and account_id != "924422830139":
+        fail("dev account_id must match the approved target account 924422830139")
     if not re.fullmatch(r"[a-z0-9]{10}", api_id):
         fail(f"{environment} api_id must be a 10-character lowercase alphanumeric placeholder")
     expected_boundary = (
