@@ -495,7 +495,7 @@ document.querySelector("#report-form").addEventListener("submit", async event =>
   event.preventDefault();
   const type = document.querySelector("#report-type").value;
   const period = document.querySelector("#report-period").value.trim();
-  const valid = type === "daily" ? /^\\d{4}-\\d{2}-\\d{2}$/.test(period) : /^\\d{4}-W\\d{2}$/.test(period);
+  const valid = type === "daily" ? /^\d{4}-\d{2}-\d{2}$/.test(period) : /^\d{4}-W\d{2}$/.test(period);
   if (!valid) {
     reportOutput.replaceChildren();
     const note = document.createElement("p");
