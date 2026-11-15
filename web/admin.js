@@ -51,6 +51,12 @@ async function loadEmployees() {
       deactivate.textContent = "Deactivate";
       deactivate.addEventListener("click", () => deactivateEmployee(employee.employee_id));
       group.append(deactivate);
+    } else if (employee.has_face_templates) {
+      const cleanup = document.createElement("button");
+      cleanup.className = "danger";
+      cleanup.textContent = "Retry face cleanup";
+      cleanup.addEventListener("click", () => deleteFaceTemplates(employee.employee_id));
+      group.append(cleanup);
     }
     actions.append(group);
     row.append(actions);
@@ -118,17 +124,29 @@ async function pollEnrollment(requestId) {
   throw new Error("Enrollment processing timed out. Check the employee's photo count before retrying.");
 }
 
+async function deleteFaceTemplates(employeeId) {
+  try {
+    await api(`/admin/employees/${encodeURIComponent(employeeId)}/faces`, { method: "DELETE" });
+    status(`${employeeId} biometric templates deleted. Attendance history retained.`);
+  } catch (error) {
+    status(`${employeeId} is inactive, but biometric cleanup is still pending. Use Retry face cleanup after resolving the error.`, true);
+  } finally {
+    await loadEmployees().catch(error => status(error.message || "Employee state could not be refreshed.", true));
+  }
+}
+
 async function deactivateEmployee(employeeId) {
   if (!confirm(`Deactivate ${employeeId} and permanently remove their biometric face templates? Attendance history will be retained.`)) return;
+  status(`Deactivating ${employeeId}…`);
   try {
-    status(`Deactivating ${employeeId} and removing face templates…`);
     await api(`/admin/employees/${encodeURIComponent(employeeId)}`, { method: "DELETE" });
-    await api(`/admin/employees/${encodeURIComponent(employeeId)}/faces`, { method: "DELETE" });
-    status(`${employeeId} deactivated. Face templates deleted; attendance history retained.`);
-    await loadEmployees();
   } catch (error) {
-    status(error.message || "Offboarding did not complete. Review the employee and face-template state.", true);
+    // The response may be lost after the deactivation transaction committed.
+    await loadEmployees().catch(() => {});
+    status(error.message || "Deactivation could not be confirmed. Refresh employee state before retrying.", true);
+    return;
   }
+  await deleteFaceTemplates(employeeId);
 }
 
 function attendanceQuery(cursor = null) {
