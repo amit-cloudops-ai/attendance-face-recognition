@@ -228,24 +228,24 @@ locals {
       },
       {
         Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:PutItem"]
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:TransactWriteItems"]
         Resource = [aws_dynamodb_table.attendance.arn]
       },
       {
         Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
+        Action   = ["dynamodb:PutItem", "dynamodb:TransactWriteItems"]
         Resource = [aws_dynamodb_table.audit.arn]
       }
     ]
     settings = [
       {
         Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:PutItem"]
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:TransactWriteItems"]
         Resource = [aws_dynamodb_table.config.arn]
       },
       {
         Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
+        Action   = ["dynamodb:PutItem", "dynamodb:TransactWriteItems"]
         Resource = [aws_dynamodb_table.audit.arn]
       }
     ]
