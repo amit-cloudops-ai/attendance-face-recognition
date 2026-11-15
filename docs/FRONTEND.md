@@ -49,8 +49,11 @@ The raw bucket is created by the foundation module, while the CloudFront distrib
 | No face / multiple faces / low quality | Contract result shown in kiosk | Record request ID + result code |
 | Matched clock-in / clock-out / duplicate | Name, action and IST time shown | Record request ID + result code |
 | Employee creation without consent | Browser blocks submit; API independently rejects it | Record result |
-| Enrollment of 3–5 photos | Per-photo result shown; count refreshes | Record employee test ID only |
-| Offboarding | Employee deactivated, face templates deleted, history retained | Record API result |
+| Enrollment | First enrollment accepts 3–5 photos; later additions respect remaining capacity; partial failure refreshes the count | Record employee test ID only |
+| Offboarding | Employee deactivated, face templates deleted, history retained; failed cleanup leaves a visible retry action without exposing FaceIds | Record API result |
+| Attendance after daily finalization | A delayed clock-out removes the stale `missing_clock_out` flag | Record request ID and final flags |
+| Settings change | Changing max photos updates employee capacity display and picker validation | Record old/new setting and result |
+| New attendance search | Starting a new filter resets the previous page cursor | Record filters and page results |
 | Attendance filters and pagination | Correct rows and next page | Record filters |
 | Daily / weekly report | JSON summary and CSV link when generated | Record period |
 | Expired session / 401 | User is sent through sign-in again | Record result |
