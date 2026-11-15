@@ -60,6 +60,7 @@ def _guarded_transaction(employees, attendance, employee_id: str, action: dict) 
 
 
 def _guarded_put(employees, attendance, employee_id: str, item: dict) -> bool:
+    item = {**item, "version": int(item.get("version", 0)) or 1}
     return _guarded_transaction(employees, attendance, employee_id, {"Put": {
         "TableName": attendance.name, "Item": _marshal(item),
         "ConditionExpression": "attribute_not_exists(employee_id)",
@@ -67,15 +68,27 @@ def _guarded_put(employees, attendance, employee_id: str, item: dict) -> bool:
 
 
 def _guarded_update(employees, attendance, employee_id: str, kwargs: dict) -> bool:
+    expression = kwargs["UpdateExpression"]
+    clause_positions = [
+        position for clause in (" REMOVE ", " ADD ", " DELETE ")
+        if (position := expression.find(clause)) >= 0
+    ]
+    split_at = min(clause_positions) if clause_positions else len(expression)
+    expression = (
+        expression[:split_at]
+        + ", #version=if_not_exists(#version,:zero)+:one"
+        + expression[split_at:]
+    )
+    values = {**kwargs.get("ExpressionAttributeValues", {}), ":zero": 0, ":one": 1}
+    names = {**(kwargs.get("ExpressionAttributeNames") or {}), "#version": "version"}
     update = {
         "TableName": attendance.name,
         "Key": _marshal(kwargs["Key"]),
-        "UpdateExpression": kwargs["UpdateExpression"],
+        "UpdateExpression": expression,
         "ConditionExpression": kwargs["ConditionExpression"],
-        "ExpressionAttributeValues": _marshal(kwargs.get("ExpressionAttributeValues", {})),
+        "ExpressionAttributeValues": _marshal(values),
+        "ExpressionAttributeNames": names,
     }
-    if kwargs.get("ExpressionAttributeNames"):
-        update["ExpressionAttributeNames"] = kwargs["ExpressionAttributeNames"]
     return _guarded_transaction(employees, attendance, employee_id, {"Update": update})
 
 
@@ -170,9 +183,12 @@ def record_scan(
             try:
                 attendance.update_item(
                     Key={"employee_id": employee_id, "date": business_date},
-                    UpdateExpression="SET scan_events=:empty",
+                    UpdateExpression=(
+                        "SET scan_events=:empty, "
+                        "version=if_not_exists(version,:zero)+:one"
+                    ),
                     ConditionExpression="attribute_not_exists(scan_events)",
-                    ExpressionAttributeValues={":empty": {}},
+                    ExpressionAttributeValues={":empty": {}, ":zero": 0, ":one": 1},
                 )
             except ClientError as exc:
                 if not _conditional_failure(exc):
