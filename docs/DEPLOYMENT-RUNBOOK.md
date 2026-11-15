@@ -43,7 +43,7 @@ All steps below are instructions for the repository owner. They are not executed
    if "${account_id}" in rendered:
        raise SystemExit("Unresolved account_id placeholder")
    output = Path("/tmp/attendance-dev-execution-boundary.json")
-   output.write_text(rendered + "\\n", encoding="utf-8")
+   output.write_text(rendered + "\n", encoding="utf-8")
    print(output)
    PY
    python -m json.tool /tmp/attendance-dev-execution-boundary.json >/dev/null
