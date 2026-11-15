@@ -6,10 +6,10 @@ import re
 import uuid
 
 import boto3
-from boto3.dynamodb.types import TypeSerializer
 from attendance_common.auth import get_username, require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist, parse_hhmm, to_iso
+from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 LOGGER = logging.getLogger()
