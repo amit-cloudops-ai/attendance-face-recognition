@@ -1,8 +1,12 @@
 # Serverless Face-Recognition Attendance System
 
-Contactless, real-time employee clock-in / clock-out using face recognition on AWS. A kiosk browser captures a still image, uploads it straight to S3, and a Lambda matches the face against an Amazon Rekognition collection, writes a timestamped attendance record to DynamoDB, and targets a p95 capture-click-to-result time of 3 seconds or less. This is a deployment acceptance target, not a measured claim; it requires the 20-scan browser/device test in `docs/SPEC.md`. Scheduled jobs mark absences and publish daily and weekly summaries. An admin web app lets HR filter and export attendance.
+Contactless, real-time employee clock-in / clock-out using face recognition on AWS. A kiosk browser captures a still image, uploads it to S3, and a Lambda matches the face against an Amazon Rekognition collection before writing attendance to DynamoDB. Scheduled jobs mark absences and publish daily and weekly summaries. The Cognito-authenticated admin app manages employees, attendance, settings and reports.
 
-**Status:** [docs/STATUS.md](docs/STATUS.md) | **Finish line:** [docs/SPEC.md](docs/SPEC.md) | **New to the team?** Start with [docs/TEAM_BRIEF.md](docs/TEAM_BRIEF.md)
+<escape>**Production:**</escape> <Link url="https://d2l1fs6zsfo1ga.cloudfront.net/kiosk/" title="Kiosk"/> · <Link url="https://d2l1fs6zsfo1ga.cloudfront.net/admin/" title="Admin"/> · Region: `us-east-1` · AWS account: `924422830139`.
+
+**Release status:** Production is deployed and core acceptance (employee enrollment, kiosk recognition, daily/weekly reports, 20-scan and browser acceptance) has been operator-confirmed. Numeric p95 output and several operational/security evidence gates remain tracked in [docs/STATUS.md](docs/STATUS.md); do not treat operator confirmation as a substitute for attached test artifacts.
+
+**Project docs:** [Production status](docs/STATUS.md) · [Frozen specification](docs/SPEC.md) · [Architecture](docs/ARCHITECTURE.md) · [Deployment runbook](docs/DEPLOYMENT-RUNBOOK.md) · [Operations runbook](docs/OPERATIONS-RUNBOOK.md) · [Cost sheet](docs/COST.md) · [Demo storyboard](docs/DEMO_SCRIPT.md) · [Team brief](docs/TEAM_BRIEF.md)
 
 ## Architecture
 
@@ -48,13 +52,13 @@ scripts/     region guard, Terraform wrapper, read-only AWS preflight, e2e smoke
 ```
 
 ## Environments and branches
-`develop` is the **dev** deployment branch; `main` is the **prod** deployment branch. Deployments are manual via `.github/workflows/deploy.yml`: run `plan`, review it, then explicitly select `apply`. Production apply requires the `prod-apply` GitHub environment's independent reviewer. Feature branches: `a/<topic>`, `b/<topic>`, `c/<topic>`, `lead/<topic>`; open PRs into `develop`.
+`main` is the production source-of-truth branch. `develop` is reserved for development integration; feature branches should be short-lived and merged by pull request. The production environment is currently deployed from the release-candidate code now merged into `main`. The GitHub Actions Terraform workflow remains manual: generate a plan, review it, then explicitly select apply. The live production deployment in this release was performed through the reviewed local Terraform workflow, not by claiming the GitHub Actions deploy workflow ran. Never apply Terraform from a commit whose plan has not been reviewed.
 
 ## Frontend and local verification
 The kiosk is served at `/`, the admin app at `/admin/`, and Cognito returns to `/callback.html`. See [docs/FRONTEND.md](docs/FRONTEND.md) for local run instructions, runtime configuration and the browser verification matrix. The generated `web/config.json` is ignored by Git and uploaded by the access Terraform module.
 
 ## Deploy
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 11 and [infra/bootstrap/README.md](infra/bootstrap/README.md). CI validates changes; the OIDC deployment workflow is manual-only and has not been run.
+See [docs/DEPLOYMENT-RUNBOOK.md](docs/DEPLOYMENT-RUNBOOK.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 11 and [infra/bootstrap/README.md](infra/bootstrap/README.md). CI validates changes. The GitHub OIDC deployment workflow is available but has not been used for the current production deployment; the live stack was deployed through the local Terraform workflow. Follow the runbook and inspect a saved plan before any future apply.
 
 ## Documents
 | Doc | Purpose |
