@@ -1,6 +1,7 @@
 """Cross-check the frozen API contract against Terraform route exports."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -42,14 +43,19 @@ def _documented_routes() -> dict[str, tuple[str, str]]:
         if not line.startswith("|") or "/api/" not in line:
             continue
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if len(cells) < 4 or not cells[0].startswith("`"):
+        if len(cells) < 4:
             continue
-        route = cells[0].strip("`")
         group = cells[1].replace(" ", "")
         function = cells[2].split()[0].replace("-", "_")
-        if route in routes:
-            raise AssertionError(f"duplicate documented API route: {route}")
-        routes[route] = (function, group)
+        route_tokens = re.findall(
+            r"(GET|POST|PUT|PATCH|DELETE) (/api/[^\s`|]+)",
+            cells[0],
+        )
+        for method, path in route_tokens:
+            route = f"{method} {path}"
+            if route in routes:
+                raise AssertionError(f"duplicate documented API route: {route}")
+            routes[route] = (function, group)
     return routes
 
 
