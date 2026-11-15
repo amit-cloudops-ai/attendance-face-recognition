@@ -1,23 +1,23 @@
 # Development environment
 
-This root wires the shared foundation, data/automation, recognition and access modules. It exports the combined Part A + Part B API route map, Cognito details and CloudFront site URL.
+This root wires the shared foundation, data/automation, recognition and access modules. It exports the combined API route map, Cognito details and CloudFront site URL.
 
-## Bootstrap prerequisite
+## Recommended first deployment
 
-The S3 backend bucket is intentionally not created by this root. Follow infra/bootstrap/README.md once, copy backend.hcl.example to backend.hcl, replace the account ID, and initialize with:
+For the first dev deployment, follow the ordered [solo local dev bootstrap](../../../docs/DEPLOYMENT-RUNBOOK.md#1-solo-local-dev-bootstrap-owner-operated-path). It covers the read-only account preflight, API Gateway import, dev execution boundary, state bucket, ignored local backend file, concurrency quota check, first apply, required CloudFront second apply, Cognito users, SNS confirmation and consent-gated smoke test.
 
-```bash
-terraform init -backend-config=backend.hcl
-terraform validate
-terraform plan -var-file=terraform.tfvars
-```
+The target account for this dev environment is `924422830139` in `us-east-1`. Run Terraform through `bash scripts/terraform.sh` as the approved `Amit-admin` profile. Do not use direct Terraform commands that bypass the canonical-region wrapper.
 
-Copy terraform.tfvars.example to terraform.tfvars and supply the AWS account ID and alert email. Keep both local files out of Git.
+## Local files
 
-## Cognito callback setup
+Copy `backend.hcl.example` to `backend.hcl` and set the final state bucket name. Copy `terraform.tfvars.example` to `terraform.tfvars`, replace the API ID placeholder with the real 10-character API Gateway ID, and set the alert email. Both files must remain ignored by Git.
 
-The example callback and logout URLs use localhost for the first plan. After the first approved apply, read the site_url output and add that exact HTTPS URL to callback_urls and logout_urls in terraform.tfvars, then create a second plan/apply. Update web/config.js with the Cognito domain and app client ID outputs before publishing the static site.
+The default Lambda concurrency reservations total 19 and require an account concurrency quota of at least 29 to retain 10 unreserved executions. If the quota is lower, set selected `lambda_reserved_concurrency` values to `null` or request an increase before applying.
+
+## Cognito and CloudFront
+
+The initial callback and logout URLs use localhost. After the first apply, add the exact CloudFront HTTPS origin to `allowed_origins`, its `/callback.html` URL to `callback_urls`, and its root URL to `logout_urls`. Run a reviewed second plan/apply. Cognito login and browser-to-S3 uploads from the deployed site are not expected to work until this second apply is complete.
 
 ## Safety
 
-No AWS resources are created by init, validate or plan. Do not run terraform apply without explicit approval. The Part C frontend files and deployment workflow remain separate deliverables.
+No AWS resources are created by Terraform init, validate or plan. The first and second applies are owner-approved AWS writes. Never use `-auto-approve`; inspect each saved plan before applying. Keep production separate and blocked until dev acceptance is complete.
