@@ -162,5 +162,5 @@ def lambda_handler(event, context):
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         return error(400, "invalid_request", str(exc))
     except Exception as exc:  # noqa: BLE001 - API boundary returns a sanitized 500 response
-        LOGGER.error("Attendance override failed (%s)", type(exc).__name__)
+        LOGGER.error("Attendance override failed (%s): %r", type(exc).__name__, getattr(exc, "response", None))
         return error(500, "internal_error", "Unable to override the attendance record.")
