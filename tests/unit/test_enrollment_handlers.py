@@ -158,7 +158,7 @@ def test_enroll_indexes_face_updates_employee_and_deletes_raw_image(aws_env, mon
     assert employee["photo_count"] == 1 and employee["face_ids"] == ["face-001"]
     external_id = fake_rekognition.index_args[0]["ExternalImageId"]
     assert external_id == f"EMP001:{request_id}"
-    assert re.fullmatch(r"[a-zA-Z0-9_.\\-:]+", external_id)
+    assert re.fullmatch(r"[A-Za-z0-9_.:-]+", external_id)
     assert result["code"] == "enrolled" and result["employee_id"] == "EMP001"
     assert fake_s3.deleted == [f"enroll/EMP001/{request_id}.jpg"]
 
