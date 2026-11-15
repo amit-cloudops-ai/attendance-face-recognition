@@ -4,7 +4,7 @@
 
 ## Executive status
 
-The production AWS environment is deployed in **us-east-1** and the kiosk and admin applications are live over HTTPS. The release candidate is deployed from `release/aws-readiness-candidate`; it has **not** been promoted to `main`. Do not treat production deployment from this release branch as satisfying the frozen specification's separate `main)-deployment/governance gate.
+The production AWS environment is deployed in **us-east-1** and the kiosk and admin applications are live over HTTPS. The deployed release-candidate source has now been merged into `main` through PR #33. The production stack itself remains the already-running deployment; the Git merge did not apply Terraform or mutate AWS resources. The GitHub Actions production Terraform workflow has not been used for this deployment.
 
 - Production CloudFront: https://d2l1fs6zsfo1ga.cloudfront.net
 - Production kiosk: https://d2l1fs6zsfo1ga.cloudfront.net/kiosk/
@@ -48,7 +48,7 @@ The following are **not yet evidenced in this status file**. Mark each PASS only
 | N04 per-Lambda least privilege | Export deployed Lambda execution-role mappings and compare every attached policy/action/resource to the architecture IAM matrix; document the AWS-required `rekognition:DetectFaces` wildcard exception | OPEN |
 | N05 private buckets / CloudFront-only web access | Record Block Public Access and bucket policy/OAC evidence for raw, reports and web buckets | PARTIAL — bucket security controls were applied; full live evidence bundle outstanding |
 | N06 clean-checkout reproducibility | Rebuild a disposable dev environment from a clean checkout and record plan/apply/test results; do not destroy or rebuild production | OPEN |
-| N07 release governance | Verify required branch protections and CI policy on `main`; decide and approve the separate promotion path. Current production is on the release candidate, not `main` | OPEN — no promotion authorized |
+| N07 release governance | Verify required branch protections and CI policy on `main`; confirm production release commit provenance | PARTIAL — source merged to `main` via PR #33; branch protection is currently reported disabled and must be configured/reviewed |
 | N08 operational alert delivery | Verify SNS subscription confirmation and budget notification delivery; deliberately trigger one safe test alarm and record email receipt, alarm transition and reset | OPEN |
 | N09 cost ceiling | The cost sheet estimates approximately USD 12–14/month for 100 employees x 2 scans/day and defines a USD 15 budget guardrail. Attach an AWS Pricing Calculator estimate and verify the deployed budget and notifications | PARTIAL — estimate exists; calculator and live notification evidence outstanding |
 | N10 logging | Verify each Lambda log group has 30-day retention and inspect sanitized structured samples for absence of images, tokens and full face data | OPEN |
@@ -70,7 +70,8 @@ The following are **not yet evidenced in this status file**. Mark each PASS only
 - [ ] Demo video recorded from production using consenting participants and sanitized evidence.
 - [ ] Cost sheet supplemented with an AWS Pricing Calculator estimate.
 - [ ] README deployment instructions reconciled with the actual local Terraform production workflow.
-- [ ] Release branch/PR #33 governance and promotion decision completed separately; no automatic merge or promotion.
+- [x] Release candidate promoted to `main` through PR #33 after exact-head CI passed.
+- [ ] Configure and verify `main` branch protection/rulesets; branch protection was reported disabled at promotion time.
 
 ## Evidence handling
 
