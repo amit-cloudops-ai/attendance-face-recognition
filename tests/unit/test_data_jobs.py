@@ -140,8 +140,14 @@ def test_weekly_job_calculates_working_days_and_percentages(job_resources):
     _put_attendance(attendance, "EMP001", "2026-11-09", "present", "09:00")
     _put_attendance(attendance, "EMP001", "2026-11-10", "late", "09:40")
     _put_attendance(attendance, "EMP001", "2026-11-12", "absent")
+    # Records on holidays and weekends must not affect weekly working-day metrics.
+    _put_attendance(attendance, "EMP001", "2026-11-11", "present", "09:00")
+    _put_attendance(attendance, "EMP001", "2026-11-14", "present", "09:00")
+    _put_attendance(attendance, "EMP001", "2026-11-15", "present", "09:00")
     for day in ["2026-11-09", "2026-11-10", "2026-11-12", "2026-11-13"]:
         _put_attendance(attendance, "EMP002", day, "absent")
+    _put_attendance(attendance, "EMP002", "2026-11-11", "absent")
+    _put_attendance(attendance, "EMP002", "2026-11-14", "absent")
 
     result = weekly_job.lambda_handler({"week": "2026-W46"}, None)
     assert result["statusCode"] == 200
