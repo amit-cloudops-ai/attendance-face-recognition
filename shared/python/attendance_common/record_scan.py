@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID
 
 import boto3
+from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 from .config import get_settings
@@ -23,6 +24,52 @@ def _table(env_name: str) -> Any:
 
 def _conditional_failure(exc: ClientError) -> bool:
     return exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException"
+
+
+def _marshal(item: dict) -> dict:
+    serializer = TypeSerializer()
+    return {key: serializer.serialize(value) for key, value in item.items()}
+
+
+def _guarded_transaction(employees, attendance, employee_id: str, action: dict) -> bool:
+    check = {"ConditionCheck": {
+        "TableName": employees.name,
+        "Key": _marshal({"employee_id": employee_id}),
+        "ConditionExpression": "active = :active",
+        "ExpressionAttributeValues": {":active": {"BOOL": True}},
+    }}
+    try:
+        attendance.meta.client.transact_write_items(TransactItems=[check, action])
+        return True
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
+            latest = employees.get_item(Key={"employee_id": employee_id}, ConsistentRead=True).get("Item")
+            if not latest:
+                raise ValueError(f"employee {employee_id} does not exist")
+            if not latest.get("active", False):
+                raise ValueError(f"employee {employee_id} is inactive")
+            return False
+        raise
+
+
+def _guarded_put(employees, attendance, employee_id: str, item: dict) -> bool:
+    return _guarded_transaction(employees, attendance, employee_id, {"Put": {
+        "TableName": attendance.name, "Item": _marshal(item),
+        "ConditionExpression": "attribute_not_exists(employee_id)",
+    }})
+
+
+def _guarded_update(employees, attendance, employee_id: str, kwargs: dict) -> bool:
+    update = {
+        "TableName": attendance.name,
+        "Key": _marshal(kwargs["Key"]),
+        "UpdateExpression": kwargs["UpdateExpression"],
+        "ConditionExpression": kwargs["ConditionExpression"],
+        "ExpressionAttributeValues": _marshal(kwargs.get("ExpressionAttributeValues", {})),
+    }
+    if kwargs.get("ExpressionAttributeNames"):
+        update["ExpressionAttributeNames"] = kwargs["ExpressionAttributeNames"]
+    return _guarded_transaction(employees, attendance, employee_id, {"Update": update})
 
 
 def _late_status(scanned_at: datetime, shift_start: str, grace_minutes: int) -> str:
@@ -131,11 +178,9 @@ def record_scan(
             if request_id is not None:
                 item["scan_events"] = {request_id: outcome}
             try:
-                attendance.put_item(
-                    Item=item,
-                    ConditionExpression="attribute_not_exists(employee_id)",
-                )
-                return outcome
+                if _guarded_put(employees, attendance, employee_id, item):
+                    return outcome
+                continue
             except ClientError as exc:
                 if _conditional_failure(exc):
                     continue
@@ -164,14 +209,15 @@ def record_scan(
                 update += " , #events.#request=:outcome"
                 condition += " AND attribute_not_exists(#events.#request)"
             try:
-                attendance.update_item(
-                    Key={"employee_id": employee_id, "date": business_date},
-                    UpdateExpression=update + " REMOVE flags",
-                    ConditionExpression=condition,
-                    ExpressionAttributeNames=names,
-                    ExpressionAttributeValues=values,
-                )
-                return outcome
+                if _guarded_update(employees, attendance, employee_id, {
+                    "Key": {"employee_id": employee_id, "date": business_date},
+                    "UpdateExpression": update + " REMOVE flags",
+                    "ConditionExpression": condition,
+                    "ExpressionAttributeNames": names,
+                    "ExpressionAttributeValues": values,
+                }):
+                    return outcome
+                continue
             except ClientError as exc:
                 if _conditional_failure(exc):
                     continue
@@ -184,14 +230,15 @@ def record_scan(
             if request_id is None:
                 return outcome
             try:
-                attendance.update_item(
-                    Key={"employee_id": employee_id, "date": business_date},
-                    UpdateExpression="SET #events.#request=:outcome",
-                    ConditionExpression="attribute_not_exists(#events.#request)",
-                    ExpressionAttributeNames={"#events": "scan_events", "#request": request_id},
-                    ExpressionAttributeValues={":outcome": outcome},
-                )
-                return outcome
+                if _guarded_update(employees, attendance, employee_id, {
+                    "Key": {"employee_id": employee_id, "date": business_date},
+                    "UpdateExpression": "SET #events.#request=:outcome",
+                    "ConditionExpression": "attribute_not_exists(#events.#request)",
+                    "ExpressionAttributeNames": {"#events": "scan_events", "#request": request_id},
+                    "ExpressionAttributeValues": {":outcome": outcome},
+                }):
+                    return outcome
+                continue
             except ClientError as exc:
                 if _conditional_failure(exc):
                     continue
@@ -240,8 +287,12 @@ def record_scan(
             }
             if names:
                 update_args["ExpressionAttributeNames"] = names
-            updated = attendance.update_item(**update_args)
-            return _result("clock_out", updated["Attributes"])
+            if not _guarded_update(employees, attendance, employee_id, update_args):
+                continue
+            updated = attendance.get_item(
+                Key={"employee_id": employee_id, "date": business_date}, ConsistentRead=True
+            )["Item"]
+            return _result("clock_out", updated)
         except ClientError as exc:
             if _conditional_failure(exc):
                 continue
