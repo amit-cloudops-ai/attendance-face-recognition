@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 
 import boto3
 from botocore.exceptions import ClientError
@@ -105,7 +106,7 @@ def test_employee_api_uses_atomic_dynamodb_transactions_and_hides_face_ids(monke
         stubber.add_response("transact_write_items", {})
         stubber.add_response(
             "get_item",
-            {"Item": existing_item},
+            {"Item": deepcopy(existing_item)},
             expected_params={
                 "TableName": "attendance-dev-employees",
                 "Key": {"employee_id": "EMP901"},
@@ -114,7 +115,7 @@ def test_employee_api_uses_atomic_dynamodb_transactions_and_hides_face_ids(monke
         )
         stubber.add_response(
             "get_item",
-            {"Item": existing_item},
+            {"Item": deepcopy(existing_item)},
             expected_params={
                 "TableName": "attendance-dev-employees",
                 "Key": {"employee_id": "EMP901"},
