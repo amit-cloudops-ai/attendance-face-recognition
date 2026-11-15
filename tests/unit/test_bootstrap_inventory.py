@@ -25,6 +25,8 @@ def test_render_inventory_outputs_all_account_specific_policy_documents(tmp_path
     assert len(manifest["rendered_files"]) == 35
 
     for path in output.glob("*.json"):
+        if path.name == "bootstrap-manifest.json":
+            continue
         policy = json.loads(path.read_text(encoding="utf-8"))
         assert isinstance(policy["Statement"], list)
         assert "$" + "{account_id}" not in path.read_text(encoding="utf-8")
