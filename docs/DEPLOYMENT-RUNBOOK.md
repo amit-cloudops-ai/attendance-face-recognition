@@ -1,8 +1,30 @@
 # Deployment runbook
 
-**Status:** repository instructions only. This runbook does not authorize AWS writes, remote backend initialization, Terraform planning or applying.
+**Current production:** deployed and live in `us-east-1`. This runbook documents the owner-operated deployment workflow and historical bootstrap steps. It does not authorize a new AWS mutation; inspect and approve a fresh Terraform plan before any future apply.
 
-## Live AWS bootstrap snapshot — 15 November 2026
+## Current production deployment snapshot — 15 November 2026
+
+| Item | Current production value |
+|---|---|
+| Source of truth | `main`; production release promoted by PR #33 |
+| Deployed release source | `release/aws-readiness-candidate` head `014e09d571effb7982fafdf2d9a08f6d553146af`, now included in `main` |
+| AWS account / region | `924422830139` / `us-east-1` |
+| Kiosk | https://d2l1fs6zsfo1ga.cloudfront.net/kiosk/ |
+| Admin | https://d2l1fs6zsfo1ga.cloudfront.net/admin/ |
+| CloudFront distribution | `E3C89JGWXFNNGL` |
+| API Gateway HTTP API | `pmd8cihlki` |
+| Terraform state bucket/key | `attendance-tf-state-924422830139-amit-2026-1115` / `attendance/prod/terraform.tfstate` |
+| Deployment mechanism used | Local Terraform CLI from WSL; GitHub OIDC deploy workflow was not used |
+| First production apply | 1 imported, 200 added, 1 changed, 0 destroyed |
+| Follow-up production config apply | 0 added, 4 changed, 0 destroyed |
+
+The production kiosk, admin login, employee registration/enrollment, kiosk recognition, daily/weekly reports, 20-scan performance and browser acceptance have been operator-confirmed. See [STATUS.md](STATUS.md) for qualifications and remaining evidence gates. Merging PR #33 promoted repository source only; it did not apply Terraform. Do not run another production apply merely because the Git source was merged.
+
+## Historical dev bootstrap snapshot — 15 November 2026
+
+The following section records the earlier dev bootstrap investigation. It is historical context, **not the current production deployment state**. Do not use its dev API ID, dev boundary, or dev-only instructions as production values.
+
+### Dev bootstrap inventory recorded before production deployment — 15 November 2026
 
 This snapshot records verified state from the owner's WSL session. It supersedes generic placeholders and earlier pre-bootstrap assumptions below.
 
