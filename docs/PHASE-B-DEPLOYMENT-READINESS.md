@@ -12,13 +12,13 @@
 - Terraform S3 native lock files are enabled (`use_lockfile = true`); Terraform is pinned to 1.10.5 in CI.
 - Terraform providers load the region from the canonical manifest. The S3 backend receives the same value through `scripts/terraform.sh` locally and the deployment workflow in GitHub Actions.
 - Lambda SDK clients use the Lambda-reserved `AWS_REGION`; the local/test fallback is the canonical region.
-- CI includes a region-consistency gate that fails on conflicting region literals, stale regional endpoints, or Terraform roots that bypass the manifest. A follow-up audit also caught and corrected a hardcoded access-module region and a DynamoDB KMS statement incorrectly placed in an S3 bucket policy; CI now checks the canonical region input and KMS policy placement. Follow-up run 43679979477 passed on the dedicated T38 branch (118 Python tests and both CI jobs); merge and post-merge validation on `solo/amit-monday` remain pending.
-- The manual deployment workflow uses GitHub OIDC, operation-specific plan/apply environments, encrypted saved-plan artifacts using `age`, exact plan commit/branch/run provenance and explicit environment gates.
+- CI includes a region-consistency gate that fails on conflicting region literals, stale regional endpoints, or Terraform roots that bypass the manifest. A follow-up audit caught and corrected hardcoded access-module region values and a DynamoDB KMS statement incorrectly placed in an S3 bucket policy. PR #31 passed its own CI run 43680111003 (118 Python tests and both jobs); these changes are integrated in PR #33 and the combined candidate CI is still being verified.
+- The manual deployment workflow uses GitHub OIDC, operation-specific plan/apply environments, encrypted saved-plan artifacts using `age`, exact plan commit/branch/run provenance and explicit environment gates. It now also verifies that the assumed role ARN, state-bucket prefix and STS caller account match the configured account ID before remote Terraform initialization.
 - Dev workflow runs only from `develop`; prod and billing run only from `main`. The release branch must be reviewed and promoted through a PR before deployment workflow dispatch.
 
 ## Phase B implementation status
 
-The task chain T01–T15, T17 and T31–T38 has implementation/documentation and CI evidence recorded in `docs/TASKS.md` and `docs/STATUS.md`. T38's follow-up corrections are validated on a dedicated PR branch; merge and post-merge validation remain pending. This includes:
+The task chain T01–T15, T17 and T31–T38 has implementation/documentation and CI evidence recorded in `docs/TASKS.md` and `docs/STATUS.md`. T38's follow-up corrections passed on PR #31 individually and are integrated in the isolated PR #33 release candidate; combined CI on the final candidate commit remains a release gate. This includes:
 
 - Per-handler runtime IAM reconciliation and environment-specific runtime permissions boundaries.
 - Terraform provider IAM action mapping for foundation, data, recognition and access modules.
@@ -29,7 +29,7 @@ The task chain T01–T15, T17 and T31–T38 has implementation/documentation and
 - Terraform policy-template validation and provider lockfiles.
 - Scheduler trust hardening, CloudFront KMS scope, DynamoDB KMS ViaService access and isolated billing roles.
 
-T16 and T18 remain blocked on actions that cannot be completed by repository code changes alone. T38 (canonical region manifest and drift-prevention gate) is in progress until this branch's CI validates it.
+T16 and T18 remain blocked on actions that cannot be completed by repository code changes alone. The application baseline and original region guard are on `solo/amit-monday`; the access-module/KMS follow-up is isolated in PR #33 until combined CI passes.
 
 ## Security design requirements
 
@@ -91,3 +91,10 @@ The repository contains no verified account ID or live AWS inventory yet. A repo
 ## Safety boundary
 
 No AWS resources have been created by this preparation. No IAM roles or policies have been created/attached, no OIDC provider or state bucket has been created, no remote backend has been initialized, and no Terraform plan or apply has been run. Any AWS mutation requires an exact written plan and separate explicit owner approval.
+
+
+## Integrated release-candidate work
+
+PR #33 integrates PR #30 (T16 helper correction), PR #31 (T38 access-region and KMS policy correction) and PR #32 (T18 read-only bootstrap inventory renderer). It also adds an API route contract test and a Moto-backed employee API integration test. The candidate has not been merged. Its first combined CI attempts exposed Ruff and contract-test parser defects; both were corrected, and a fresh green run on the latest candidate head is required before this document can be treated as a completed gate.
+
+The repository now includes `docs/DEPLOYMENT-RUNBOOK.md` and `docs/OPERATIONS-RUNBOOK.md`. Live AWS policy analysis, account preflight, GitHub environment configuration, restore testing, budget/alert delivery and deployed browser/camera acceptance remain unverified.
