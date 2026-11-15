@@ -59,7 +59,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T25 | Establish operational runbooks and incident response | IN_PROGRESS | Deployment and operations runbooks are drafted; operational owner assignment and live alert/incident drill remain required |
 | T26 | Verify budget alarms and cost guardrails | IN_PROGRESS | Dev/prod USD 15 budgets with 80%/100% actual-cost notifications and concurrency controls are defined; live email delivery and cost behavior remain untested |
 | T27 | Verify backup, restore and disaster recovery procedures | IN_PROGRESS | DynamoDB PITR, reports/state versioning and recovery steps are documented; a dev restore drill remains required |
-| T28 | Add dependency and container/code supply-chain checks | TODO | Dependency scanning and pinned/reviewed CI actions with actionable failure policy |
+| T28 | Add dependency and container/code supply-chain checks | IN_PROGRESS | CI pins all GitHub Actions to full commit SHAs, pins Python dependencies, runs pip-audit and enforces pins; Dependabot weekly updates are configured. Container scanning and broader SBOM/provenance checks remain open |
 | T29 | Complete end-to-end release documentation | IN_PROGRESS | Obsolete deployment steps are being replaced with the six-environment workflow; local reproducibility and final cross-document review remain |
 | T30 | Conduct final production readiness review | TODO | All release acceptance evidence reviewed; remaining risks accepted by owner |
 
