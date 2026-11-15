@@ -2,3 +2,8 @@
 .callback-panel{max-width:520px;margin:12vh auto}.tiny{font-size:13px}.tiny.top-gap{font-size:12px;margin-top:18px}.kiosk-center{max-width:760px;margin:7vh auto 0;text-align:center}.kiosk-panel{text-align:left;margin-top:28px}.text-link,.download-link{color:#176b4b;font-weight:700}.row-between{justify-content:space-between}.span-all{grid-column:1/-1}.report-json{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:14px}
 
 .field textarea{width:100%;border:1px solid #ccd7ce;border-radius:9px;padding:10px 11px;font:inherit;resize:vertical}.override-dialog{border:0;border-radius:18px;padding:24px;max-width:560px;width:calc(100% - 24px);box-shadow:0 24px 80px #17211d40;color:#17211d}.override-dialog::backdrop{background:#14231c99;backdrop-filter:blur(3px)}.override-dialog h2{margin-bottom:0}
+
+.enroll-dialog{max-width:720px}
+.enroll-dialog video{max-height:420px}
+.enroll-previews{display:flex;gap:10px;flex-wrap:wrap}
+.enroll-preview{width:88px;height:88px;object-fit:cover;border-radius:10px;border:2px solid #dbe5dc}
