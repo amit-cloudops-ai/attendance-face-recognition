@@ -378,22 +378,155 @@ document.querySelector("#attendance-form").addEventListener("submit", event => {
 document.querySelector("#next-page").addEventListener("click", () => {
   if (nextCursor) loadAttendance(nextCursor).catch(error => status(error.message, true));
 });
+function metricCard(label, value, detail = "") {
+  const card = document.createElement("article");
+  card.className = "report-metric";
+  const heading = document.createElement("span");
+  heading.className = "report-metric-label";
+  heading.textContent = label;
+  const number = document.createElement("strong");
+  number.className = "report-metric-value";
+  number.textContent = String(value);
+  card.append(heading, number);
+  if (detail) {
+    const note = document.createElement("span");
+    note.className = "report-metric-detail";
+    note.textContent = detail;
+    card.append(note);
+  }
+  return card;
+}
+
+function reportTable(headers, rows, emptyMessage) {
+  const wrap = document.createElement("div");
+  wrap.className = "table-wrap report-table-wrap";
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const heading of headers) {
+    const th = document.createElement("th");
+    th.textContent = heading;
+    headRow.append(th);
+  }
+  thead.append(headRow);
+  const tbody = document.createElement("tbody");
+  if (!rows.length) {
+    const row = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = headers.length;
+    td.className = "muted";
+    td.textContent = emptyMessage;
+    row.append(td);
+    tbody.append(row);
+  } else {
+    for (const values of rows) {
+      const row = document.createElement("tr");
+      for (const value of values) cell(row, value);
+      tbody.append(row);
+    }
+  }
+  table.append(thead, tbody);
+  wrap.append(table);
+  return wrap;
+}
+
+function renderDailyReport(summary) {
+  const totals = summary.totals || {};
+  const metrics = document.createElement("div");
+  metrics.className = "report-metrics";
+  metrics.append(
+    metricCard("Employees", totals.employees ?? 0, "Active workforce"),
+    metricCard("Present", totals.present ?? 0, "On-time attendance"),
+    metricCard("Late", totals.late ?? 0, "Late arrivals"),
+    metricCard("Absent", totals.absent ?? 0, "No attendance record"),
+    metricCard("Missing clock-out", totals.missing_clock_out ?? 0, "Needs follow-up")
+  );
+  const note = document.createElement("p");
+  note.className = summary.skipped ? "status pending report-note" : "muted report-note";
+  note.textContent = summary.skipped
+    ? "This date was skipped: " + summary.skipped + ". No absence finalization was applied."
+    : "Daily attendance for " + (summary.date || "the selected date") + ".";
+  const rows = (summary.records || []).map(item => [
+    item.employee_id, item.name, item.status,
+    item.clock_in ? new Date(item.clock_in).toLocaleTimeString("en-IN", {hour:"2-digit",minute:"2-digit",timeZone:"Asia/Kolkata"}) : "—",
+    item.clock_out ? new Date(item.clock_out).toLocaleTimeString("en-IN", {hour:"2-digit",minute:"2-digit",timeZone:"Asia/Kolkata"}) : "—",
+    (item.flags || []).join(", ") || "—"
+  ]);
+  reportOutput.replaceChildren(metrics, note, reportTable(
+    ["Employee ID", "Name", "Status", "Clock in", "Clock out", "Flags"],
+    rows,
+    "No employee records are available for this report."
+  ));
+}
+
+function renderWeeklyReport(summary) {
+  const totals = summary.totals || {};
+  const metrics = document.createElement("div");
+  metrics.className = "report-metrics";
+  metrics.append(
+    metricCard("Present rate", (totals.present_pct ?? 0) + "%", "Attendance days with a clock-in"),
+    metricCard("Late rate", (totals.late_pct ?? 0) + "%", "Working days marked late"),
+    metricCard("Absence rate", (totals.absent_pct ?? 0) + "%", "Working days marked absent"),
+    metricCard("Working days", summary.working_days ?? 0, (summary.from || "") + " — " + (summary.to || ""))
+  );
+  const rows = (summary.employees || []).map(item => [
+    item.employee_id, item.name, item.present_days ?? 0, item.late_days ?? 0,
+    item.absent_days ?? 0, (item.present_pct ?? 0) + "%",
+    (item.late_pct ?? 0) + "%", (item.absent_pct ?? 0) + "%"
+  ]);
+  reportOutput.replaceChildren(metrics, reportTable(
+    ["Employee ID", "Name", "Present", "Late", "Absent", "Present %", "Late %", "Absent %"],
+    rows,
+    "No employee records are available for this report."
+  ));
+}
+
+function updateReportPeriodHint() {
+  const type = document.querySelector("#report-type").value;
+  const period = document.querySelector("#report-period");
+  period.placeholder = type === "weekly" ? "YYYY-Www (e.g. 2026-W46)" : "YYYY-MM-DD";
+  period.setAttribute("aria-label", type === "weekly" ? "ISO week, YYYY-Www" : "Report date, YYYY-MM-DD");
+}
+
+document.querySelector("#report-type").addEventListener("change", updateReportPeriodHint);
+updateReportPeriodHint();
+
 document.querySelector("#report-form").addEventListener("submit", async event => {
   event.preventDefault();
   const type = document.querySelector("#report-type").value;
   const period = document.querySelector("#report-period").value.trim();
+  const valid = type === "daily" ? /^\\d{4}-\\d{2}-\\d{2}$/.test(period) : /^\\d{4}-W\\d{2}$/.test(period);
+  if (!valid) {
+    reportOutput.replaceChildren();
+    const note = document.createElement("p");
+    note.className = "status error";
+    note.textContent = type === "weekly" ? "Enter a valid ISO week, for example 2026-W46." : "Enter a date in YYYY-MM-DD format.";
+    reportOutput.append(note);
+    csvDownload.classList.add("hidden");
+    return;
+  }
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = "Loading…";
+  reportOutput.textContent = "Loading report…";
+  csvDownload.classList.add("hidden");
   try {
     const data = await api(`/admin/reports?type=${encodeURIComponent(type)}&period=${encodeURIComponent(period)}`);
-    reportOutput.textContent = JSON.stringify(data.summary, null, 2);
+    if (type === "daily") renderDailyReport(data.summary || {});
+    else renderWeeklyReport(data.summary || {});
     if (data.csv_url) {
       csvDownload.href = data.csv_url;
       csvDownload.classList.remove("hidden");
-    } else {
-      csvDownload.classList.add("hidden");
     }
   } catch (error) {
-    reportOutput.textContent = error.message || "Report could not be loaded.";
-    csvDownload.classList.add("hidden");
+    reportOutput.replaceChildren();
+    const note = document.createElement("p");
+    note.className = "status error";
+    note.textContent = error.message || "Report could not be loaded.";
+    reportOutput.append(note);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Load report";
   }
 });
 async function loadSettings() {
