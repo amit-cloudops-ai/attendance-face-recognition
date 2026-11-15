@@ -224,13 +224,13 @@ locals {
         Resource = [aws_rekognition_collection.faces.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:TransactWriteItems"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:TransactWriteItems"]
         Resource = [var.tables.employees.arn]
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:PutItem", "dynamodb:TransactWriteItems"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem", "dynamodb:TransactWriteItems"]
         Resource = [var.tables.audit.arn]
       }
     ]
