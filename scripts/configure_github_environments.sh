@@ -22,7 +22,7 @@ USAGE
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --reviewer) REVIEWER="\${2:?Missing GitHub username}"; shift 2 ;;
+    --reviewer) REVIEWER="${2:?Missing GitHub username}"; shift 2 ;;
     --apply) APPLY=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -42,6 +42,12 @@ gh auth status >/dev/null
 ADMIN="$(gh api "repos/$REPO" --jq '.permissions.admin')"
 if [[ "$ADMIN" != "true" ]]; then
   echo "The authenticated GitHub user must have repository admin permission." >&2
+  exit 2
+fi
+
+ACTOR="$(gh api user --jq '.login')"
+if [[ "$REVIEWER" == "$ACTOR" ]]; then
+  echo "The authenticated administrator cannot be the independent deployment reviewer." >&2
   exit 2
 fi
 
@@ -77,7 +83,7 @@ echo "Independent reviewer: $REVIEWER (ID $REVIEWER_ID)"
 echo "Mode: $([[ "$APPLY" == true ]] && echo APPLY || echo DRY RUN)"
 echo
 
-for item in "\${ENVIRONMENTS[@]}"; do
+for item in "${ENVIRONMENTS[@]}"; do
   IFS='|' read -r environment allowed_branch require_reviewer <<<"$item"
   reviewers='[]'
   if [[ "$require_reviewer" == true ]]; then
