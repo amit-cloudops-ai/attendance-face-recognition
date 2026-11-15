@@ -111,6 +111,14 @@ def test_daily_job_marks_absent_and_missing_clockout_idempotently(job_resources)
     rows = {row["employee_id"]: row for row in report["records"]}
     assert rows["EMP003"]["status"] == "absent"
     assert "missing_clock_out" in rows["EMP001"]["flags"]
+    stored_missing = attendance.get_item(
+        Key={"employee_id": "EMP001", "date": "2026-11-13"}
+    )["Item"]
+    stored_absent = attendance.get_item(
+        Key={"employee_id": "EMP003", "date": "2026-11-13"}
+    )["Item"]
+    assert stored_missing["version"] == 1
+    assert stored_absent["version"] == 1
     csv_text = s3.get_object(
         Bucket="attendance-reports", Key="reports/daily/2026-11-13.csv"
     )["Body"].read().decode()
