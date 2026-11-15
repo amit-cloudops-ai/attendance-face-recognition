@@ -263,13 +263,15 @@ enrollDialog.addEventListener("close", () => {
 });
 
 async function pollEnrollment(requestId) {
-  const deadline = Date.now() + 12000;
+  const deadline = Date.now() + 60000;
+  let delay = 400;
   while (Date.now() < deadline) {
     const data = await api(`/kiosk/result/${encodeURIComponent(requestId)}`);
     if (data.code !== "pending") return data;
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, delay));
+    delay = Math.min(1500, Math.round(delay * 1.5));
   }
-  throw new Error("Enrollment processing timed out. Check the employee's photo count before retrying.");
+  throw new Error("Enrollment is still processing. Do not upload the same photo again yet; refresh the employee list and check the photo count before starting another enrollment.");
 }
 
 async function deleteFaceTemplates(employeeId) {
