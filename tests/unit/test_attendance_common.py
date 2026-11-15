@@ -10,10 +10,10 @@ from attendance_common.record_scan import record_scan
 from attendance_common.responses import error, ok
 from attendance_common.tz import IST, now_ist, parse_hhmm, to_iso, today_ist
 from moto import mock_aws
+
 from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
 UTC = ZoneInfo("UTC")
-
 
 @pytest.fixture
 def aws_tables(monkeypatch):
@@ -36,10 +36,8 @@ def aws_tables(monkeypatch):
         yield employees, attendance
         config._reset_cache()
 
-
 def scan(at, confidence=98.5):
     return record_scan("EMP001", datetime.fromisoformat(at), confidence)
-
 
 def test_time_helpers():
     assert parse_hhmm("09:05").isoformat(timespec="minutes") == "09:05"
@@ -52,14 +50,12 @@ def test_time_helpers():
     with pytest.raises(ValueError):
         to_iso(datetime(2026, 11, 14, 9, 0))
 
-
 def test_response_envelopes():
     import json
     assert ok({"x": 1})["statusCode"] == 200
     failure = error(404, "not_found", "Missing")
     assert failure["statusCode"] == 404
     assert json.loads(failure["body"]) == {"error": {"code": "not_found", "message": "Missing"}}
-
 
 def test_first_scan_creates_present_clock_in(aws_tables):
     _, table = aws_tables
@@ -69,12 +65,10 @@ def test_first_scan_creates_present_clock_in(aws_tables):
     item = table.get_item(Key={"employee_id": "EMP001", "date": "2026-11-14"})["Item"]
     assert item["confidence"] == Decimal("98.5") and item["source"] == "face"
 
-
 def test_late_boundary_is_strictly_after_shift_plus_grace(aws_tables):
     assert scan("2026-11-14T09:15:00+05:30")["status"] == "present"
     # Different business date so this is an independent first scan.
     assert scan("2026-11-15T09:16:00+05:30")["status"] == "late"
-
 
 def test_duplicate_inside_debounce_does_not_write_clock_out(aws_tables):
     first = scan("2026-11-14T09:00:00+05:30")
@@ -82,12 +76,10 @@ def test_duplicate_inside_debounce_does_not_write_clock_out(aws_tables):
     assert first["action"] == "clock_in" and second["action"] == "duplicate_ignored"
     assert second["clock_in"] == first["clock_in"] and second["clock_out"] is None
 
-
 def test_scan_at_debounce_boundary_sets_clock_out(aws_tables):
     scan("2026-11-14T09:00:00+05:30")
     result = scan("2026-11-14T09:10:00+05:30")
     assert result["action"] == "clock_out" and result["clock_out"] == "2026-11-14T09:10:00+05:30"
-
 
 def test_later_scan_updates_clock_out_and_out_of_order_event_cannot_reverse_it(aws_tables):
     scan("2026-11-14T09:00:00+05:30")
@@ -97,12 +89,10 @@ def test_later_scan_updates_clock_out_and_out_of_order_event_cannot_reverse_it(a
     assert latest["clock_out"] == "2026-11-14T17:30:00+05:30"
     assert stale["clock_out"] == latest["clock_out"]
 
-
 def test_business_date_uses_ist_after_offset_conversion(aws_tables):
     result = scan("2026-11-13T20:00:00+00:00")
     assert result["date"] == "2026-11-14"
     assert result["clock_in"] == "2026-11-14T01:30:00+05:30"
-
 
 def test_absent_row_is_conditionally_promoted_to_clock_in(aws_tables):
     _, table = aws_tables
@@ -113,7 +103,6 @@ def test_absent_row_is_conditionally_promoted_to_clock_in(aws_tables):
     assert result["action"] == "clock_in" and item["status"] == "present"
     assert "flags" not in item
 
-
 def test_inactive_and_unknown_employees_do_not_create_attendance(aws_tables):
     employees, table = aws_tables
     employees.update_item(Key={"employee_id": "EMP001"}, UpdateExpression="SET active=:v", ExpressionAttributeValues={":v": False})
@@ -123,14 +112,12 @@ def test_inactive_and_unknown_employees_do_not_create_attendance(aws_tables):
         record_scan("EMP999", datetime.fromisoformat("2026-11-14T09:00:00+05:30"), 98)
     assert table.scan()["Items"] == []
 
-
 @pytest.mark.parametrize("employee_id,confidence,stamp", [("", 98, "2026-11-14T09:00:00+05:30"),
     ("EMP001", -1, "2026-11-14T09:00:00+05:30"), ("EMP001", 101, "2026-11-14T09:00:00+05:30"),
     ("EMP001", 98, "2026-11-14T09:00:00")])
 def test_invalid_inputs_are_rejected(aws_tables, employee_id, confidence, stamp):
     with pytest.raises(ValueError):
         record_scan(employee_id, datetime.fromisoformat(stamp), confidence)
-
 
 def test_settings_defaults_are_filled_in(monkeypatch):
     monkeypatch.delenv("TABLE_CONFIG", raising=False)
@@ -139,8 +126,6 @@ def test_settings_defaults_are_filled_in(monkeypatch):
     assert settings["grace_minutes"] == 15 and settings["debounce_minutes"] == 10
     assert settings["weekend_days"] == [6, 7]
     config._reset_cache()
-
-
 
 def test_same_request_id_returns_original_clock_in_without_clocking_out(aws_tables):
     _, table = aws_tables
@@ -153,7 +138,6 @@ def test_same_request_id_returns_original_clock_in_without_clocking_out(aws_tabl
     assert first["action"] == "clock_in"
     assert item.get("clock_out") is None
     assert item["scan_events"][request_id] == first
-
 
 def test_different_request_after_debounce_records_clock_out(aws_tables):
     first_id, second_id = str(uuid4()), str(uuid4())
@@ -169,7 +153,6 @@ def test_different_request_after_debounce_records_clock_out(aws_tables):
     assert second["action"] == "clock_out"
     assert second["clock_out"] == "2026-11-14T09:10:00+05:30"
 
-
 def test_request_idempotency_initializes_existing_attendance_rows(aws_tables):
     _, table = aws_tables
     table.put_item(Item={
@@ -183,8 +166,6 @@ def test_request_idempotency_initializes_existing_attendance_rows(aws_tables):
     retried = record_scan("EMP001", stamp, 98.5, request_id=request_id)
     assert first == retried
     assert first["action"] == "clock_out"
-
-
 
 def test_employee_deactivation_between_read_and_attendance_write_is_blocked(aws_tables, monkeypatch):
     employees, attendance = aws_tables
@@ -203,7 +184,6 @@ def test_employee_deactivation_between_read_and_attendance_write_is_blocked(aws_
     with pytest.raises(ValueError, match="inactive"):
         scan("2026-11-14T09:00:00+05:30")
     assert attendance.scan()["Items"] == []
-
 
 def test_active_employee_guard_and_attendance_write_share_transaction(aws_tables, monkeypatch):
     employees, attendance = aws_tables
