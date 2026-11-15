@@ -286,3 +286,24 @@ def test_settings_update_detects_stale_concurrent_write(admin_resources, monkeyp
     assert response["statusCode"] == 409
     assert settings.get_item(Key={"pk": "SETTINGS"})["Item"]["grace_minutes"] == 8
     assert audit.scan()["Items"] == []
+
+
+
+def test_override_clockout_removes_stale_missing_clockout_flag(admin_resources):
+    _, attendance, _, _ = admin_resources
+    attendance.put_item(Item={
+        "employee_id": "EMP001", "date": "2026-11-13",
+        "status": "present", "source": "face",
+        "clock_in": "2026-11-13T09:00:00+05:30",
+        "flags": {"missing_clock_out", "manual_review"},
+        "updated_at": "2026-11-13T23:59:00+05:30",
+    })
+    response = override_handler.lambda_handler(admin_event({
+        "employee_id": "EMP001", "date": "2026-11-13", "status": "present",
+        "clock_in": "2026-11-13T09:00:00+05:30",
+        "clock_out": "2026-11-13T18:00:00+05:30",
+        "reason": "Verified against the register.",
+    }), None)
+    item = attendance.get_item(Key={"employee_id": "EMP001", "date": "2026-11-13"})["Item"]
+    assert response["statusCode"] == 200
+    assert item["flags"] == {"manual_review"}
