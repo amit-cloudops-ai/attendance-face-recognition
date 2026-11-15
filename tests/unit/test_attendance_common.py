@@ -180,3 +180,41 @@ def test_request_idempotency_initializes_existing_attendance_rows(aws_tables):
     retried = record_scan("EMP001", stamp, 98.5, request_id=request_id)
     assert first == retried
     assert first["action"] == "clock_out"
+
+
+
+def test_employee_deactivation_between_read_and_attendance_write_is_blocked(aws_tables, monkeypatch):
+    employees, attendance = aws_tables
+    client = attendance.meta.client
+    original = client.transact_write_items
+    deactivated = {"done": False}
+
+    def deactivate_before_commit(**kwargs):
+        if not deactivated["done"]:
+            employees.update_item(Key={"employee_id": "EMP001"},
+                UpdateExpression="SET active=:inactive", ExpressionAttributeValues={":inactive": False})
+            deactivated["done"] = True
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", deactivate_before_commit)
+    with pytest.raises(ValueError, match="inactive"):
+        scan("2026-11-14T09:00:00+05:30")
+    assert attendance.scan()["Items"] == []
+
+
+def test_active_employee_guard_and_attendance_write_share_transaction(aws_tables, monkeypatch):
+    employees, attendance = aws_tables
+    client = attendance.meta.client
+    original = client.transact_write_items
+    captured = []
+
+    def capture(**kwargs):
+        captured.append(kwargs["TransactItems"])
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", capture)
+    scan("2026-11-14T09:00:00+05:30")
+    assert len(captured) == 1
+    assert [next(iter(action)) for action in captured[0]] == ["ConditionCheck", "Put"]
+    assert captured[0][0]["ConditionCheck"]["TableName"] == employees.name
+    assert captured[0][1]["Put"]["TableName"] == attendance.name
