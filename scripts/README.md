@@ -12,7 +12,7 @@ bash scripts/terraform.sh -chdir=infra/envs/dev init -input=false -backend-confi
 
 ## GitHub Actions environment setup
 
-\`configure_github_environments.sh\` creates/updates the six exact deployment environments, enforces their single allowed branch and configures independent reviewers. It is dry-run by default and requires GitHub CLI authenticated as a repository administrator plus an independent reviewer with repository access.
+\`configure_github_environments.sh\` creates/updates the six exact deployment environments and restricts each to its single approved deployment branch. The agreed model is solo-owner: no independent reviewer is required and self-review is allowed. It is dry-run by default and requires GitHub CLI authenticated as a repository administrator.
 
 \`\`\`bash
 bash scripts/configure_github_environments.sh
