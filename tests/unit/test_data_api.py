@@ -299,3 +299,40 @@ def test_employee_deactivation_transaction_failure_preserves_active_state(data_t
     assert employees.get_item(Key={"employee_id": "EMP001"})["Item"]["active"] is True
     assert audit.scan()["Items"] == []
 
+
+
+
+@pytest.mark.parametrize("cursor", [
+    attendance_query._encode_cursor({
+        "mode": "employee",
+        "last_key": {"employee_id": "EMP002", "date": "2026-11-12"},
+    }),
+    attendance_query._encode_cursor({
+        "mode": "employee",
+        "last_key": {"employee_id": "EMP001", "date": "not-a-date"},
+    }),
+    attendance_query._encode_cursor({
+        "mode": "employee",
+        "last_key": {"employee_id": "EMP001", "date": "2026-11-12", "extra": "x"},
+    }),
+])
+def test_attendance_query_rejects_mismatched_or_malformed_employee_cursor(data_tables, cursor):
+    response = attendance_query.lambda_handler(admin_event(query={
+        "employee_id": "EMP001", "from": "2026-11-12", "to": "2026-11-14",
+        "cursor": cursor,
+    }), None)
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"])["error"]["code"] == "invalid_cursor"
+
+
+def test_attendance_query_rejects_date_cursor_key_for_another_date(data_tables):
+    cursor = attendance_query._encode_cursor({
+        "mode": "date",
+        "date": "2026-11-14",
+        "last_key": {"employee_id": "EMP001", "date": "2026-11-13"},
+    })
+    response = attendance_query.lambda_handler(admin_event(query={
+        "from": "2026-11-14", "to": "2026-11-15", "cursor": cursor,
+    }), None)
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"])["error"]["code"] == "invalid_cursor"
