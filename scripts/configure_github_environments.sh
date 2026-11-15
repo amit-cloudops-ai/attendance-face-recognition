@@ -45,6 +45,12 @@ if [[ "$ADMIN" != "true" ]]; then
   exit 2
 fi
 
+ACTOR="$(gh api user --jq '.login')"
+if [[ "$REVIEWER" == "$ACTOR" ]]; then
+  echo "The authenticated administrator cannot be the independent deployment reviewer." >&2
+  exit 2
+fi
+
 REVIEWER_ID="$(gh api "users/$REVIEWER" --jq '.id')"
 if [[ ! "$REVIEWER_ID" =~ ^[0-9]+$ ]]; then
   echo "Could not resolve reviewer GitHub numeric ID." >&2
