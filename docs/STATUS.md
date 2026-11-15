@@ -131,3 +131,12 @@ T19–T24 and T25–T30 remain release, deployment and operational acceptance wo
 ## Safety boundary
 
 No AWS resources, IAM roles, OIDC provider, permissions boundaries, state bucket or KMS keys have been created by this work. No remote backend initialization, Terraform plan or Terraform apply has been run. Any AWS mutation requires an exact written plan and separate explicit owner approval before execution.
+
+
+## T26 cost-guardrail follow-up
+
+A pre-deployment review found that the two existing dev/prod budgets had no cost filters and therefore both measured the same total AWS account spend. They were not environment-specific. T26 has been reopened on `ai/T26-project-cost-budget-scope` to replace them with one $15/month project budget filtered by `Project=attendance`, activate that cost-allocation tag through the billing root, and scope the billing IAM policies to the single budget plus the minimum Cost Explorer tag actions.
+
+The Project tag is already attached by the dev/prod Terraform resource definitions. The billing root must be applied after the first tagged dev resources exist and the tag appears in Cost Explorer; AWS may take up to 24 hours for a newly applied tag to appear for activation. The budget is an alert, not an automatic spending cap. A saved AWS Pricing Calculator quote and actual notification verification remain owner/deployment acceptance items.
+
+The cost model was also corrected: Rekognition's 12-month Free Tier is 1,000 images/month in each image group (not 5,000 total), and the modeled 4,400 calls per group cost $8.80/month without Free Tier. Cognito's current 10,000-MAU free tier applies to Lite/Essentials, not Plus. The updated estimate remains approximately $12–$14/month at 100 employees, two scans/day and 22 working days, subject to actual account eligibility, log volume and the saved calculator estimate.
