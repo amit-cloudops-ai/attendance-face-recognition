@@ -24,7 +24,7 @@ def test_render_inventory_outputs_all_account_specific_policy_documents(tmp_path
     assert manifest["state_bucket"] == "attendance-tf-state-123456789012-unit-test"
     assert manifest["api_id"] == "a1b2c3d4e5"
     assert manifest["template_counts"] == {"trust": 6, "boundary": 2, "managed": 28}
-    assert len(manifest["rendered_files"]) == 35
+    assert len(manifest["rendered_files"]) == 37
 
     for path in output.glob("*.json"):
         if path.name == "bootstrap-manifest.json":
