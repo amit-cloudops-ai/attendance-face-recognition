@@ -37,7 +37,7 @@ The apply path requires a numeric plan run ID, confirms the plan run is successf
 
 ## GitHub environment protection rules
 
-Configure the following branch restrictions and reviewers before enabling deployments:
+Configure the following branch restrictions and solo-owner review policy before enabling deployments:
 
 | Environment | Allowed deployment branch | Required reviewers |
 |---|---|---|
@@ -48,7 +48,7 @@ Configure the following branch restrictions and reviewers before enabling deploy
 | billing-plan | main only | None |
 | billing-apply | main only | None; owner self-review allowed |
 
-Protect main and develop with pull-request review requirements. Require CODEOWNERS review for .github/workflows/**, infra/policies/** and infra/** so changes to deployment logic, role policies and Terraform are reviewed before reaching the release branches. Restrict environment administration to repository maintainers.
+Protect main and develop with required pull requests and CI checks. During the solo-owner phase, require zero external approvals and allow owner self-review. Add CODEOWNERS review for .github/workflows/**, infra/policies/** and infra/** when a second trusted maintainer is available. Restrict environment administration to repository maintainers.
 
 The AWS trust policy only distinguishes repository and environment. Exact GitHub environment branch restrictions, the workflow's branch if-condition, required CI checks, saved-plan provenance and manual workflow dispatch form the deployment boundary. This repository currently uses a solo-owner model: independent environment reviewers are not required and owner self-review is allowed. Add independent reviewers if the project later gains another trusted operator.
 
