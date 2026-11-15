@@ -43,6 +43,8 @@ def _guarded_transaction(employees, attendance, employee_id: str, action: dict) 
         return True
     except ClientError as exc:
         if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
+            import logging
+            logging.getLogger(__name__).error("Attendance transaction canceled: %r", exc.response)
             latest = employees.get_item(Key={"employee_id": employee_id}, ConsistentRead=True).get("Item")
             if not latest:
                 raise ValueError(f"employee {employee_id} does not exist")
