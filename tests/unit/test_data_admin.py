@@ -187,3 +187,116 @@ def test_settings_rejects_invalid_or_empty_updates(admin_resources, body):
 def test_settings_requires_admin_group(admin_resources):
     response = settings_handler.lambda_handler(admin_event(method="GET", group="kiosk"), None)
     assert response["statusCode"] == 403
+
+
+
+def test_override_audit_and_attendance_are_written_in_one_transaction(admin_resources, monkeypatch):
+    _, attendance, _, audit = admin_resources
+    client = attendance.meta.client
+    original = client.transact_write_items
+    calls = []
+
+    def capture(**kwargs):
+        calls.append(kwargs["TransactItems"])
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", capture)
+    response = override_handler.lambda_handler(admin_event({
+        "employee_id": "EMP001", "date": "2026-11-13", "status": "present",
+        "clock_in": "2026-11-13T09:00:00+05:30", "reason": "Verified.",
+    }), None)
+    assert response["statusCode"] == 200
+    assert len(calls) == 1
+    assert [next(iter(action)) for action in calls[0]] == ["Put", "Put"]
+    assert len(audit.scan()["Items"]) == 1
+
+
+def test_override_transaction_failure_writes_neither_record(admin_resources, monkeypatch):
+    from botocore.exceptions import ClientError
+
+    _, attendance, _, audit = admin_resources
+
+    def fail(**kwargs):
+        raise ClientError({"Error": {"Code": "InternalServerError", "Message": "simulated"}}, "TransactWriteItems")
+
+    monkeypatch.setattr(attendance.meta.client, "transact_write_items", fail)
+    response = override_handler.lambda_handler(admin_event({
+        "employee_id": "EMP001", "date": "2026-11-13", "status": "present",
+        "clock_in": "2026-11-13T09:00:00+05:30", "reason": "Verified.",
+    }), None)
+    assert response["statusCode"] == 500
+    assert attendance.scan()["Items"] == []
+    assert audit.scan()["Items"] == []
+
+
+def test_override_detects_concurrent_attendance_change(admin_resources, monkeypatch):
+    _, attendance, _, audit = admin_resources
+    client = attendance.meta.client
+    original = client.transact_write_items
+
+    def race(**kwargs):
+        attendance.put_item(Item={
+            "employee_id": "EMP001", "date": "2026-11-13",
+            "status": "present", "clock_in": "2026-11-13T08:00:00+05:30",
+            "updated_at": "2026-11-13T08:00:00+05:30",
+        })
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", race)
+    response = override_handler.lambda_handler(admin_event({
+        "employee_id": "EMP001", "date": "2026-11-13", "status": "late",
+        "clock_in": "2026-11-13T09:00:00+05:30", "reason": "Verified.",
+    }), None)
+    assert response["statusCode"] == 409
+    assert attendance.get_item(Key={"employee_id": "EMP001", "date": "2026-11-13"})["Item"]["clock_in"] == "2026-11-13T08:00:00+05:30"
+    assert audit.scan()["Items"] == []
+
+
+def test_settings_update_and_audit_are_transactional(admin_resources, monkeypatch):
+    _, _, settings, audit = admin_resources
+    client = settings.meta.client
+    original = client.transact_write_items
+    calls = []
+
+    def capture(**kwargs):
+        calls.append(kwargs["TransactItems"])
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", capture)
+    response = settings_handler.lambda_handler(admin_event({"grace_minutes": 12}, method="PUT"), None)
+    assert response["statusCode"] == 200
+    assert len(calls) == 1
+    assert [next(iter(action)) for action in calls[0]] == ["Put", "Put"]
+    assert len(audit.scan()["Items"]) == 1
+
+
+def test_settings_transaction_failure_preserves_config_and_audit(admin_resources, monkeypatch):
+    from botocore.exceptions import ClientError
+
+    _, _, settings, audit = admin_resources
+
+    def fail(**kwargs):
+        raise ClientError({"Error": {"Code": "InternalServerError", "Message": "simulated"}}, "TransactWriteItems")
+
+    monkeypatch.setattr(settings.meta.client, "transact_write_items", fail)
+    response = settings_handler.lambda_handler(admin_event({"grace_minutes": 12}, method="PUT"), None)
+    assert response["statusCode"] == 500
+    assert settings.get_item(Key={"pk": "SETTINGS"}).get("Item") is None
+    assert audit.scan()["Items"] == []
+
+
+def test_settings_update_detects_stale_concurrent_write(admin_resources, monkeypatch):
+    _, _, settings, audit = admin_resources
+    settings.put_item(Item={"pk": "SETTINGS", "grace_minutes": 5, "updated_at": "old"})
+    client = settings.meta.client
+    original = client.transact_write_items
+
+    def race(**kwargs):
+        settings.put_item(Item={"pk": "SETTINGS", "grace_minutes": 8, "updated_at": "newer"})
+        return original(**kwargs)
+
+    monkeypatch.setattr(client, "transact_write_items", race)
+    response = settings_handler.lambda_handler(admin_event({"debounce_minutes": 15}, method="PUT"), None)
+    assert response["statusCode"] == 409
+    assert settings.get_item(Key={"pk": "SETTINGS"})["Item"]["grace_minutes"] == 8
+    assert audit.scan()["Items"] == []
