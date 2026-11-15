@@ -7,3 +7,16 @@
 .enroll-dialog video{max-height:420px}
 .enroll-previews{display:flex;gap:10px;flex-wrap:wrap}
 .enroll-preview{width:88px;height:88px;object-fit:cover;border-radius:10px;border:2px solid #dbe5dc}
+
+/* Reporting dashboard */
+.report-output{margin-top:16px;min-width:0}
+.report-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.report-metric{display:grid;gap:7px;align-content:start;min-height:112px;padding:16px;border:1px solid #e2e8e2;border-radius:13px;background:#f8faf7}
+.report-metric-label{font-size:11px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;color:#63736a}
+.report-metric-value{font-size:30px;line-height:1.1;letter-spacing:-.045em;color:#17211d}
+.report-metric-detail{font-size:12px;line-height:1.4;color:#63736a}
+.report-note{margin:12px 0}
+.report-table-wrap{margin-top:12px;border:1px solid #edf0ed;border-radius:12px}
+.report-table-wrap table{min-width:680px}
+.download-link{display:inline-flex;margin-top:14px;padding:10px 14px;border-radius:9px;background:#e6ece7}
+@media(max-width:600px){.report-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.report-metric{padding:13px;min-height:100px}.report-metric-value{font-size:25px}}
