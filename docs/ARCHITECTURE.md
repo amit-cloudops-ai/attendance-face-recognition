@@ -124,23 +124,29 @@ See [COST.md](COST.md). About 10 to 14 USD per month at 100 employees x 2 scans/
 | D11 | Single region us-east-1 | Existing deployment target and verified service/IAM policy alignment; one region keeps resource, identity and signing endpoints consistent |
 | D12 | Liveness deferred | Time; risk documented, mitigations listed |
 
-## 11. Deployment
-1. **Bootstrap (once, Lead, Console):** create S3 bucket `attendance-tfstate-<account_id>` (versioning on, encryption on, TLS-only); create the IAM OIDC provider `token.actions.githubusercontent.com`; create scoped roles `attendance-github-deploy-dev` and `attendance-github-deploy-prod` with trust subjects for the GitHub `dev` and `prod` environments. See `infra/bootstrap/README.md`.
-2. Create GitHub environments `dev` (deployment branch `develop`) and `prod` (deployment branch `main`, required reviewer). Configure repository/environment variables: `AWS_ROLE_ARN_DEV`, `AWS_ROLE_ARN_PROD`, `TF_STATE_BUCKET`, `AWS_ACCOUNT_ID`, `ALERT_EMAIL`, `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS`, and `ALLOWED_ORIGINS`. The three URL/origin variables are non-empty JSON arrays of strings.
-3. Merge reviewed changes to `develop` or `main`. Deployment is **manual only**: trigger `.github/workflows/deploy.yml` from the matching branch, choose `plan`, review the one-day plan artifact, then trigger `apply` and provide that plan run ID. Apply downloads the exact saved plan and verifies it was created by a successful plan run on the same branch and exact commit SHA; Terraform rejects it if the state has changed. Production apply is gated by the `prod` environment reviewer. CI push events never apply Terraform.
-4. On first apply, localhost is used for Cognito callback/logout and raw-bucket CORS to avoid a module dependency cycle. After CloudFront is created, update `COGNITO_CALLBACK_URLS`, `COGNITO_LOGOUT_URLS` and `ALLOWED_ORIGINS` to include the exact HTTPS site origin, then plan and apply the reviewed update.
-5. Post-deploy: create Cognito users (`kiosk-01`, admins), confirm SNS email subscription, and run the e2e smoke script. No deployment has been executed from this branch; no AWS resources have been provisioned.
+## 11. Deployment and release
+The current deployment design is approval-gated and uses six GitHub Actions environments and six matching OIDC roles: `dev-plan`, `dev-apply`, `prod-plan`, `prod-apply`, `billing-plan` and `billing-apply`. The older two-role/two-environment bootstrap procedure is obsolete; follow [GITHUB-OIDC-DEPLOYMENT.md](GITHUB-OIDC-DEPLOYMENT.md), [MANUAL-AWS-BOOTSTRAP-PLAN.md](MANUAL-AWS-BOOTSTRAP-PLAN.md) and [DEPLOYMENT-RUNBOOK.md](DEPLOYMENT-RUNBOOK.md).
 
-## 12. Operations runbook
-| Task | How |
-|---|---|
-| Add employee | Admin app, Add employee, capture 3-5 photos, wait for "enrolled" |
-| Offboard | Admin app, Deactivate (sets inactive and deletes faces) |
-| Tune accuracy | Admin app Settings (or config table item `SETTINGS`): `face_match_threshold` |
-| Re-run daily/weekly job | Console, Lambda, Test with `{"date": "YYYY-MM-DD"}` / `{"week": "YYYY-Www"}` |
-| Revoke a kiosk | Cognito, disable user `kiosk-01` |
-| Roll back | Revert commit on `main`, run a new manual plan, review it, then apply through the protected `prod` environment |
-| Restore data | DynamoDB point-in-time restore to a new table, then swap |
+1. **Repository gate:** review the release-candidate PR, require the exact combined CI run to pass, verify provider lockfiles and IAM policy checks, and obtain the required independent review. Do not deploy from a feature or release-candidate branch; dev deploys only from `develop`, while prod and billing deploy only from `main`.
+2. **GitHub gate:** configure and verify all six environments, exact branch restrictions, environment-scoped role ARNs and variables, plan-only age recipients, apply-only age identity secrets, and independent reviewers. Apply environments must prevent self-review and administrator bypass.
+3. **AWS preflight:** with an explicitly selected read-only profile, run `bash scripts/aws_preflight_readonly.sh`. Confirm STS account identity, canonical region, OIDC provider, runtime boundaries, deployment roles and state bucket. Treat AccessDenied as unknown, not as proof a resource is absent.
+4. **Bootstrap proposal:** choose a unique state-bucket suffix and run `python scripts/render_bootstrap_inventory.py --suffix <approved-suffix> --profile default`. Review the account-specific manifest and every rendered trust, boundary, managed-policy and bucket-policy document. Obtain separate written approval for the exact bootstrap writes. The renderer performs only STS GetCallerIdentity and S3 HeadBucket reads; it does not create resources.
+5. **Bootstrap execution:** after explicit approval, create only the approved missing resources, reuse compatible existing resources, and verify every setting with read-only calls. Bootstrap approval does not authorize remote backend initialization or Terraform apply.
+6. **Dev plan/apply:** from `develop`, dispatch `.github/workflows/deploy.yml` with environment `dev` and operation `plan`. Review the complete saved plan and cost impact. Apply requires a separate dispatch, the successful plan run ID, the exact same commit, and approval in `dev-apply`. The workflow verifies the assumed AWS account and state-bucket account prefix before Terraform initialization.
+7. **Dev acceptance:** complete authentication, employee consent/enrollment, scan recognition, attendance transitions, reports, offboarding/deletion, DLQ recovery, browser/camera, privacy, cost and latency tests. Do not promote to production on static Terraform validation alone.
+8. **Production:** only after dev acceptance, merge a reviewed release to `main`, create a new prod plan, review it independently, and apply only that exact saved plan through `prod-apply`. Billing remains isolated and uses its own plan/apply roles and state key.
+
+The S3 backend is initialized only by the manual deployment workflow after OIDC and account checks. CI validates Terraform with `-backend=false`; it does not initialize the remote backend or create AWS resources.
+
+## 12. Operations and recovery
+See [OPERATIONS-RUNBOOK.md](OPERATIONS-RUNBOOK.md) for alert triage, DLQ handling, privacy/offboarding, budget response, backup/restore and rollback. Key operational boundaries:
+
+- Lambda errors and throttles, recognition p95 duration, recognition/enrollment DLQ depth and failure-processor DLQ depth have CloudWatch alarms routed to the environment SNS topic. Data and recognition Lambda log groups retain logs for 30 days.
+- Recognition and enrollment have reserved concurrency limits of 10 and 5 respectively; the failure processor is limited to 2. Daily and weekly jobs each have reserved concurrency 1.
+- Each environment has a USD 15 monthly AWS Budget with actual-cost notifications at 80% and 100%. Notification delivery and budget behavior must be verified after deployment.
+- All five DynamoDB tables enable point-in-time recovery. The reports bucket is versioned. Raw biometric images are intentionally not versioned; workers delete them after terminal processing and a one-day lifecycle rule is only a backstop.
+- A code rollback is a new reviewed deployment of a known-good commit and saved Terraform plan, not an unreviewed `git revert` or an assumption that reversing code reverses data changes. Restore data separately from PITR/versioned objects.
+- No restore drill, live alarm delivery, budget notification or production rollback has yet been evidenced. Complete these checks in dev before production readiness approval.
 
 ## 13. Limitations and future work
 Face Liveness, admin MFA, custom domain, SES email reports, shift templates and leave management, multi-region. See SPEC section 8.
