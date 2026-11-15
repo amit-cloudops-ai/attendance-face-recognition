@@ -50,17 +50,17 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T36 | Add DynamoDB customer-managed KMS authorization | DONE | Customer-managed key policy and dev/prod apply fragments use exact DynamoDB ViaService and environment alias; CreateGrant is AWS-resource constrained |
 | T37 | Build dedicated billing plan/apply policies and OIDC roles | DONE | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
 
-| T38 | Establish canonical AWS region manifest and CI drift prevention | DONE | Terraform providers, backend initialization, Lambda SDKs, contracts, frontend config, IAM regional ARNs and documentation resolve to config/deployment.json; CI fails on any conflicting region or legacy region reference |
+| T38 | Establish canonical AWS region manifest and CI drift prevention | IN_PROGRESS | Canonical region is enforced; follow-up access-module region/KMS fixes are integrated in PR #33 and require passing combined CI on the final candidate commit |
 
 ## Phase C — release and operations
 
 | ID | Task | Status | Acceptance criteria |
 |---|---|---|---|
-| T25 | Establish operational runbooks and incident response | TODO | Alert ownership, severity, triage, recovery, escalation and rollback documented |
-| T26 | Verify budget alarms and cost guardrails | TODO | Budgets, thresholds, notification paths and expected monthly cost documented and tested |
-| T27 | Verify backup, restore and disaster recovery procedures | TODO | Recovery objectives, backup configuration and restore test evidence recorded |
+| T25 | Establish operational runbooks and incident response | IN_PROGRESS | Deployment and operations runbooks are drafted; operational owner assignment and live alert/incident drill remain required |
+| T26 | Verify budget alarms and cost guardrails | IN_PROGRESS | Dev/prod USD 15 budgets with 80%/100% actual-cost notifications and concurrency controls are defined; live email delivery and cost behavior remain untested |
+| T27 | Verify backup, restore and disaster recovery procedures | IN_PROGRESS | DynamoDB PITR, reports/state versioning and recovery steps are documented; a dev restore drill remains required |
 | T28 | Add dependency and container/code supply-chain checks | TODO | Dependency scanning and pinned/reviewed CI actions with actionable failure policy |
-| T29 | Complete end-to-end release documentation | TODO | Architecture, deployment, configuration, operator and user documentation agree with implementation |
+| T29 | Complete end-to-end release documentation | IN_PROGRESS | Obsolete deployment steps are being replaced with the six-environment workflow; local reproducibility and final cross-document review remain |
 | T30 | Conduct final production readiness review | TODO | All release acceptance evidence reviewed; remaining risks accepted by owner |
 
 ## Task execution notes
@@ -72,10 +72,20 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T13 state bucket bootstrap specification: PR #21; CI run 43618372200 passed.
 - T14 GitHub OIDC hardening: PR #22; CI run 43618685801 passed.
 - T15 encrypted plan artifact lifecycle: PR #23; CI run 43618692691 passed.
-- T16 GitHub environment setup: PR #24; documentation is ready, but actual GitHub environment settings cannot be inspected or configured by the current connector. Repository-admin action is required.
+- T16 GitHub environment setup: PR #30 corrects the helper and rejects the authenticated owner as the sole independent reviewer; its dry-run regression tests passed. Actual six-environment settings, reviewers, secrets and branch restrictions still require repository-admin configuration and verification.
 - T17 template linting: PR #25; CI run 43619026006 passed. No CloudFormation/SAM templates exist; Terraform and JSON policy templates are validated in CI.
-- T18 manual bootstrap plan: PR #26; plan is documented and CI run 43619095037 passed. Exact account ID, globally unique bucket suffix and owner approval remain required.
+- T18 manual bootstrap plan: PR #32 adds the account-specific read-only renderer and 125-test CI evidence (run 43680572421). The renderer has not been run against the owner's account in this preparation; account identity, suffix, live inventory and approval remain outstanding.
 - T37 implementation is complete: billing plan/apply policy and OIDC trust templates, isolated billing workflow path and six-environment documentation are validated by CI run 43620012088. PR #27.
-- T38 is complete and merged into `solo/amit-monday`: canonical region manifest, Terraform provider loading, backend wrapper/workflow export, contract/example updates, Moto fixture alignment and repository-wide region drift guard. Consolidated CI run 43622637663 passed all 27 Python/security steps and all 21 Terraform formatting/validation steps on head commit `8bae76d788074e9c0d47d886fe355fddbcff709f`.
-- Consolidation PR #28 was merged into `solo/amit-monday` at merge commit `a43adea001009004597e19e1c04c14079205865a`. It contains the T01–T38 security and region-guard work. The individual task PRs remain historical and may remain open; do not merge teammate PRs or promote to `main`/`develop` without the required T16/T18 gates and owner direction.
+- The original T38 region guard is merged into `solo/amit-monday`. A follow-up found and corrected access-module hardcoded region values and misplaced DynamoDB KMS permissions. PR #31 passed its individual CI run 43680111003 (118 Python tests and both jobs); the combined result is being verified in PR #33.
+- Consolidation PR #28 was merged into `solo/amit-monday` at merge commit `a43adea001009004597e19e1c04c14079205865a`. PR #33 is the separate combined AWS-readiness candidate; it is not merged. Do not merge it or promote to `main`/`develop` until the combined CI and remaining release gates pass.
 - No AWS resources, OIDC provider, IAM roles, boundaries, state bucket or KMS keys have been created. No remote backend init, Terraform plan or apply has been run. PR #28 merge did not provision AWS resources.
+
+
+## Current release-candidate integration
+
+- PR #33 integrates the T16 helper fix (PR #30), T38 access/KMS correction (PR #31), T18 bootstrap renderer (PR #32), and new API route contract plus Moto-backed employee integration tests.
+- The first combined run 43685191974 failed Ruff on the new integration test; that was corrected.
+- The next combined run 43685265242 failed during collection because the first contract-test parser regex was malformed; the parser was replaced with a line-based parser and its route-key extraction corrected.
+- A fresh green run on the final candidate head is mandatory. The earlier green PR runs do not replace it.
+- The deployment workflow now fails closed if the OIDC role ARN, state-bucket prefix and STS caller account do not match the configured account ID.
+- No AWS resources, remote backend initialization, Terraform plan or apply have been performed.
