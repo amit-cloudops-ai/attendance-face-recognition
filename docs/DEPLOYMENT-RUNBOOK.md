@@ -245,7 +245,22 @@ The preflight and the bootstrap script's default mode are read-only. The rendere
 
 A new commit requires a new plan. Do not apply a saved plan from a different commit, branch, environment or workflow attempt.
 
-## 8. Post-deployment acceptance
+## 8. First dev deployment troubleshooting
+
+| Symptom | Likely cause | Corrective action |
+|---|---|---|
+| Terraform variable validation rejects `execution_role_boundary_arn` | The dev boundary policy is missing, has the wrong name, or belongs to another account | In IAM Console, confirm **Policies → attendance-dev-execution-boundary** exists and its ARN is exactly `arn:aws:iam::924422830139:policy/attendance-dev-execution-boundary`. Create it from the rendered template in step 3; do not weaken the Terraform validation. |
+| `terraform init` says the backend bucket or `backend.hcl` cannot be found | The state bucket was not created, the local backend file is absent/misnamed, or its bucket value is wrong | Confirm `infra/envs/dev/backend.hcl` exists locally, is gitignored, and names the exact bucket created in `us-east-1`. Verify bucket versioning, encryption, public-access block and TLS-only policy against [STATE-BUCKET-BOOTSTRAP.md](STATE-BUCKET-BOOTSTRAP.md). |
+| Apply fails while setting Lambda reserved concurrency | The account quota cannot accommodate 19 reserved executions while retaining the required 10 unreserved executions | Recheck **Lambda → Dashboard → Account-level concurrency** in `us-east-1`. Reduce the total reservations by setting selected `lambda_reserved_concurrency` entries to `null`, or request and wait for a quota increase. Do not remove the unreserved-concurrency safety margin. |
+| Cognito returns `redirect_mismatch` | The callback URL is not an exact match for the browser redirect | Confirm the URL ends in `/callback.html`, not `/auth/callback/`, and that the exact CloudFront HTTPS callback URL is in `callback_urls`. Confirm the CloudFront logout root is in `logout_urls`, then run the reviewed second apply. |
+| Kiosk upload fails with a browser CORS error | The CloudFront origin has not yet been added to the raw-bucket/API allowed origins | Add the exact CloudFront origin (scheme + host, no path) to `allowed_origins`, preserve localhost if needed, and complete the reviewed second apply. Do not use a wildcard origin. |
+| A Lambda returns `AccessDenied` after deployment | The execution-role permissions boundary may deny the action even if the attached role policy allows it | Check the boundary first in **IAM → Policies → attendance-dev-execution-boundary**. Confirm the affected function's execution role has that boundary attached and that the requested action/resource is permitted. Then inspect the failing function's **CloudWatch Logs** log group for the exact denied action and resource ARN. Fix the narrow boundary or role statement; do not respond by granting broad `*` permissions. |
+
+For every failure, preserve the exact error, request ID, function name and resource ARN while redacting tokens, credentials, employee data and biometric material. Re-run a fresh plan after any configuration or IAM change; never reuse a saved plan from before that change.
+
+---
+
+## 9. Post-deployment acceptance
 
 Run the consent-gated smoke flow with a test employee and explicitly consented test images. The script requires at least 20 scans and verifies enrollment, matching, attendance persistence and cleanup. Its p95 measures API/upload/recognition round-trip; it does not measure physical camera capture or browser rendering. Complete separate Chrome/Android and Safari/iOS camera tests, real Cognito login/group authorization, raw-image deletion, face offboarding, DLQ recovery, alarm delivery, budget notifications and a restore drill.
 
