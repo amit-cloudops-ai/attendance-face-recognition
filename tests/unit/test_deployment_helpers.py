@@ -95,6 +95,7 @@ esac
         ],
         cwd=ROOT,
         env=env,
+        check=False,
         capture_output=True,
         text=True,
     )
