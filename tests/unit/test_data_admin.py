@@ -4,11 +4,11 @@ import boto3
 import pytest
 from attendance_common import config
 from moto import mock_aws
+
 from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
 from services.data.override import handler as override_handler
 from services.data.settings import handler as settings_handler
-
 
 def admin_event(body=None, method="POST", group="admin"):
     return {
@@ -22,7 +22,6 @@ def admin_event(body=None, method="POST", group="admin"):
         },
         "body": json.dumps(body or {}),
     }
-
 
 @pytest.fixture
 def admin_resources(monkeypatch):
@@ -70,10 +69,8 @@ def admin_resources(monkeypatch):
         yield employees, attendance, settings, audit
         config._reset_cache()
 
-
 def payload(response):
     return json.loads(response["body"])
-
 
 def test_override_writes_admin_record_and_audit(admin_resources):
     _, attendance, _, audit = admin_resources
@@ -96,7 +93,6 @@ def test_override_writes_admin_record_and_audit(admin_resources):
     assert audit_item["action"] == "override"
     assert audit_item["reason"] == "Reception register confirmed the late arrival."
 
-
 def test_override_requires_reason_and_valid_clock_in(admin_resources):
     missing_reason = override_handler.lambda_handler(admin_event({
         "employee_id": "EMP001", "date": "2026-11-13",
@@ -111,7 +107,6 @@ def test_override_requires_reason_and_valid_clock_in(admin_resources):
     assert missing_clock["statusCode"] == 400
     assert payload(missing_clock)["error"]["code"] == "clock_in_required"
 
-
 def test_override_rejects_naive_or_wrong_business_date_timestamp(admin_resources):
     naive = override_handler.lambda_handler(admin_event({
         "employee_id": "EMP001", "date": "2026-11-13",
@@ -123,7 +118,6 @@ def test_override_rejects_naive_or_wrong_business_date_timestamp(admin_resources
     }), None)
     assert naive["statusCode"] == 400
     assert wrong_day["statusCode"] == 400
-
 
 def test_override_absent_record_has_no_clock_times(admin_resources):
     _, attendance, _, audit = admin_resources
@@ -137,7 +131,6 @@ def test_override_absent_record_has_no_clock_times(admin_resources):
     assert "clock_in" not in item and "clock_out" not in item
     assert audit.scan()["Items"][0]["action"] == "override"
 
-
 def test_override_checks_employee_and_admin_group(admin_resources):
     missing = override_handler.lambda_handler(admin_event({
         "employee_id": "EMP999", "date": "2026-11-13",
@@ -149,7 +142,6 @@ def test_override_checks_employee_and_admin_group(admin_resources):
     }, group="kiosk"), None)
     assert missing["statusCode"] == 404
     assert denied["statusCode"] == 403
-
 
 def test_settings_get_returns_defaults_and_put_persists_with_audit(admin_resources):
     _, _, settings, audit = admin_resources
@@ -172,7 +164,6 @@ def test_settings_get_returns_defaults_and_put_persists_with_audit(admin_resourc
     assert audit_item["action"] == "settings_update"
     assert audit_item["actor"] == "hr-admin"
 
-
 @pytest.mark.parametrize("body", [
     {"face_match_threshold": 101},
     {"grace_minutes": -1},
@@ -186,12 +177,9 @@ def test_settings_rejects_invalid_or_empty_updates(admin_resources, body):
     response = settings_handler.lambda_handler(admin_event(body, method="PUT"), None)
     assert response["statusCode"] == 400
 
-
 def test_settings_requires_admin_group(admin_resources):
     response = settings_handler.lambda_handler(admin_event(method="GET", group="kiosk"), None)
     assert response["statusCode"] == 403
-
-
 
 def test_override_audit_and_attendance_are_written_in_one_transaction(admin_resources, monkeypatch):
     _, attendance, _, audit = admin_resources
@@ -213,7 +201,6 @@ def test_override_audit_and_attendance_are_written_in_one_transaction(admin_reso
     assert [next(iter(action)) for action in calls[0]] == ["Put", "Put"]
     assert len(audit.scan()["Items"]) == 1
 
-
 def test_override_transaction_failure_writes_neither_record(admin_resources, monkeypatch):
     from botocore.exceptions import ClientError
 
@@ -230,7 +217,6 @@ def test_override_transaction_failure_writes_neither_record(admin_resources, mon
     assert response["statusCode"] == 500
     assert attendance.scan()["Items"] == []
     assert audit.scan()["Items"] == []
-
 
 def test_override_detects_concurrent_attendance_change(admin_resources, monkeypatch):
     _, attendance, _, audit = admin_resources
@@ -254,7 +240,6 @@ def test_override_detects_concurrent_attendance_change(admin_resources, monkeypa
     assert attendance.get_item(Key={"employee_id": "EMP001", "date": "2026-11-13"})["Item"]["clock_in"] == "2026-11-13T08:00:00+05:30"
     assert audit.scan()["Items"] == []
 
-
 def test_settings_update_and_audit_are_transactional(admin_resources, monkeypatch):
     _, _, settings, audit = admin_resources
     client = settings.meta.client
@@ -272,7 +257,6 @@ def test_settings_update_and_audit_are_transactional(admin_resources, monkeypatc
     assert [next(iter(action)) for action in calls[0]] == ["Put", "Put"]
     assert len(audit.scan()["Items"]) == 1
 
-
 def test_settings_transaction_failure_preserves_config_and_audit(admin_resources, monkeypatch):
     from botocore.exceptions import ClientError
 
@@ -286,7 +270,6 @@ def test_settings_transaction_failure_preserves_config_and_audit(admin_resources
     assert response["statusCode"] == 500
     assert settings.get_item(Key={"pk": "SETTINGS"}).get("Item") is None
     assert audit.scan()["Items"] == []
-
 
 def test_settings_update_detects_stale_concurrent_write(admin_resources, monkeypatch):
     _, _, settings, audit = admin_resources
