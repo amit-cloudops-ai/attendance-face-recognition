@@ -145,7 +145,7 @@ locals {
       },
       {
         Effect   = "Allow"
-        Action   = ["dynamodb:TransactWriteItems"]
+        Action   = ["dynamodb:TransactWriteItems", "dynamodb:ConditionCheckItem"]
         Resource = [var.tables.employees.arn]
       },
       {
