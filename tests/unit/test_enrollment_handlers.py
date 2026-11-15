@@ -10,6 +10,7 @@ from moto import mock_aws
 from services.recognition.enroll import handler as enroll
 from services.recognition.enroll_url import handler as enroll_url
 from services.recognition.faces_delete import handler as faces_delete
+from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
 
 def event(group="admin", employee_id="EMP001"):
@@ -47,6 +48,8 @@ def aws_env(monkeypatch):
             Bucket="attendance-raw",
         )
         config._reset_cache()
+        monkeypatch.setattr(boto3, "resource", lambda *args, **kwargs: db)
+        install_transaction_emulator(monkeypatch, db)
         yield scans, employees, audit
         config._reset_cache()
 
