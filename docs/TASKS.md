@@ -32,7 +32,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T17 | Add or verify infrastructure template linting in CI | DONE | No CloudFormation/SAM source exists; Terraform and JSON policy templates are validated; CI fails if unlinted CloudFormation/SAM is introduced |
 | T18 | Produce exact manual bootstrap change plan | BLOCKED | OIDC pipeline bootstrap only; owner must verify STS identity against target account 924422830139, choose a unique bucket suffix, review 6 OIDC trust policies, 2 boundaries, 28 managed policy documents and 1 generated bucket policy, then approve the exact write inventory. First dev can use the solo local path in DEPLOYMENT-RUNBOOK.md without OIDC roles/environments |
 | T19 | Open solo-only deployment-readiness PR to develop | TODO | T16/T18 and required security/CI gates resolved; PR contains only approved solo implementation; teammate PRs remain separate |
-| T20 | Review and obtain approval for dev Terraform plan | TODO | State bucket and OIDC bootstrap separately approved; full dev plan shown and explicitly approved before apply |
+| T20 | Review and obtain approval for dev Terraform plan | TODO | Local dev backend and variables are ready; full saved dev plan is shown and explicitly approved before apply. OIDC roles are not a prerequisite for the local first-dev path |
 | T21 | Deploy and validate dev environment | TODO | Explicit apply approval; smoke/integration checks, Cognito/CORS/CloudFront validation and rollback readiness evidenced |
 | T22 | Complete privacy, deletion, latency and browser acceptance | TODO | Raw-image deletion evidence, consent checks, 20-scan p95, Chrome/Android and Safari/iOS checks |
 | T23 | Prepare production release review | TODO | Dev acceptance complete, security/cost evidence, rollback plan and separate production approval |
@@ -50,7 +50,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T36 | Add DynamoDB customer-managed KMS authorization | DONE | Customer-managed key policy and dev/prod apply fragments use exact DynamoDB ViaService and environment alias; CreateGrant is AWS-resource constrained |
 | T37 | Build dedicated billing plan/apply policies and OIDC roles | DONE | Billing root has separate plan/apply roles, exact budgets/billing actions and separate OIDC subjects; no billing actions in environment roles |
 
-| T38 | Establish canonical AWS region manifest and CI drift prevention | IN_PROGRESS | Canonical region is enforced; follow-up access-module region/KMS fixes are integrated in PR #33 and require passing combined CI on the final candidate commit |
+| T38 | Establish canonical AWS region manifest and CI drift prevention | DONE | Canonical region is enforced; access-module region/KMS corrections are integrated in PR #33 and exact release-candidate CI passed |
 
 ## Phase C — release and operations
 
@@ -62,6 +62,17 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 | T28 | Add dependency and container/code supply-chain checks | IN_PROGRESS | CI pins all GitHub Actions to full commit SHAs, pins Python dependencies, runs pip-audit and enforces pins; Dependabot weekly updates are configured. Container scanning and broader SBOM/provenance checks remain open |
 | T29 | Complete end-to-end release documentation | IN_PROGRESS | Obsolete deployment steps are being replaced with the six-environment workflow; local reproducibility and final cross-document review remain |
 | T30 | Conduct final production readiness review | TODO | All release acceptance evidence reviewed; remaining risks accepted by owner |
+
+## Live AWS execution notes — 15 November 2026
+
+- WSL profile is `default`; STS identity is `arn:aws:iam::924422830139:user/Amit-admin` in account `924422830139`, region `us-east-1`.
+- Existing dev HTTP API `attendance-dev-http-api` ID `7nii6lm2z2` was verified with matching project/environment/component tags; no stages, routes or integrations. Do not create a duplicate.
+- Read-only preflight found no OIDC provider, six GitHub deployment roles, dev/prod execution boundary policies or account-prefixed state bucket. OIDC roles/provider are optional for local first dev deployment.
+- Dev boundary JSON passed IAM Access Analyzer with zero findings; no matching local managed policy exists yet.
+- Candidate state bucket `attendance-tf-state-924422830139-amit-2026-1115` had a 404 HeadBucket result at render time; recheck immediately before creation.
+- Lambda quota is 10 with 10 unreserved; use `null` for all five initial dev reserved-concurrency values unless quota changes.
+- Renderer produced 37 local policy documents; no IAM/S3 resources, backend initialization, Terraform plan or apply have been performed in this sequence.
+- Next: create only the approved dev execution boundary and protected state bucket, verify both read-only, then prepare local backend and variables. Plan and apply remain separate approval gates.
 
 ## Task execution notes
 
@@ -76,7 +87,7 @@ Status values: TODO, IN_PROGRESS, BLOCKED, DONE.
 - T17 template linting: PR #25; CI run 43619026006 passed. No CloudFormation/SAM templates exist; Terraform and JSON policy templates are validated in CI.
 - T18 manual bootstrap plan: PR #32 adds the account-specific read-only renderer. The owner-provided target account is 924422830139, but STS identity, bucket suffix and live inventory still require read-only verification. The first dev local path is documented separately in PR #34.
 - T37 implementation is complete: billing plan/apply policy and OIDC trust templates, isolated billing workflow path and six-environment documentation are validated by CI run 43620012088. PR #27.
-- The original T38 region guard is merged into `solo/amit-monday`. A follow-up found and corrected access-module hardcoded region values and misplaced DynamoDB KMS permissions. PR #31 passed its individual CI run 43680111003 (118 Python tests and both jobs); the combined result is being verified in PR #33.
+- The T38 region guard and access-module region/KMS corrections are integrated into the release candidate. Exact release-candidate CI run 43689838548 passed on commit 6873a36f6eeb0a1e4cc5f32900303fb7c4714b1e.
 - Consolidation PR #28 was merged into `solo/amit-monday` at merge commit `a43adea001009004597e19e1c04c14079205865a`. PR #33 is the separate combined AWS-readiness candidate; it is not merged. Do not merge it or promote to `main`/`develop` until the combined CI and remaining release gates pass.
 - No AWS resources, OIDC provider, IAM roles, boundaries, state bucket or KMS keys have been created. No remote backend init, Terraform plan or apply has been run. PR #28 merge did not provision AWS resources.
 
