@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10251d">
+  <meta name="description" content="Secure sign-in to the Attendance operations platform.">
+  <title>Sign in · Attendance</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/shared/styles.css">
+  <link rel="stylesheet" href="/signin.css">
+</head>
+<body class="signin-page">
+  <main class="signin-layout">
+    <section class="signin-story" aria-label="Platform introduction">
+      <a class="signin-brand" href="/" aria-label="Attendance home"><span class="brand-mark">A</span><span>ATTENDANCE<span class="brand-sub">WORKFORCE OPERATIONS</span></span></a>
+      <div class="story-copy">
+        <p class="eyebrow">A clearer view of every workday</p>
+        <h1>People first.<br><em>Presence, understood.</em></h1>
+        <p class="story-lede">A secure workspace for employee attendance, recognition and reporting—built to keep daily operations moving.</p>
+      </div>
+      <div class="story-footer"><span class="live-dot"></span> Secure attendance platform <span class="footer-divider">/</span> Private access</div>
+      <div class="story-orbit orbit-one"></div><div class="story-orbit orbit-two"></div>
+    </section>
+    <section class="signin-main">
+      <div class="signin-card">
+        <div class="card-kicker">WELCOME BACK</div>
+        <h2>Sign in to your workspace</h2>
+        <p class="card-intro">Use your organisation account to continue to the attendance portal.</p>
+        <div class="secure-note"><span class="secure-icon" aria-hidden="true">⌑</span><span><strong>Protected sign-in</strong><small>Your credentials are handled by Amazon Cognito over an encrypted connection.</small></span></div>
+        <button id="continue-signin" class="signin-submit" type="button">Continue to secure sign in <span aria-hidden="true">↗</span></button>
+        <p id="signin-message" class="signin-message" role="status" aria-live="polite">You’ll be redirected to the organisation’s secure identity service.</p>
+        <div class="signin-divider"><span>ACCESS &amp; SUPPORT</span></div>
+        <p class="support-copy">Having trouble accessing your account? Use the password recovery option on the secure sign-in screen or contact your system administrator.</p>
+      </div>
+      <footer class="signin-legal">Attendance operations <span>·</span> Authorised users only</footer>
+    </section>
+  </main>
+  <script type="module" src="/signin.js"></script>
+</body>
+</html>
