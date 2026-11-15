@@ -32,6 +32,7 @@ def admin_resources(monkeypatch):
         monkeypatch.setenv("TABLE_CONFIG", "config")
         monkeypatch.setenv("TABLE_AUDIT", "audit")
         db = boto3.resource("dynamodb", region_name="us-east-1")
+        monkeypatch.setattr(boto3, "resource", lambda *args, **kwargs: db)
         employees = db.create_table(
             TableName="employees",
             KeySchema=[{"AttributeName": "employee_id", "KeyType": "HASH"}],
