@@ -121,7 +121,11 @@ def lambda_handler(event, context):
         if clock_out:
             item["clock_out"] = clock_out
         if status != "absent" and old.get("flags"):
-            item["flags"] = old["flags"]
+            flags = set(old["flags"])
+            if clock_out:
+                flags.discard("missing_clock_out")
+            if flags:
+                item["flags"] = flags
         audit_item = {
             "audit_id": str(uuid.uuid4()),
             "actor": username,
