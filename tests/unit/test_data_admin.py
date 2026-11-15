@@ -9,6 +9,7 @@ from services.data.override import handler as override_handler
 from services.data.settings import handler as settings_handler
 from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
+
 def admin_event(body=None, method="POST", group="admin"):
     return {
         "requestContext": {
