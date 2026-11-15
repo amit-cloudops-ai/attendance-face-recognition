@@ -47,3 +47,16 @@ Create billing-plan and billing-apply. Each receives AWS_ROLE_ARN, AWS_ACCOUNT_I
 ## Approval boundary
 
 The policies and trust documents are templates only. The billing roles and environments remain uncreated until the account ID is verified, the state bucket exists, T16 settings are configured, and the owner approves the exact rendered role permissions. Do not attach account billing actions to any normal environment role.
+
+
+## Project budget attribution and apply order
+
+The billing root manages one $15/month budget filtered by the `Project=attendance` cost-allocation tag. Dev and prod resources share this Project tag, so one budget measures the combined project rather than creating two unfiltered account-wide budgets.
+
+Apply order matters:
+1. Deploy the dev foundation and data/recognition/access resources so AWS has resources carrying `Project=attendance`.
+2. In Cost Explorer / Billing, confirm the `Project` user-defined tag appears in cost-allocation tags. AWS may take up to 24 hours after the tag is first applied for it to appear.
+3. Apply the billing root. Terraform activates the `Project` tag and then creates the tag-filtered budget.
+4. Verify the tag status is Active and the budget filter is `Project=attendance`. Cost data can lag tag activation; do not treat the alert as effective until cost allocation data is visible.
+
+The budget sends actual-spend alerts at 80% and 100%. It does not stop or throttle AWS resources. The $15 threshold is for tagged attendance-project usage; unrelated account resources are intentionally excluded.
