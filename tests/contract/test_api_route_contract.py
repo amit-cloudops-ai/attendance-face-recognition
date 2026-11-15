@@ -23,7 +23,7 @@ def _terraform_routes() -> dict[str, tuple[str, str]]:
                 group = None
             elif current_route is not None and stripped.startswith("function_name = aws_lambda_function.lambda["):
                 function = stripped.split('lambda["', 1)[1].split('"]', 1)[0]
-            elif current_route is not None and stripped.startswith("group = "):
+            elif current_route is not None and stripped.startswith("group") and "=" in stripped:
                 group = stripped.split('"', 2)[1]
             elif current_route is not None and stripped == "}":
                 if function is None or group is None:
