@@ -285,6 +285,8 @@ def test_settings_update_detects_stale_concurrent_write(admin_resources, monkeyp
     response = settings_handler.lambda_handler(admin_event({"debounce_minutes": 15}, method="PUT"), None)
     assert response["statusCode"] == 409
     assert settings.get_item(Key={"pk": "SETTINGS"})["Item"]["grace_minutes"] == 8
+    fresh = settings_handler.lambda_handler(admin_event(method="GET"), None)
+    assert payload(fresh)["grace_minutes"] == 8
     assert audit.scan()["Items"] == []
 
 
