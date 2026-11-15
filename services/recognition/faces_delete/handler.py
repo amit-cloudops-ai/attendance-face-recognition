@@ -5,6 +5,7 @@ import os
 import re
 
 import boto3
+from boto3.dynamodb.types import TypeSerializer
 from attendance_common.auth import get_username, require_group
 from attendance_common.responses import error, ok
 from attendance_common.tz import now_ist
@@ -87,50 +88,65 @@ def lambda_handler(event, context):
             face_ids,
         )
 
-        # Write a deterministic audit record before changing DynamoDB state.
-        # If the employee update fails, a retry reuses the same audit ID.
+        audit_item = {
+            "audit_id": audit_id,
+            "actor": get_username(event),
+            "action": "faces_delete",
+            "employee_id": employee_id,
+            "old": {
+                "face_ids": face_ids,
+                "photo_count": int(employee.get("photo_count", 0)),
+            },
+            "new": {"face_ids": [], "photo_count": 0},
+            "reason": "Biometric face templates removed after employee deactivation.",
+            "at": now,
+        }
+        serializer = TypeSerializer()
+        marshal = lambda item: {
+            key: serializer.serialize(value) for key, value in item.items()
+        }
+        values = {
+            ":empty": [],
+            ":zero": 0,
+            ":now": now,
+            ":audit_id": audit_id,
+            ":inactive": False,
+        }
+        condition = "active=:inactive"
+        if "updated_at" in employee:
+            condition += " AND updated_at=:old_updated"
+            values[":old_updated"] = employee["updated_at"]
+        else:
+            condition += " AND attribute_not_exists(updated_at)"
         try:
-            audit.put_item(
-                Item={
-                    "audit_id": audit_id,
-                    "actor": get_username(event),
-                    "action": "faces_delete",
-                    "employee_id": employee_id,
-                    "old": {
-                        "face_ids": face_ids,
-                        "photo_count": int(employee.get("photo_count", 0)),
-                    },
-                    "new": {"face_ids": [], "photo_count": 0},
-                    "reason": "Biometric face templates removed after employee deactivation.",
-                    "at": now,
-                },
-                ConditionExpression="attribute_not_exists(audit_id)",
-            )
+            employees.meta.client.transact_write_items(TransactItems=[
+                {"Update": {
+                    "TableName": employees.name,
+                    "Key": marshal({"employee_id": employee_id}),
+                    "UpdateExpression": (
+                        "SET face_ids=:empty, photo_count=:zero, updated_at=:now, "
+                        "last_faces_delete_audit_id=:audit_id"
+                    ),
+                    "ConditionExpression": condition,
+                    "ExpressionAttributeValues": marshal(values),
+                }},
+                {"Put": {
+                    "TableName": audit.name,
+                    "Item": marshal(audit_item),
+                }},
+            ])
         except ClientError as exc:
-            if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
-                raise
-
-        try:
-            employees.update_item(
-                Key={"employee_id": employee_id},
-                UpdateExpression=(
-                    "SET face_ids=:empty, photo_count=:zero, updated_at=:now, "
-                    "last_faces_delete_audit_id=:audit_id"
-                ),
-                ConditionExpression="active=:inactive",
-                ExpressionAttributeValues={
-                    ":empty": [], ":zero": 0, ":now": now, ":audit_id": audit_id,
-                    ":inactive": False,
-                },
-            )
-        except ClientError as exc:
-            if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+            if exc.response.get("Error", {}).get("Code") != "TransactionCanceledException":
                 raise
             latest = employees.get_item(
                 Key={"employee_id": employee_id}, ConsistentRead=True
             ).get("Item") or {}
-            if latest.get("last_faces_delete_audit_id") != audit_id:
-                raise RuntimeError("Employee face list changed during offboarding") from exc
+            if latest.get("last_faces_delete_audit_id") == audit_id:
+                return ok({"deleted": deleted, "already_deleted": True})
+            return error(
+                409, "employee_changed",
+                "Employee state changed during offboarding. Reload and retry face deletion.",
+            )
 
         return ok({"deleted": deleted})
     except Exception as exc:  # noqa: BLE001 - API boundary returns a sanitized response
