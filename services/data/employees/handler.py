@@ -195,7 +195,7 @@ def lambda_handler(event, context):
                         }},
                         {"Put": {
                             "TableName": audit.name,
-                            "Item": _ddb_item(audit_item),
+                            "Item": audit_item,
                         }},
                     ])
                 except ClientError as exc:
