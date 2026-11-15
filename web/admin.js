@@ -102,6 +102,7 @@ async function enrollPhotos(employee) {
       await loadEmployees();
     } catch (error) {
       status(error.message || "Enrollment failed.", true);
+      await loadEmployees().catch(() => {});
     }
   });
   picker.click();
