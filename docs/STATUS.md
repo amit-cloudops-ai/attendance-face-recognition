@@ -144,7 +144,7 @@ The exact role trust documents, managed policy JSON, account IDs and bucket name
 - T25 is still in progress because operational ownership and a live incident/alert drill are not verified.
 - T26 is still in progress: dev/prod USD 15 monthly budgets with 80%/100% actual-cost notifications exist in Terraform, but email delivery and live cost behavior are untested.
 - T27 is still in progress: five DynamoDB tables have PITR and the reports/state buckets are intended to be versioned, but no restore drill has been performed.
-- T28 remains TODO: dependency scanning and immutable action SHA pinning are not yet implemented.
+- T28 is in progress: CI now pins all GitHub Actions to full commit SHAs, pins the complete Python test dependency set, runs SHA-pinned pip-audit, enforces pinning, and Dependabot checks GitHub Actions/Python dependencies weekly. Container scanning and broader SBOM/provenance checks remain open.
 - T29 remains in progress until local reproduction and a full cross-document consistency review are evidenced.
 - T30 remains TODO until all release gates are reviewed.
 
