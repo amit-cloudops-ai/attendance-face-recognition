@@ -152,7 +152,13 @@ def lambda_handler(event, context):
                     }},
                 ])
             except ClientError as exc:
-                if exc.response.get("Error", {}).get("Code") == "TransactionCanceledException":
+                if (
+                    exc.response.get("Error", {}).get("Code") == "TransactionCanceledException"
+                    and any(
+                        reason.get("Code") == "ConditionalCheckFailed"
+                        for reason in exc.response.get("CancellationReasons", [])
+                    )
+                ):
                     existing = employees.get_item(
                         Key={"employee_id": employee_id}, ConsistentRead=True
                     ).get("Item")
@@ -204,7 +210,7 @@ def lambda_handler(event, context):
                     ).get("Item")
                     if latest and not latest.get("active", False):
                         return ok(_public_employee(latest))
-                    raise
+                    return error(409, "employee_changed", "Employee state changed concurrently. Reload and retry.")
                 return ok(_public_employee(new))
             return ok(_public_employee(old))
 
@@ -212,5 +218,5 @@ def lambda_handler(event, context):
     except (ValueError, TypeError) as exc:
         return error(400, "invalid_request", str(exc))
     except Exception as exc:  # noqa: BLE001 - API boundary returns a sanitized 500 response
-        LOGGER.error("Employee handler failed (%s): %r", type(exc).__name__, getattr(exc, "response", None))
+        LOGGER.error("Employee handler failed (%s)", type(exc).__name__)
         return error(500, "internal_error", "Unable to process the employee request.")
