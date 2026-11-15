@@ -1,3 +1,7 @@
+# Deployment runbook
+
+**Status:** repository instructions only. This runbook does not authorize AWS writes, remote backend initialization, Terraform planning or applying.
+
 ## 1. Solo local dev bootstrap (owner-operated path)
 
 **Recommended for the first development deployment.** This path uses the existing AWS account through the local AWS CLI profile `Amit-admin`. It does not require the OIDC provider, six deployment roles, six GitHub environments, or promotion to `develop`. It is a dev-only path; production remains separately gated.
@@ -131,10 +135,6 @@ All steps below are instructions for the repository owner. They are not executed
 The six-environment OIDC pipeline (T16/T18) is optional for this first dev deployment. You do not need to create the OIDC provider, six deployment roles, 37 policy documents or six GitHub environments to use the solo local path above. Add and validate the pipeline after the dev stack is established. The local path does not require merging or promoting the candidate to `develop`; only the GitHub Actions dev pipeline is restricted to `develop`. Do not weaken or remove the existing OIDC workflow when using the local path.
 
 ---
-
-# Deployment runbook
-
-**Status:** repository instructions only. This runbook does not authorize AWS writes, remote backend initialization, Terraform planning or applying.
 
 ## 2. Deployment model
 
