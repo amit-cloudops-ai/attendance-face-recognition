@@ -3,11 +3,11 @@ import json
 import boto3
 import pytest
 from moto import mock_aws
+
 from tests.unit.dynamodb_transaction_emulator import install_transaction_emulator
 
 from services.data.attendance_query import handler as attendance_query
 from services.data.employees import handler as employees_handler
-
 
 def admin_event(method="GET", body=None, employee_id=None, query=None, group="admin"):
     return {
@@ -22,7 +22,6 @@ def admin_event(method="GET", body=None, employee_id=None, query=None, group="ad
         "queryStringParameters": query or {},
         "body": json.dumps(body) if body is not None else None,
     }
-
 
 @pytest.fixture
 def data_tables(monkeypatch):
@@ -68,7 +67,6 @@ def data_tables(monkeypatch):
         install_transaction_emulator(monkeypatch, db)
         yield employee_table, audit_table, attendance_table
 
-
 def employee_payload(employee_id="EMP001", consent=True):
     return {
         "employee_id": employee_id,
@@ -80,13 +78,11 @@ def employee_payload(employee_id="EMP001", consent=True):
         "consent": consent,
     }
 
-
 def test_employee_routes_require_admin(data_tables):
     denied = employees_handler.lambda_handler(admin_event(group="kiosk"), None)
     assert denied["statusCode"] == 403
     denied = attendance_query.lambda_handler(admin_event(group="kiosk"), None)
     assert denied["statusCode"] == 403
-
 
 def test_employee_create_requires_consent_and_valid_shift(data_tables):
     assert employees_handler.lambda_handler(
@@ -97,7 +93,6 @@ def test_employee_create_requires_consent_and_valid_shift(data_tables):
     assert employees_handler.lambda_handler(
         admin_event("POST", invalid), None
     )["statusCode"] == 400
-
 
 def test_employee_create_persists_consent_and_audits(data_tables):
     _, audit, _ = data_tables
@@ -113,7 +108,6 @@ def test_employee_create_persists_consent_and_audits(data_tables):
     audit_item = audit.scan()["Items"][0]
     assert audit_item["action"] == "employee_create"
     assert audit_item["actor"] == "hr-admin"
-
 
 def test_employee_public_response_hides_internal_enrollment_metadata(data_tables):
     employees, _, _ = data_tables
@@ -135,7 +129,6 @@ def test_employee_public_response_hides_internal_enrollment_metadata(data_tables
     assert "last_faces_delete_audit_id" not in item
     assert not any(key.startswith("enrollment_") for key in item)
 
-
 def test_employee_duplicate_get_and_list(data_tables):
     employees_handler.lambda_handler(admin_event("POST", employee_payload()), None)
     duplicate = employees_handler.lambda_handler(
@@ -149,7 +142,6 @@ def test_employee_duplicate_get_and_list(data_tables):
     listing = employees_handler.lambda_handler(admin_event(), None)
     assert len(json.loads(listing["body"])["items"]) == 1
 
-
 def test_employee_deactivate_keeps_record_and_audits(data_tables):
     employees_handler.lambda_handler(admin_event("POST", employee_payload()), None)
     response = employees_handler.lambda_handler(
@@ -160,7 +152,6 @@ def test_employee_deactivate_keeps_record_and_audits(data_tables):
     assert item["employee_id"] == "EMP001"
     audit = data_tables[1].scan()["Items"]
     assert any(row["action"] == "employee_deactivate" for row in audit)
-
 
 def test_attendance_query_by_employee_with_status_and_cursor(data_tables):
     employees, _, attendance = data_tables
@@ -187,7 +178,6 @@ def test_attendance_query_by_employee_with_status_and_cursor(data_tables):
     }), None)
     assert len(json.loads(second["body"])["items"]) == 1
 
-
 def test_attendance_query_by_date_index_and_multi_day_cursor(data_tables):
     employees, _, attendance = data_tables
     employees.put_item(Item={"employee_id": "EMP001", "name": "Priya"})
@@ -212,7 +202,6 @@ def test_attendance_query_by_date_index_and_multi_day_cursor(data_tables):
     }), None)
     assert len(json.loads(second["body"])["items"]) == 1
 
-
 @pytest.mark.parametrize("query", [
     {"status": "unknown"},
     {"from": "2026-11-15", "to": "2026-11-14"},
@@ -224,8 +213,6 @@ def test_attendance_query_by_date_index_and_multi_day_cursor(data_tables):
 def test_attendance_query_rejects_invalid_filters(data_tables, query):
     response = attendance_query.lambda_handler(admin_event(query=query), None)
     assert response["statusCode"] == 400
-
-
 
 def test_employee_create_uses_one_transaction_for_employee_and_audit(data_tables, monkeypatch):
     employees, audit, _ = data_tables
@@ -248,7 +235,6 @@ def test_employee_create_uses_one_transaction_for_employee_and_audit(data_tables
     assert captured[0][1]["Put"]["TableName"] == audit.name
     assert len(audit.scan()["Items"]) == 1
 
-
 def test_employee_create_transaction_failure_leaves_no_employee_or_audit(data_tables, monkeypatch):
     from botocore.exceptions import ClientError
 
@@ -267,7 +253,6 @@ def test_employee_create_transaction_failure_leaves_no_employee_or_audit(data_ta
     assert response["statusCode"] == 500
     assert employees.get_item(Key={"employee_id": "EMP001"}).get("Item") is None
     assert audit.scan()["Items"] == []
-
 
 def test_employee_deactivation_uses_one_transaction_for_employee_and_audit(data_tables, monkeypatch):
     employees, audit, _ = data_tables
@@ -292,7 +277,6 @@ def test_employee_deactivation_uses_one_transaction_for_employee_and_audit(data_
     assert employees.get_item(Key={"employee_id": "EMP001"})["Item"]["active"] is False
     assert len(audit.scan()["Items"]) == 1
 
-
 def test_employee_deactivation_transaction_failure_preserves_active_state(data_tables, monkeypatch):
     from botocore.exceptions import ClientError
 
@@ -312,5 +296,4 @@ def test_employee_deactivation_transaction_failure_preserves_active_state(data_t
     assert response["statusCode"] == 500
     assert employees.get_item(Key={"employee_id": "EMP001"})["Item"]["active"] is True
     assert audit.scan()["Items"] == []
-
 
