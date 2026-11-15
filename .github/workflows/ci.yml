@@ -190,6 +190,15 @@ jobs:
                   raise SystemExit(f"IAM managed policy size exceeded: {path}")
               prod_policies[name] = policy
 
+          prod_access = json.loads((root / "github-apply-prod-access.json.tftpl").read_text(encoding="utf-8").replace("${account_id}", "123456789012").replace("${api_id}", "a1b2c3d4e5"))["Statement"]
+          prod_api = next(s for s in prod_access if s["Sid"] == "ApiGatewayManageApi")
+          prod_child = next(s for s in prod_access if s["Sid"] == "ApiGatewayManageChildResources")
+          if prod_api["Resource"] != "arn:aws:apigateway:us-east-1::/apis/a1b2c3d4e5" or prod_child["Resource"] != "arn:aws:apigateway:us-east-1::/apis/a1b2c3d4e5/*":
+              raise SystemExit("Prod API Gateway permissions must be restricted to the exact imported API ID")
+          prod_bootstrap_cf = json.loads((root / "github-apply-prod-cloudfront-bootstrap.json.tftpl").read_text(encoding="utf-8"))["Statement"]
+          if not prod_bootstrap_cf or any(not str(action).startswith("cloudfront:Create") for statement in prod_bootstrap_cf for action in (statement["Action"] if isinstance(statement["Action"], list) else [statement["Action"]])):
+              raise SystemExit("Temporary prod CloudFront bootstrap policy must grant create-only actions")
+
           prod_core_edge = prod_policies[prod_names[0]]["Statement"] + prod_policies[prod_names[1]]["Statement"]
           prod_scheduler = next(s for s in prod_policies[prod_names[0]]["Statement"] if s["Sid"] == "SchedulerRead")
           prod_group = next(s for s in prod_policies[prod_names[0]]["Statement"] if s["Sid"] == "SchedulerGroupRead")
@@ -342,6 +351,7 @@ jobs:
               "github-apply-dev-iam.json.tftpl",
               "github-apply-dev-foundation.json.tftpl",
               "github-apply-dev-access.json.tftpl",
+              "github-apply-dev-cloudfront-bootstrap.json.tftpl",
               "github-apply-dev-state.json.tftpl",
               "github-apply-dev-dynamodb-kms.json.tftpl",
           )
@@ -410,8 +420,24 @@ jobs:
 
           access = policies["github-apply-dev-access.json.tftpl"]["Statement"]
           api = next(s for s in access if s["Sid"] == "ApiGatewayManageApi")
-          if api["Resource"] != "arn:aws:apigateway:us-east-1::/apis/*":
-              raise SystemExit("API Gateway permissions must be restricted to API resource paths")
+          child = next(s for s in access if s["Sid"] == "ApiGatewayManageChildResources")
+          create_child = next(s for s in access if s["Sid"] == "ApiGatewayCreateChildResources")
+          exact_api = "arn:aws:apigateway:us-east-1::/apis/a1b2c3d4e5"
+          if api["Resource"] != exact_api:
+              raise SystemExit("API Gateway parent API permissions must use the exact imported API ID")
+          if child["Resource"] != exact_api + "/*" or create_child["Resource"] != exact_api + "/*":
+              raise SystemExit("API Gateway child permissions must use the exact imported API ID")
+          if api["Condition"]["StringEquals"] != {"aws:ResourceTag/Project": "attendance", "aws:ResourceTag/Environment": "dev"}:
+              raise SystemExit("Dev API Gateway parent updates must require project/environment tags")
+
+          bootstrap_cf = policies["github-apply-dev-cloudfront-bootstrap.json.tftpl"]["Statement"]
+          if not bootstrap_cf or any(not str(action).startswith("cloudfront:Create") for statement in bootstrap_cf for action in (statement["Action"] if isinstance(statement["Action"], list) else [statement["Action"]])):
+              raise SystemExit("Temporary dev CloudFront bootstrap policy must grant create-only actions")
+          for sid in ("CloudFrontOAC", "CloudFrontCachePolicies", "CloudFrontOriginPolicies", "CloudFrontResponsePolicies"):
+              statement = next(s for s in access if s["Sid"] == sid)
+              actions = statement["Action"] if isinstance(statement["Action"], list) else [statement["Action"]]
+              if any(action.startswith(("cloudfront:Update", "cloudfront:Delete")) for action in actions):
+                  raise SystemExit(f"Permanent dev policy must not broadly update/delete {sid}")
           PY
 
       - name: Validate prod apply-role IAM policy templates
@@ -428,6 +454,7 @@ jobs:
               "github-apply-prod-iam.json.tftpl",
               "github-apply-prod-foundation.json.tftpl",
               "github-apply-prod-access.json.tftpl",
+              "github-apply-prod-cloudfront-bootstrap.json.tftpl",
               "github-apply-prod-state.json.tftpl",
               "github-apply-prod-dynamodb-kms.json.tftpl",
           )
