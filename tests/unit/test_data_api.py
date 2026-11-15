@@ -124,6 +124,7 @@ def test_employee_public_response_hides_internal_enrollment_metadata(data_tables
         admin_event("GET", employee_id="EMP002"), None
     )
     item = json.loads(detail["body"])
+    assert item["has_face_templates"] is True
     assert "face_ids" not in item
     assert "enrollment_lock_request" not in item
     assert "enrollment_lock_until" not in item
