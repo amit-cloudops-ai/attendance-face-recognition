@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Attendance</title><link rel="stylesheet" href="style.css"></head><body>
+<header><b>Attendance</b><button class="ghost" id="out" hidden>Sign out</button></header>
+<main><div class="panel"><h2 id="t">Signing you in…</h2><p id="p"></p><div id="links" class="row"></div></div></main>
+<script type="module">
+import {handleCallback, user, login, logout} from './common.js';
+const $ = id => document.getElementById(id);
+try {
+  if (await handleCallback()) throw 0;
+  const u = user();
+  if (!u) { $('t').textContent = 'Welcome'; $('p').textContent = 'Sign in to continue.'; $('links').innerHTML = '<button id="in">Sign in</button>'; $('in').onclick = () => login('/index.html'); }
+  else {
+    $('t').textContent = 'Signed in as ' + u.email; $('out').hidden = false; $('out').onclick = logout;
+    const l = [];
+    if (u.groups.some(g => ['kiosk','admin'].includes(g))) l.push('<a class="btn" href="kiosk.html">Open kiosk</a>');
+    if (u.groups.includes('admin')) l.push('<a class="btn" href="admin.html">Open admin</a>');
+    $('links').innerHTML = l.join('') || '<div class="msg warn">No access yet. Ask an administrator to add you to the admin or kiosk group.</div>';
+  }
+} catch (e) { if (e) { $('t').textContent = 'Sign-in problem'; $('p').textContent = e.message; $('links').innerHTML = '<a class="btn" href="index.html">Try again</a>'; } }
+</script></body></html>

@@ -1,0 +1,25 @@
+:root{--bg:#f3f5f4;--ink:#16221e;--mut:#5d6b66;--line:#d5dcd8;--card:#fff;--brand:#0f6b57;--brand-d:#0a4f40;--ok:#0f6b57;--warn:#9a5b00;--bad:#a32626;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#101815;--ink:#e8f0ec;--mut:#9db0a8;--line:#2a3833;--card:#17221e;--brand:#3cc7a3;--brand-d:#7fe0c6;--ok:#3cc7a3;--warn:#e0a84a;--bad:#f08080;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+header b{font-size:18px}main{max-width:1000px;margin:0 auto;padding:20px}
+h2{margin:0 0 12px}
+button,.btn{background:var(--brand);color:#fff;border:0;border-radius:6px;padding:10px 16px;font:inherit;cursor:pointer;text-decoration:none;display:inline-block}
+@media(prefers-color-scheme:dark){button,.btn{color:#06130f}}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--brand-d);outline-offset:2px}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);max-width:100%}
+label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--mut)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:14px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}.tabs button[aria-selected=true]{background:var(--brand);color:#fff}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.msg{padding:10px 12px;border-radius:6px;margin:10px 0;border:1px solid var(--line)}
+.msg.ok{color:var(--ok)}.msg.warn{color:var(--warn)}.msg.bad{color:var(--bad)}
+.kiosk{display:grid;place-items:center;min-height:calc(100vh - 60px);text-align:center;padding:16px}
+video{width:min(92vw,560px);border-radius:10px;background:#000;transform:scaleX(-1)}
+#result{font-size:clamp(22px,4vw,34px);margin:16px 0;min-height:2.6em;font-weight:600}
+[hidden]{display:none!important}
