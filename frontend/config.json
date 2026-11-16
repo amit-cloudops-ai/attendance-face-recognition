@@ -1,0 +1,5 @@
+{
+  "apiBase": "https://REPLACE_API_ID.execute-api.ap-south-1.amazonaws.com",
+  "cognitoDomain": "https://REPLACE_PREFIX.auth.ap-south-1.amazoncognito.com",
+  "clientId": "REPLACE_CLIENT_ID"
+}

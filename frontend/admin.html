@@ -1,0 +1,94 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin</title><link rel="stylesheet" href="style.css"></head><body>
+<header><b>Attendance admin</b><span><a href="index.html">Home</a> <button class="ghost" id="out">Sign out</button></span></header>
+<main>
+<div class="tabs" role="tablist"><button data-t="emp" aria-selected="true">Employees</button><button data-t="att" aria-selected="false">Attendance</button><button data-t="rep" aria-selected="false">Reports</button></div>
+<div id="note" role="status"></div>
+
+<section id="emp">
+ <div class="panel"><h2>Add employee</h2>
+  <div class="row">
+   <label>Employee ID<input id="e_id" pattern="[A-Z0-9_-]{3,20}" placeholder="EMP001"></label>
+   <label>Name<input id="e_name"></label><label>Email<input id="e_email" type="email"></label>
+   <label>Department<input id="e_dept"></label>
+   <label>Shift start<input id="e_ss" type="time" value="09:00"></label><label>Shift end<input id="e_se" type="time" value="18:00"></label>
+  </div>
+  <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="e_consent"> Employee has given consent for face recognition</label>
+  <p><button id="e_add">Add employee</button></p></div>
+ <div class="panel"><h2>Employees</h2><div class="tablewrap"><table><thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Status</th><th>Photos</th><th>Actions</th></tr></thead><tbody id="e_rows"></tbody></table></div></div>
+ <input type="file" id="photo" accept="image/jpeg" hidden>
+</section>
+
+<section id="att" hidden><div class="panel"><h2>Attendance</h2>
+ <div class="row"><label>From<input type="date" id="a_from"></label><label>To<input type="date" id="a_to"></label>
+ <label>Employee ID<input id="a_emp"></label>
+ <label>Status<select id="a_st"><option value="">All</option><option>present</option><option>late</option><option>absent</option></select></label>
+ <button id="a_go">Search</button></div>
+ <div class="tablewrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Clock in</th><th>Clock out</th><th>Status</th></tr></thead><tbody id="a_rows"></tbody></table></div>
+ <p><button class="ghost" id="a_prev" disabled>Previous</button> <button class="ghost" id="a_next" disabled>Next</button></p></div></section>
+
+<section id="rep" hidden><div class="panel"><h2>Reports</h2>
+ <div class="row"><label>Period<select id="r_per"><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label>
+ <label>Date<input type="date" id="r_date"></label><button id="r_go">Generate report</button></div>
+ <pre id="r_sum" style="white-space:pre-wrap"></pre><p id="r_dl"></p></div></section>
+</main>
+<script type="module">
+import {requireGroup, api, s3Upload, pollResult, presignOf, esc, logout} from './common.js';
+const $ = id => document.getElementById(id);
+const ENROL = {unknown_employee:'Employee not found.', limit_reached:'This employee already has the maximum number of photos.', duplicate_face:'This face is already enrolled for someone else.', no_face:'No face found in that photo.', multiple_faces:'More than one face in that photo.', low_quality:'Photo quality is too low. Use a clear, well-lit photo.', error:'Enrolment failed. Please try again.'};
+const note = (cls, t) => { $('note').innerHTML = t ? `<div class="msg ${cls}">${esc(t)}</div>` : ''; };
+const run = async fn => { try { await fn(); } catch (e) { note('bad', e.message); } };
+$('out').onclick = logout;
+if (await requireGroup(['admin'], '/admin.html')) {
+  document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+    ['emp','att','rep'].forEach(s => $(s).hidden = s !== b.dataset.t); note('', '');
+  });
+  // ---- Employees
+  let enrolId = null;
+  const loadEmp = () => run(async () => {
+    const d = await api('/api/admin/employees'), rows = d.items || d.employees || [];
+    $('e_rows').innerHTML = rows.map(e => `<tr><td>${esc(e.employee_id)}</td><td>${esc(e.name)}</td><td>${esc(e.department)}</td><td>${e.active ? 'Active' : 'Inactive'}</td><td>${esc(e.photo_count ?? 0)}</td>
+      <td><button data-act="enrol" data-id="${esc(e.employee_id)}">Add photo</button> <button class="ghost" data-act="del" data-id="${esc(e.employee_id)}">Delete faces</button></td></tr>`).join('') || '<tr><td colspan="6">No employees yet. Add your first employee above.</td></tr>';
+  });
+  $('e_add').onclick = () => run(async () => {
+    if (!$('e_consent').checked) return note('warn', 'Consent is required before adding an employee.');
+    await api('/api/admin/employees', {method:'POST', body:{employee_id:$('e_id').value.trim().toUpperCase(), name:$('e_name').value.trim(), email:$('e_email').value.trim(), department:$('e_dept').value.trim(), shift_start:$('e_ss').value, shift_end:$('e_se').value, consent:true}});
+    note('ok', 'Employee added. Use "Add photo" to enrol their face.'); loadEmp();
+  });
+  $('e_rows').onclick = ev => {
+    const b = ev.target.closest('button'); if (!b) return; const id = b.dataset.id;
+    if (b.dataset.act === 'enrol') { enrolId = id; $('photo').click(); }
+    if (b.dataset.act === 'del' && confirm(`Delete all stored face data for ${id}? Attendance history is kept.`)) run(async () => { await api(`/api/admin/employees/${encodeURIComponent(id)}/faces`, {method:'DELETE'}); note('ok', 'Face data deleted.'); loadEmp(); });
+  };
+  $('photo').onchange = () => run(async () => {
+    const f = $('photo').files[0]; $('photo').value = ''; if (!f) return;
+    note('warn', 'Uploading photo…');
+    const d = await api(`/api/admin/employees/${encodeURIComponent(enrolId)}/enroll-url`, {method:'POST'});
+    await s3Upload(presignOf(d), f);
+    const r = await pollResult(d.request_id);
+    r.code === 'enrolled' || r.code === 'matched' || r.status === 'enrolled' ? note('ok', 'Photo enrolled.') : note('bad', ENROL[r.code] || r.message || ENROL.error);
+    loadEmp();
+  });
+  // ---- Attendance (cursor pagination; keeps a stack of tokens for Previous)
+  let cursors = [null], page = 0, nextTok = null;
+  const loadAtt = () => run(async () => {
+    const d = await api('/api/admin/attendance', {query:{from:$('a_from').value, to:$('a_to').value, employee_id:$('a_emp').value.trim(), status:$('a_st').value, limit:25, next_token:cursors[page]}});
+    nextTok = d.next_token || null;
+    $('a_rows').innerHTML = (d.items || []).map(r => `<tr><td>${esc(r.date)}</td><td>${esc(r.employee_id)}</td><td>${esc((r.clock_in||'').slice(11,16))}</td><td>${esc((r.clock_out||'').slice(11,16))}</td><td>${esc(r.status)}</td></tr>`).join('') || '<tr><td colspan="5">No records match these filters.</td></tr>';
+    $('a_prev').disabled = page === 0; $('a_next').disabled = !nextTok;
+  });
+  $('a_go').onclick = () => { cursors = [null]; page = 0; loadAtt(); };
+  $('a_next').onclick = () => { cursors[++page] = nextTok; loadAtt(); };
+  $('a_prev').onclick = () => { page--; loadAtt(); };
+  // ---- Reports
+  $('r_go').onclick = () => run(async () => {
+    const d = await api('/api/admin/reports', {query:{period:$('r_per').value, date:$('r_date').value}});
+    $('r_sum').textContent = JSON.stringify(d.summary ?? {}, null, 2);
+    $('r_dl').innerHTML = d.csv_url ? `<a class="btn" href="${esc(d.csv_url)}">Download CSV</a>` : '';
+  });
+  const today = new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'});
+  $('a_from').value = $('a_to').value = $('r_date').value = today;
+  loadEmp();
+}
+</script></body></html>

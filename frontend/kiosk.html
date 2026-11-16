@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kiosk</title><link rel="stylesheet" href="style.css"></head><body>
+<header><b>Attendance kiosk</b><a href="index.html">Home</a></header>
+<div class="kiosk"><div>
+<video id="v" autoplay playsinline muted aria-label="Camera preview"></video>
+<div id="result" role="status" aria-live="polite">Allow camera access to begin.</div>
+<button id="scan" disabled>Scan my face</button>
+</div></div>
+<script type="module">
+import {requireGroup, api, s3Upload, pollResult, presignOf} from './common.js';
+const $ = id => document.getElementById(id);
+const MSG = {
+  no_match:['bad','We could not recognise you. Look straight at the camera and try again, or ask HR.'],
+  no_face:['warn','No face found. Stand closer and face the camera.'],
+  multiple_faces:['warn','More than one face detected. Please scan one person at a time.'],
+  low_quality:['warn','The photo was unclear. Improve the lighting and hold still.'],
+  inactive:['bad','This employee account is inactive. Please contact HR.'],
+  error:['bad','Something went wrong. Please try again in a moment.']};
+function show(cls, text) { const r = $('result'); r.textContent = text; r.className = cls; r.style.color = `var(--${cls === 'ok' ? 'ok' : cls === 'warn' ? 'warn' : 'bad'})`; }
+if (await requireGroup(['kiosk','admin'], '/kiosk.html')) {
+  try {
+    $('v').srcObject = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:1280}}});
+    $('scan').disabled = false; $('result').textContent = 'Ready. Press Scan when you are in front of the camera.';
+  } catch { show('bad', 'Camera access was blocked. Allow the camera in your browser settings and reload.'); }
+  $('scan').onclick = async () => {
+    const b = $('scan'); b.disabled = true; show('warn', 'Scanning…');
+    try {
+      const v = $('v'), c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
+      c.getContext('2d').drawImage(v, 0, 0);
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+      const d = await api('/api/kiosk/upload-url', {method:'POST'});
+      await s3Upload(presignOf(d), blob);
+      const res = await pollResult(d.request_id);
+      if (res.code === 'matched') show('ok', res.message || `Welcome, ${res.name}. ${res.action === 'clock_out' ? 'Clocked out' : 'Clocked in'} at ${(res.time || '').slice(11,16)}.`);
+      else show(...(MSG[res.code] || MSG.error));
+    } catch (e) { show('bad', e.message || MSG.error[1]); }
+    setTimeout(() => { b.disabled = false; }, 3000);
+  };
+}
+</script></body></html>
