@@ -1,6 +1,6 @@
 # Versions resolved and validated by GitHub Actions on 15 Nov 2026.
 # Keep the direct tools and their transitive test dependencies pinned together.
-boto3==1.44.3
+boto3==1.44.6
 botocore==1.44.3
 certifi==2026.10.23
 cffi==2.1.1
