@@ -17,6 +17,16 @@ A serverless employee-attendance platform built on AWS. Employees use a browser-
 
 The repository contains the application, infrastructure-as-code, automated tests, operational runbooks and release evidence. It is designed around a static-first browser frontend and event-driven AWS services.
 
+## F13 Technologies Internship Context
+
+**Internship:** AWS Cloud Intern (Cloud Engineering) · F13 Technologies · September 2026 – Present  
+**Project sequence:** Project 2 of 3  
+**Collaboration:** Developed collaboratively with the F13 Technologies intern team.
+
+This was the second major project undertaken during my F13 Technologies internship. I contributed as part of the team building an AWS-hosted, serverless attendance platform, combining cloud infrastructure, application services, identity and access controls, biometric recognition, scheduled reporting and operational safeguards.
+
+The repository documents the shared system architecture, implementation, tests, deployment and acceptance evidence. It should be understood as a team-delivered internship project; individual ownership should be attributed only where supported by the repository's commit history, pull requests and work records.
+
 > **Release transparency:** The production environment is deployed. Core workflows have been operator-confirmed, including employee enrollment, kiosk recognition and daily/weekly report generation. Some operational and security acceptance evidence remains open; see [Production status](docs/STATUS.md). A deployed system should not be described as fully release-complete until every required evidence gate is closed.
 
 ## Live application
